@@ -49,5 +49,12 @@
   "languageChinese": "简体中文",
   "about": "关于",
   "version": "版本",
-  "appDescription": "专业的英语听力练习应用"
+  "appDescription": "专业的英语听力练习应用",
+  "enableLoop": "启用循环",
+  "loopSettings": "循环设置",
+  "displaySettings": "显示设置",
+  "showTranscript": "显示字幕",
+  "shortcutKey": "快捷键",
+  "seconds": "秒",
+  "infinite": "无限"
 }

@@ -66,10 +66,7 @@ class ListenMasterApp extends StatelessWidget {
             darkTheme: _buildDarkTheme(),
             themeMode: settings.themeMode,
             locale: settings.locale,
-            supportedLocales: const [
-              Locale('en'),
-              Locale('zh'),
-            ],
+            supportedLocales: const [Locale('en'), Locale('zh')],
             localizationsDelegates: const [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
@@ -110,7 +107,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWideScreen = constraints.maxWidth > 600;
@@ -119,32 +116,44 @@ class _MainScreenState extends State<MainScreen> {
           body: Row(
             children: [
               if (isWideScreen)
-                NavigationRail(
-                  extended: constraints.maxWidth >= 800,
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (index) {
-                    setState(() {
-                      _selectedIndex = index;
-                    });
-                  },
-                  destinations: [
-                    NavigationRailDestination(
-                      icon: const Icon(Icons.library_music),
-                      label: Text(l10n.library),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    border: Border(
+                      right: BorderSide(
+                        color: Theme.of(context).dividerColor,
+                        width: 1,
+                      ),
                     ),
-                    NavigationRailDestination(
-                      icon: const Icon(Icons.play_circle),
-                      label: Text(l10n.player),
-                    ),
-                    NavigationRailDestination(
-                      icon: const Icon(Icons.account_circle),
-                      label: Text(l10n.account),
-                    ),
-                  ],
+                  ),
+                  child: NavigationRail(
+                    extended: constraints.maxWidth >= 800,
+                    selectedIndex: _selectedIndex,
+                    backgroundColor: Colors.transparent,
+                    onDestinationSelected: (index) {
+                      setState(() {
+                        _selectedIndex = index;
+                      });
+                    },
+                    destinations: [
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.library_music),
+                        label: Text(l10n.library),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.play_circle),
+                        label: Text(l10n.player),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.account_circle),
+                        label: Text(l10n.account),
+                      ),
+                    ],
+                  ),
                 ),
-              Expanded(
-                child: _getSelectedScreen(),
-              ),
+              Expanded(child: _getSelectedScreen()),
             ],
           ),
           bottomNavigationBar: isWideScreen

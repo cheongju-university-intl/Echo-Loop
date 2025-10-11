@@ -131,6 +131,12 @@ class PlayerProvider extends ChangeNotifier {
         _bookmarkedIndices = {};
       }
 
+      // Set initial sentence to first sentence if available
+      if (_sentences.isNotEmpty) {
+        _currentSentenceIndex = 0;
+        await _audioPlayer.seek(_sentences[0].startTime);
+      }
+
     } catch (e) {
       print('Error loading audio: $e');
       _currentAudioItem = null;
@@ -154,16 +160,18 @@ class PlayerProvider extends ChangeNotifier {
         await playSentence(_currentSentenceIndex!);
       }
     } else if (_settings.mode == PlaybackMode.bookmarkedOnly) {
-      // If in bookmarked mode, only play bookmarked sentences
+      // Play bookmarked sentences with per-sentence control so loop/pause work
       final bookmarked = bookmarkedSentences;
       if (bookmarked.isEmpty) return;
       
-      // If no sentence selected or current isn't bookmarked, go to first bookmark
-      if (_currentSentenceIndex == null || 
+      int targetIndex;
+      if (_currentSentenceIndex == null ||
           !_bookmarkedIndices.contains(_currentSentenceIndex)) {
-        await seek(bookmarked.first.startTime);
+        targetIndex = bookmarked.first.index;
+      } else {
+        targetIndex = _currentSentenceIndex!;
       }
-      await _audioPlayer.play();
+      await playSentence(targetIndex);
     } else {
       await _audioPlayer.play();
     }
@@ -206,30 +214,48 @@ class PlayerProvider extends ChangeNotifier {
     _sentenceEndTimer?.cancel();
     
     // Schedule pause at sentence end
-    final duration = sentence.duration;
+    // Adjust for current playback speed so the timer fires when audio reaches the end
+    final speed = _audioPlayer.speed == 0 ? 1.0 : _audioPlayer.speed;
+    final scaledMs = (sentence.duration.inMilliseconds / speed).round();
+    final duration = Duration(milliseconds: scaledMs);
     _sentenceEndTimer = Timer(duration, () async {
       if (!_isDisposed && _audioPlayer.playing && _currentSentenceIndex == index) {
         await _audioPlayer.pause();
-        _handleSentenceCompleted();
+        await _handleSentenceCompleted();
       }
     });
   }
 
-  void _handleSentenceCompleted() {
-    if (_isDisposed || !_settings.loopEnabled) return;
+  Future<void> _handleSentenceCompleted() async {
+    if (_isDisposed) return;
 
-    _currentLoopCount++;
+    // Check if we should loop this sentence
+    if (_settings.loopEnabled) {
+      _currentLoopCount++;
+      
+      // loopCount is clamped to 1-20; no infinite loop support
+      final shouldLoop = _currentLoopCount < _settings.loopCount;
+      
+      if (shouldLoop && _currentSentenceIndex != null) {
+        _pauseTimer?.cancel();
+        _pauseTimer = Timer(_settings.pauseInterval, () async {
+          if (!_isDisposed) {
+            await _playSentenceInternal(_currentSentenceIndex!);
+          }
+        });
+        return;
+      }
+    }
     
-    final shouldLoop = _settings.loopCount == 0 || 
-                      _currentLoopCount < _settings.loopCount;
-    
-    if (shouldLoop && _currentSentenceIndex != null) {
-      _pauseTimer?.cancel();
-      _pauseTimer = Timer(_settings.pauseInterval, () {
-        if (!_isDisposed) {
-          _playSentenceInternal(_currentSentenceIndex!);
-        }
-      });
+    // Loop not enabled or loop completed
+    // In single sentence/bookmarked mode, move to next sentence and auto-play
+    if (_settings.mode == PlaybackMode.singleSentence ||
+        _settings.mode == PlaybackMode.bookmarkedOnly) {
+      _currentLoopCount = 0;
+      await nextSentence();
+      if (_currentSentenceIndex != null) {
+        await _playSentenceInternal(_currentSentenceIndex!);
+      }
     }
   }
 
@@ -239,8 +265,8 @@ class PlayerProvider extends ChangeNotifier {
     if (_settings.mode == PlaybackMode.fullArticle && _settings.loopEnabled) {
       _currentLoopCount++;
       
-      final shouldLoop = _settings.loopCount == 0 || 
-                        _currentLoopCount < _settings.loopCount;
+      // loopCount is clamped to 1-20; no infinite loop support
+      final shouldLoop = _currentLoopCount < _settings.loopCount;
       
       if (shouldLoop) {
         _pauseTimer?.cancel();
@@ -274,11 +300,10 @@ class PlayerProvider extends ChangeNotifier {
       }
     }
 
-    if (_settings.mode == PlaybackMode.singleSentence) {
-      await playSentence(nextIndex);
-    } else {
-      await seek(_sentences[nextIndex].startTime);
-    }
+    // Just seek, don't auto-play
+    _currentSentenceIndex = nextIndex;
+    await seek(_sentences[nextIndex].startTime);
+    notifyListeners();
   }
 
   Future<void> previousSentence() async {
@@ -301,11 +326,10 @@ class PlayerProvider extends ChangeNotifier {
       }
     }
 
-    if (_settings.mode == PlaybackMode.singleSentence) {
-      await playSentence(prevIndex);
-    } else {
-      await seek(_sentences[prevIndex].startTime);
-    }
+    // Just seek, don't auto-play
+    _currentSentenceIndex = prevIndex;
+    await seek(_sentences[prevIndex].startTime);
+    notifyListeners();
   }
 
   List<Sentence> _getTargetSentences() {

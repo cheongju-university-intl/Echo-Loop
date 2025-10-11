@@ -159,4 +159,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appDescription => '专业的英语听力练习应用';
+
+  @override
+  String get enableLoop => '启用循环';
+
+  @override
+  String get loopSettings => '循环设置';
+
+  @override
+  String get displaySettings => '显示设置';
+
+  @override
+  String get showTranscript => '显示字幕';
+
+  @override
+  String get shortcutKey => '快捷键';
+
+  @override
+  String get seconds => '秒';
+
+  @override
+  String get infinite => '无限';
 }

@@ -56,5 +56,12 @@
   "languageChinese": "简体中文",
   "about": "About",
   "version": "Version",
-  "appDescription": "Professional English listening practice app"
+  "appDescription": "Professional English listening practice app",
+  "enableLoop": "Enable Loop",
+  "loopSettings": "Loop Settings",
+  "displaySettings": "Display Settings",
+  "showTranscript": "Show Transcript",
+  "shortcutKey": "Shortcut",
+  "seconds": "seconds",
+  "infinite": "∞"
 }

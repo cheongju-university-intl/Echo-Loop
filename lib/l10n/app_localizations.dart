@@ -397,6 +397,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Professional English listening practice app'**
   String get appDescription;
+
+  /// No description provided for @enableLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Loop'**
+  String get enableLoop;
+
+  /// No description provided for @loopSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop Settings'**
+  String get loopSettings;
+
+  /// No description provided for @displaySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Display Settings'**
+  String get displaySettings;
+
+  /// No description provided for @showTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Transcript'**
+  String get showTranscript;
+
+  /// No description provided for @shortcutKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcut'**
+  String get shortcutKey;
+
+  /// No description provided for @seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'seconds'**
+  String get seconds;
+
+  /// No description provided for @infinite.
+  ///
+  /// In en, this message translates to:
+  /// **'∞'**
+  String get infinite;
 }
 
 class _AppLocalizationsDelegate

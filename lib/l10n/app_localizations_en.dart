@@ -159,4 +159,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appDescription => 'Professional English listening practice app';
+
+  @override
+  String get enableLoop => 'Enable Loop';
+
+  @override
+  String get loopSettings => 'Loop Settings';
+
+  @override
+  String get displaySettings => 'Display Settings';
+
+  @override
+  String get showTranscript => 'Show Transcript';
+
+  @override
+  String get shortcutKey => 'Shortcut';
+
+  @override
+  String get seconds => 'seconds';
+
+  @override
+  String get infinite => '∞';
 }

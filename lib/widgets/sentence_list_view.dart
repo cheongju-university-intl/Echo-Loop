@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/sentence.dart';
 import '../services/subtitle_parser.dart';
@@ -8,6 +9,7 @@ class SentenceListView extends StatefulWidget {
   final Set<int> bookmarkedIndices;
   final Function(int) onSentenceTap;
   final Function(int) onBookmarkToggle;
+  final bool showTranscript;
 
   const SentenceListView({
     super.key,
@@ -16,6 +18,7 @@ class SentenceListView extends StatefulWidget {
     required this.bookmarkedIndices,
     required this.onSentenceTap,
     required this.onBookmarkToggle,
+    this.showTranscript = true,
   });
 
   @override
@@ -73,6 +76,7 @@ class _SentenceListViewState extends State<SentenceListView> {
           sentence: sentence,
           isCurrent: isCurrent,
           isBookmarked: isBookmarked,
+          showTranscript: widget.showTranscript,
           onTap: () => widget.onSentenceTap(sentence.index),
           onBookmarkToggle: () => widget.onBookmarkToggle(sentence.index),
         );
@@ -91,6 +95,7 @@ class _SentenceTile extends StatelessWidget {
   final Sentence sentence;
   final bool isCurrent;
   final bool isBookmarked;
+  final bool showTranscript;
   final VoidCallback onTap;
   final VoidCallback onBookmarkToggle;
 
@@ -99,6 +104,7 @@ class _SentenceTile extends StatelessWidget {
     required this.sentence,
     required this.isCurrent,
     required this.isBookmarked,
+    required this.showTranscript,
     required this.onTap,
     required this.onBookmarkToggle,
   });
@@ -148,13 +154,29 @@ class _SentenceTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      sentence.text,
-                      style: TextStyle(
-                        fontSize: 16,
-                        height: 1.5,
-                        fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                      ),
+                    Stack(
+                      children: [
+                        Text(
+                          sentence.text,
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                            fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        if (!showTranscript)
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                                child: Container(
+                                  color: Colors.grey.withValues(alpha: 0.1),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
