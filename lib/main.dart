@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'providers/audio_library_provider.dart';
 import 'providers/player_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/library_screen.dart';
 import 'screens/player_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,46 +17,71 @@ void main() {
 class ListenMasterApp extends StatelessWidget {
   const ListenMasterApp({super.key});
 
+  ThemeData _buildLightTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF2196F3),
+        brightness: Brightness.light,
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  ThemeData _buildDarkTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF2196F3),
+        brightness: Brightness.dark,
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AudioLibraryProvider()),
         ChangeNotifierProvider(create: (_) => PlayerProvider()),
       ],
-      child: MaterialApp(
-        title: 'Listen Master',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-            ),
-          ),
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-            ),
-          ),
-        ),
-        themeMode: ThemeMode.system,
-        home: const MainScreen(),
-        routes: {
-          '/player': (context) => const PlayerScreen(),
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, child) {
+          return MaterialApp(
+            title: 'Listen Master',
+            debugShowCheckedModeBanner: false,
+            theme: _buildLightTheme(),
+            darkTheme: _buildDarkTheme(),
+            themeMode: settings.themeMode,
+            locale: settings.locale,
+            supportedLocales: const [
+              Locale('en'),
+              Locale('zh'),
+            ],
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: const MainScreen(),
+            routes: {
+              '/player': (context) => const PlayerScreen(),
+              '/settings': (context) => const SettingsScreen(),
+            },
+          );
         },
       ),
     );
@@ -80,6 +109,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWideScreen = constraints.maxWidth > 600;
@@ -96,14 +127,18 @@ class _MainScreenState extends State<MainScreen> {
                       _selectedIndex = index;
                     });
                   },
-                  destinations: const [
+                  destinations: [
                     NavigationRailDestination(
-                      icon: Icon(Icons.library_music),
-                      label: Text('Library'),
+                      icon: const Icon(Icons.library_music),
+                      label: Text(l10n.library),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.play_circle),
-                      label: Text('Player'),
+                      icon: const Icon(Icons.play_circle),
+                      label: Text(l10n.player),
+                    ),
+                    NavigationRailDestination(
+                      icon: const Icon(Icons.account_circle),
+                      label: Text(l10n.account),
                     ),
                   ],
                 ),
@@ -121,14 +156,18 @@ class _MainScreenState extends State<MainScreen> {
                       _selectedIndex = index;
                     });
                   },
-                  destinations: const [
+                  destinations: [
                     NavigationDestination(
-                      icon: Icon(Icons.library_music),
-                      label: 'Library',
+                      icon: const Icon(Icons.library_music),
+                      label: l10n.library,
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.play_circle),
-                      label: 'Player',
+                      icon: const Icon(Icons.play_circle),
+                      label: l10n.player,
+                    ),
+                    NavigationDestination(
+                      icon: const Icon(Icons.account_circle),
+                      label: l10n.account,
                     ),
                   ],
                 ),
@@ -143,6 +182,8 @@ class _MainScreenState extends State<MainScreen> {
         return const LibraryScreen();
       case 1:
         return const PlayerScreen();
+      case 2:
+        return const SettingsScreen();
       default:
         return const LibraryScreen();
     }
