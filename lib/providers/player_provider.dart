@@ -206,9 +206,12 @@ class PlayerProvider extends ChangeNotifier {
       _currentFullIndex = null;
       _currentBookmarkIndex = null;
 
+      print("loadAudio: ${audioItem.name}");
       // Load audio
       try {
-        await _audioPlayer.setFilePath(audioItem.audioPath);
+        // 使用动态获取的完整路径
+        final fullAudioPath = await audioItem.getFullAudioPath();
+        await _audioPlayer.setFilePath(fullAudioPath);
         await _audioPlayer.setSpeed(_settings.playbackSpeed);
 
         // 获取完整音频时长
@@ -228,9 +231,11 @@ class PlayerProvider extends ChangeNotifier {
       // Load transcript if available
       if (audioItem.hasTranscript) {
         try {
-          _sentences = await SubtitleParser.parseSubtitle(
-            audioItem.transcriptPath!,
-          );
+          // 使用动态获取的完整路径
+          final fullTranscriptPath = await audioItem.getFullTranscriptPath();
+          if (fullTranscriptPath != null) {
+            _sentences = await SubtitleParser.parseSubtitle(fullTranscriptPath);
+          }
         } catch (e) {
           print('Error loading transcript: $e');
         }

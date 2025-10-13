@@ -166,7 +166,23 @@ class _AudioListTile extends StatelessWidget {
             ),
           ],
         ),
-        onTap: () {
+        onTap: () async {
+          // 验证音频文件是否存在（使用相对路径动态获取完整路径）
+          final fullAudioPath = await audioItem.getFullAudioPath();
+          final audioFile = File(fullAudioPath);
+          if (!await audioFile.exists()) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Audio file not found. The file may have been deleted.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+            // 从库中移除无效条目
+            context.read<AudioLibraryProvider>().removeAudioItem(audioItem.id);
+            return;
+          }
+          
           context.read<PlayerProvider>().loadAudio(audioItem);
           Navigator.pushNamed(context, '/player');
         },
@@ -313,30 +329,13 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.single;
-        if (Platform.isIOS) {
-          final dest = await _savePickedFileToSandbox(file, 'audios');
-          if (!mounted) return;
-          setState(() {
-            _audioPath = dest;
-            _audioName = path.basenameWithoutExtension(dest);
-          });
-        } else {
-          final pickedPath = file.path;
-          if (pickedPath != null) {
-            if (!mounted) return;
-            setState(() {
-              _audioPath = pickedPath;
-              _audioName = path.basenameWithoutExtension(_audioPath!);
-            });
-          } else {
-            final dest = await _savePickedFileToSandbox(file, 'audios');
-            if (!mounted) return;
-            setState(() {
-              _audioPath = dest;
-              _audioName = path.basenameWithoutExtension(dest);
-            });
-          }
-        }
+        // 所有平台统一复制文件到应用沙盒，确保应用重装后仍可访问
+        final dest = await _savePickedFileToSandbox(file, 'audios');
+        if (!mounted) return;
+        setState(() {
+          _audioPath = dest;
+          _audioName = path.basenameWithoutExtension(dest);
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -373,27 +372,12 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.single;
-        if (Platform.isIOS) {
-          final dest = await _savePickedFileToSandbox(file, 'transcripts');
-          if (!mounted) return;
-          setState(() {
-            _transcriptPath = dest;
-          });
-        } else {
-          final pickedPath = file.path;
-          if (pickedPath != null) {
-            if (!mounted) return;
-            setState(() {
-              _transcriptPath = pickedPath;
-            });
-          } else {
-            final dest = await _savePickedFileToSandbox(file, 'transcripts');
-            if (!mounted) return;
-            setState(() {
-              _transcriptPath = dest;
-            });
-          }
-        }
+        // 所有平台统一复制文件到应用沙盒，确保应用重装后仍可访问
+        final dest = await _savePickedFileToSandbox(file, 'transcripts');
+        if (!mounted) return;
+        setState(() {
+          _transcriptPath = dest;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -414,6 +398,7 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
     }
   }
 
+  /// 保存文件到应用沙盒，返回相对于Documents目录的相对路径
   Future<String> _savePickedFileToSandbox(
     PlatformFile file,
     String subdir,
@@ -429,9 +414,9 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
         : (file.path != null ? path.basename(file.path!) : 'file');
     final destPath = path.join(dir.path, baseName);
 
-    // 如果文件已存在，直接返回现有文件路径，不做任何操作
+    // 如果文件已存在，直接返回相对路径
     if (await File(destPath).exists()) {
-      return destPath;
+      return path.join(subdir, baseName); // 返回相对路径
     }
 
     // 文件不存在，复制到沙盒
@@ -447,7 +432,8 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
       throw Exception('Unable to access picked file');
     }
 
-    return destPath;
+    // 返回相对路径（相对于Documents目录）
+    return path.join(subdir, baseName);
   }
 
   Future<void> _addAudio() async {

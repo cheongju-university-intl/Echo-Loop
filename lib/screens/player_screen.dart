@@ -195,7 +195,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 非单句模式：展示所有句子列表
     if (player.currentFullIndex == null && player.sentences.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        player.selectFullSentence(0);
+        player.selectFullSentence(0, autoPlay: false);
       });
     }
     return SentenceListView(
@@ -266,7 +266,10 @@ class _PlayerScreenState extends State<PlayerScreen>
             !player.bookmarkedIndices.contains(player.currentBookmarkIndex)) &&
         bookmarkedSentences.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        player.selectBookmarkedSentence(bookmarkedSentences.first.index);
+        player.selectBookmarkedSentence(
+          bookmarkedSentences.first.index,
+          autoPlay: false,
+        );
       });
     }
     return SentenceListView(
