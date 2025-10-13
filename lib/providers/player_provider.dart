@@ -267,8 +267,11 @@ class PlayerProvider extends ChangeNotifier {
         await StorageService.saveBookmarks(audioItem.id, _bookmarkedIndices);
       }
 
-      // Set initial sentence to first sentence if available
-      if (_sentences.isNotEmpty) {
+      // 恢复之前保存的播放状态，如果没有则初始化为第一个句子
+      await _restorePlaybackState(audioItem);
+
+      // 如果没有恢复到有效状态，设置初始句子
+      if (_sentences.isNotEmpty && _currentFullIndex == null) {
         _currentFullIndex = 0;
         await _audioPlayer.seek(_sentences[0].startTime);
       }
@@ -828,6 +831,53 @@ class PlayerProvider extends ChangeNotifier {
   void setAutoScroll(bool enabled) {
     _autoScrollEnabled = enabled;
     notifyListeners();
+  }
+
+  /// 保存当前音频的播放状态
+  Future<void> saveCurrentPlaybackState() async {
+    if (_currentAudioItem == null) return;
+
+    final state = {
+      'position': _audioPlayer.position.inMilliseconds,
+      'currentFullIndex': _currentFullIndex,
+      'currentBookmarkIndex': _currentBookmarkIndex,
+      'playlistMode': _playlistMode.index,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    await StorageService.savePlaybackState(_currentAudioItem!.id, state);
+    print('Saved playback state for ${_currentAudioItem!.name}');
+  }
+
+  /// 恢复音频的播放状态
+  Future<void> _restorePlaybackState(AudioItem audioItem) async {
+    final state = await StorageService.loadPlaybackState(audioItem.id);
+    if (state == null) return;
+
+    try {
+      // 恢复播放模式
+      if (state['playlistMode'] != null) {
+        _playlistMode = PlaylistMode.values[state['playlistMode'] as int];
+      }
+
+      // 恢复索引
+      if (state['currentFullIndex'] != null) {
+        _currentFullIndex = state['currentFullIndex'] as int?;
+      }
+      if (state['currentBookmarkIndex'] != null) {
+        _currentBookmarkIndex = state['currentBookmarkIndex'] as int?;
+      }
+
+      // 恢复播放位置
+      if (state['position'] != null) {
+        final position = Duration(milliseconds: state['position'] as int);
+        await _audioPlayer.seek(position);
+      }
+
+      print('Restored playback state for ${audioItem.name}');
+    } catch (e) {
+      print('Error restoring playback state: $e');
+    }
   }
 
   @override

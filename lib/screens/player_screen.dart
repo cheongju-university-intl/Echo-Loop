@@ -22,6 +22,7 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  PlayerProvider? _cachedPlayerProvider; // 缓存 Provider 引用
 
   @override
   void initState() {
@@ -48,7 +49,20 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 缓存 Provider 引用，以便在 dispose 中安全使用
+    _cachedPlayerProvider = Provider.of<PlayerProvider>(context, listen: false);
+  }
+
+  @override
   void dispose() {
+    // 使用缓存的 Provider 引用，避免在 dispose 中访问 context
+    if (_cachedPlayerProvider != null) {
+      _cachedPlayerProvider!.pause();
+      _cachedPlayerProvider!.saveCurrentPlaybackState();
+    }
+    
     _tabController.dispose();
     super.dispose();
   }

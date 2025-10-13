@@ -69,4 +69,34 @@ class StorageService {
     final jsonString = json.encode(bookmarks.toList());
     await prefs.setString('$_bookmarksKey$audioId', jsonString);
   }
+
+  // Playback State for specific audio
+  static const String _playbackStateKey = 'playback_state_';
+
+  static Future<Map<String, dynamic>?> loadPlaybackState(String audioId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString('$_playbackStateKey$audioId');
+    if (jsonString == null) return null;
+
+    try {
+      return json.decode(jsonString) as Map<String, dynamic>;
+    } catch (e) {
+      print('Error loading playback state: $e');
+      return null;
+    }
+  }
+
+  static Future<void> savePlaybackState(
+    String audioId,
+    Map<String, dynamic> state,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = json.encode(state);
+    await prefs.setString('$_playbackStateKey$audioId', jsonString);
+  }
+
+  static Future<void> clearPlaybackState(String audioId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_playbackStateKey$audioId');
+  }
 }
