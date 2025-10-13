@@ -292,7 +292,7 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
   Future<void> _pickAudioFile() async {
     try {
       final FilePickerResult? result;
-      
+
       if (Platform.isIOS) {
         // iOS: 使用 custom 类型和明确的扩展名列表
         result = await FilePicker.platform.pickFiles(
@@ -340,9 +340,9 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('选择音频文件失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('选择音频文件失败: $e')));
       }
     }
   }
@@ -350,12 +350,13 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
   Future<void> _pickTranscriptFile() async {
     try {
       final FilePickerResult? result;
-      
+
       if (Platform.isIOS) {
-        // iOS: 不设置 initialDirectory
+        // iOS: 使用 custom 类型，配合 Info.plist 中注册的 UTType
         result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
           allowedExtensions: ['srt', 'vtt'],
+          allowMultiple: false,
         );
       } else {
         // macOS 等其他平台：保持原有逻辑
@@ -396,9 +397,9 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('选择字幕文件失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('选择字幕文件失败: $e')));
       }
     }
   }
@@ -426,15 +427,14 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
     final baseName = file.name.isNotEmpty
         ? file.name
         : (file.path != null ? path.basename(file.path!) : 'file');
-    String destPath = path.join(dir.path, baseName);
-    int i = 1;
-    while (await File(destPath).exists()) {
-      final name = path.basenameWithoutExtension(baseName);
-      final ext = path.extension(baseName);
-      destPath = path.join(dir.path, '$name ($i)$ext');
-      i++;
+    final destPath = path.join(dir.path, baseName);
+
+    // 如果文件已存在，直接返回现有文件路径，不做任何操作
+    if (await File(destPath).exists()) {
+      return destPath;
     }
 
+    // 文件不存在，复制到沙盒
     if (file.path != null) {
       await File(file.path!).copy(destPath);
     } else if (file.bytes != null) {
@@ -453,6 +453,41 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
   Future<void> _addAudio() async {
     if (_audioPath == null) return;
 
+    // 检查是否已存在同名文件
+    final library = context.read<AudioLibraryProvider>();
+    final existingItem = library.audioItems.firstWhere(
+      (item) => item.name == _audioName,
+      orElse: () =>
+          AudioItem(id: '', name: '', audioPath: '', addedDate: DateTime.now()),
+    );
+
+    if (existingItem.id.isNotEmpty) {
+      // 已存在同名文件，提示是否覆盖
+      final shouldOverwrite = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('文件已存在'),
+          content: Text('已存在名为 "$_audioName" 的音频文件，是否覆盖？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('覆盖'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldOverwrite != true) return;
+
+      // 覆盖：删除旧条目，添加新条目
+      await library.removeAudioItem(existingItem.id);
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -465,7 +500,7 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
       addedDate: DateTime.now(),
     );
 
-    await context.read<AudioLibraryProvider>().addAudioItem(audioItem);
+    await library.addAudioItem(audioItem);
 
     if (mounted) {
       Navigator.pop(context);
