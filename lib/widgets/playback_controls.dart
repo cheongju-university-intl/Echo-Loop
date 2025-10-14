@@ -194,7 +194,7 @@ class PlaybackControls extends StatelessWidget {
   }
 
   Widget _buildPlayPauseButton(BuildContext context) {
-    print('isMainPlaybackPlaying: ${player.isMainPlaybackPlaying}');
+    print('isPlaying: ${player.isPlaying}');
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary,
@@ -202,18 +202,18 @@ class PlaybackControls extends StatelessWidget {
       ),
       child: IconButton(
         icon: Icon(
-          player.isMainPlaybackPlaying ? Icons.pause : Icons.play_arrow,
+          player.isPlaying ? Icons.pause : Icons.play_arrow,
         ),
         iconSize: 36,
         color: Theme.of(context).colorScheme.onPrimary,
         onPressed: () {
-          if (player.isMainPlaybackPlaying) {
+          if (player.isPlaying) {
             player.pause();
           } else {
             player.play();
           }
         },
-        tooltip: player.isMainPlaybackPlaying ? 'Pause' : 'Play',
+        tooltip: player.isPlaying ? 'Pause' : 'Play',
       ),
     );
   }

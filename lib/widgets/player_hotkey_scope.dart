@@ -39,7 +39,7 @@ class PlayerHotkeyScope extends StatelessWidget {
           final key = event.logicalKey;
           // 空格：播放/暂停
           if (key == LogicalKeyboardKey.space) {
-            player.isMainPlaybackPlaying ? player.pause() : player.play();
+            player.isPlaying ? player.pause() : player.play();
             return KeyEventResult.handled;
           }
           // 左右箭头：上一/下一句
@@ -85,7 +85,7 @@ class PlayerHotkeyScope extends StatelessWidget {
           actions: <Type, Action<Intent>>{
             PlayPauseIntent: CallbackAction<PlayPauseIntent>(
               onInvoke: (i) {
-                player.isMainPlaybackPlaying ? player.pause() : player.play();
+                player.isPlaying ? player.pause() : player.play();
                 return null;
               },
             ),

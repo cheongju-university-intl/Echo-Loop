@@ -30,7 +30,6 @@ class PlayerProvider extends ChangeNotifier {
 
   // 播放控制 - 简化的状态管理
   int _playbackSessionId = 0; // 用于取消旧的播放会话
-  bool _isPlaying = false; // 标记主播放控制的播放状态，这个和 AudioPlayer.playing 有区别
 
   // 进度条相关 - 用于显示绝对位置
   Duration? _fullDuration; // 完整音频时长
@@ -51,7 +50,7 @@ class PlayerProvider extends ChangeNotifier {
   PlaybackSettings get settings => _settings;
   Set<int> get bookmarkedIndices => _bookmarkedIndices;
   bool get isLoading => _isLoading;
-  bool get isMainPlaybackPlaying => _isPlaying; // 主播放控制的播放状态
+  bool get isPlaying => _audioPlayer.playing; // 主播放控制的播放状态
   Duration get currentPosition => _audioPlayer.position;
   Duration? get totalDuration => _fullDuration; // 返回完整音频时长
   bool get hasAudio => _currentAudioItem != null;
@@ -159,15 +158,13 @@ class PlayerProvider extends ChangeNotifier {
           await _playContinuous();
         });
       } else {
-        // 不循环，清除主播放状态
+        // 不循环
         print("1");
-        _isPlaying = false;
         notifyListeners();
       }
     } else {
-      // 不循环，清除主播放状态
+      // 不循环
       print("2");
-      _isPlaying = false;
       notifyListeners();
     }
   }
@@ -175,7 +172,7 @@ class PlayerProvider extends ChangeNotifier {
   void _updateCurrentSentence(Duration position) {
     // 只在 Continuous 模式下才根据播放进度自动选中句子
     // 其他模式（Subtitle-Driven）通过播放循环主动更新索引，无需此处处理
-    if (!_shouldUseContinuousMode() || !_isPlaying) return;
+    if (!_shouldUseContinuousMode() || !_audioPlayer.playing) return;
 
     if (_sentences.isEmpty) return;
 
@@ -343,9 +340,6 @@ class PlayerProvider extends ChangeNotifier {
     print('play');
     if (_currentAudioItem == null) return;
 
-    // 标记为主播放模式
-    _isPlaying = true;
-
     if (_sentences.isEmpty) {
       // 没有字幕，直接播放
       await _audioPlayer.play();
@@ -356,7 +350,6 @@ class PlayerProvider extends ChangeNotifier {
     if (_playlistMode == PlaylistMode.bookmarks) {
       final bookmarked = bookmarkedSentences;
       if (bookmarked.isEmpty) {
-        _isPlaying = false;
         notifyListeners();
         return;
       }
@@ -426,6 +419,17 @@ class PlayerProvider extends ChangeNotifier {
     }
 
     await _audioPlayer.play();
+    // 等待音频播放完成
+    if (_audioPlayer.playing) {
+      await _audioPlayer.playerStateStream.firstWhere(
+        (state) =>
+            !state.playing ||
+            state.processingState == ProcessingState.completed,
+      );
+    }
+    print("_playContinuous end");
+    await stop();
+    notifyListeners();
   }
 
   /// 模式2：Subtitle-Driven播放（异步for循环）
@@ -459,7 +463,6 @@ class PlayerProvider extends ChangeNotifier {
         // print('playList: ${playList.length}, startIndex: $startIndex, i: $i');
         // 检查会话是否被取消
         if (!_is_active_session(sessionId)) {
-          // _isMainPlaybackPlaying = false;
           return;
         }
 
@@ -508,7 +511,6 @@ class PlayerProvider extends ChangeNotifier {
 
         // 检查会话是否被取消
         if (!_is_active_session(sessionId)) {
-          // _isMainPlaybackPlaying = false;
           return;
         }
 
@@ -523,7 +525,6 @@ class PlayerProvider extends ChangeNotifier {
                   state.processingState == ProcessingState.completed,
             );
           }
-          _isPlaying = false;
           notifyListeners();
           return;
         }
@@ -536,9 +537,8 @@ class PlayerProvider extends ChangeNotifier {
       if (!_settings.loopAudioEnabled) break;
     }
 
-    // 播放完成，清除主播放状态
-    print("4");
-    _isPlaying = false;
+    // 播放完成, stop 播放
+    await stop();
     notifyListeners();
   }
 
@@ -609,14 +609,12 @@ class PlayerProvider extends ChangeNotifier {
   Future<void> pause() async {
     _playbackSessionId++; // 取消当前播放会话
     print("5");
-    _isPlaying = false;
     await _audioPlayer.pause();
   }
 
   Future<void> stop() async {
     _playbackSessionId++; // 取消当前播放会话
     print("6");
-    _isPlaying = false;
     await _audioPlayer.stop();
   }
 
@@ -743,7 +741,7 @@ class PlayerProvider extends ChangeNotifier {
 
     final isPlaying = _audioPlayer.playing;
     // 只有主播放正在播放时才需要暂停
-    final shouldResume = _isPlaying;
+    final shouldResume = _audioPlayer.playing;
     print('isPlaying: $isPlaying, shouldResume: $shouldResume');
     if (isPlaying) await pause();
 
@@ -796,7 +794,7 @@ class PlayerProvider extends ChangeNotifier {
     }
 
     final isPlaying = _audioPlayer.playing;
-    final shouldResume = _isPlaying;
+    final shouldResume = _audioPlayer.playing;
     if (isPlaying) await pause();
 
     if (_playlistMode == PlaylistMode.bookmarks) {
@@ -830,8 +828,6 @@ class PlayerProvider extends ChangeNotifier {
 
     // 当前是否在书签页
     final inBookmarksMode = _playlistMode == PlaylistMode.bookmarks;
-    // 记住播放状态：仅在书签页才需要恢复
-    final shouldResume = inBookmarksMode && _isPlaying;
 
     int? nextIndex;
     // 在书签页且是“取消收藏”时，基于操作前的列表计算“下一个”句子
@@ -846,6 +842,10 @@ class PlayerProvider extends ChangeNotifier {
         }
       }
     }
+
+    // 记住播放状态：仅在书签页才需要恢复
+    final shouldResume =
+        inBookmarksMode && _audioPlayer.playing && nextIndex != null;
 
     // 仅在书签页执行“取消收藏”时需要立即暂停
     if (inBookmarksMode && isRemoving && _audioPlayer.playing) {
@@ -866,11 +866,10 @@ class PlayerProvider extends ChangeNotifier {
           final s = _sentences[nextIndex];
           _clipStart = s.startTime;
           await _audioPlayer.setClip(start: s.startTime, end: s.endTime);
-          await _audioPlayer.seek(s.startTime);
         } else {
           // 列表为空：停止播放并重置 clip
-          await _audioPlayer.setClip(start: null, end: null);
           _clipStart = Duration.zero;
+          await _audioPlayer.setClip(start: null, end: null);
           _currentBookmarkIndex = null;
           await stop();
         }
@@ -897,10 +896,32 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> updateSettings(PlaybackSettings newSettings) async {
+    // 保存旧设置，用于检测播放模式是否改变
+    final oldSettings = _settings;
+    final wasPlaying = _audioPlayer.playing;
+
+    // 检查播放模式是否会改变
+    // 影响播放模式的关键设置：autoPlayNextSentenceEnabled, loopEnabled
+    final oldContinuousMode =
+        _playlistMode == PlaylistMode.full &&
+        oldSettings.autoPlayNextSentenceEnabled &&
+        !oldSettings.loopEnabled;
+    final newContinuousMode =
+        _playlistMode == PlaylistMode.full &&
+        newSettings.autoPlayNextSentenceEnabled &&
+        !newSettings.loopEnabled;
+    final modeWillChange = oldContinuousMode != newContinuousMode;
+
     _settings = newSettings;
     await _audioPlayer.setSpeed(newSettings.playbackSpeed);
     await StorageService.saveSettings(newSettings);
     notifyListeners();
+
+    // 如果正在播放且播放模式改变，重新开始播放以应用新模式
+    if (wasPlaying && modeWillChange) {
+      await pause();
+      await play();
+    }
   }
 
   void setAutoScroll(bool enabled) {
