@@ -34,10 +34,14 @@ class SentenceListView extends StatefulWidget {
   State<SentenceListView> createState() => _SentenceListViewState();
 }
 
-class _SentenceListViewState extends State<SentenceListView> {
+class _SentenceListViewState extends State<SentenceListView>
+    with AutomaticKeepAliveClientMixin {
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -123,6 +127,7 @@ class _SentenceListViewState extends State<SentenceListView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用以保持状态
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         // 检测用户手动滚动
