@@ -160,7 +160,6 @@ class PlayerProvider extends ChangeNotifier {
 
       // Load transcript if available
       final sentences = await AudioLoader.loadTranscript(audioItem);
-      _state.setSentences(sentences);
 
       // Load bookmarks
       final storedBookmarks = await BookmarkManager.loadBookmarks(audioItem.id);
@@ -184,6 +183,19 @@ class PlayerProvider extends ChangeNotifier {
           );
         }
       }
+
+      // 清理所有带有 [] 的句子文本（识别书签后）
+      for (int i = 0; i < sentences.length; i++) {
+        final text = sentences[i].text.trim();
+        if (text.startsWith('[') && text.endsWith(']') && text.length > 2) {
+          sentences[i] = sentences[i].copyWith(
+            text: text.substring(1, text.length - 1).trim(),
+          );
+        }
+      }
+
+      // 设置清理后的句子列表
+      _state.setSentences(sentences);
 
       // Update sentence bookmark status
       BookmarkManager.updateSentenceBookmarkStatus(

@@ -361,9 +361,20 @@ class _PlayerScreenState extends State<PlayerScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
-                        style: TextStyle(color: Colors.grey[600]),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              '#${currentSentence.index + 1}',
+                              style: TextStyle(color: Colors.grey[500]),
+                            ),
+                            const SizedBox(width: 24),
+                            Text(
+                              '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
                       ),
                       IconButton(
                         icon: Icon(
