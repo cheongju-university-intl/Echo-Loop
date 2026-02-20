@@ -1,0 +1,199 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:fluency/models/sentence.dart';
+import 'package:fluency/providers/listening_practice/bookmark_manager.dart';
+
+void main() {
+  group('BookmarkManager', () {
+    Sentence createSentence(int index, String text) {
+      return Sentence(
+        index: index,
+        text: text,
+        startTime: Duration(seconds: index * 5),
+        endTime: Duration(seconds: (index + 1) * 5),
+      );
+    }
+
+    group('autoAddBracketBookmarks', () {
+      test('[text] 格式被识别', () {
+        final sentences = [
+          createSentence(0, '[Introduction]'),
+          createSentence(1, 'Normal text'),
+          createSentence(2, '[Chapter 1]'),
+        ];
+        final bookmarks = BookmarkManager.autoAddBracketBookmarks(sentences);
+
+        expect(bookmarks, {0, 2});
+      });
+
+      test('普通文本不被识别', () {
+        final sentences = [
+          createSentence(0, 'Hello world'),
+          createSentence(1, 'Normal sentence'),
+        ];
+        final bookmarks = BookmarkManager.autoAddBracketBookmarks(sentences);
+
+        expect(bookmarks, isEmpty);
+      });
+
+      test('混合列表正确过滤', () {
+        final sentences = [
+          createSentence(0, '[Title]'),
+          createSentence(1, 'Body text'),
+          createSentence(2, 'More text [with brackets] inside'),
+          createSentence(3, '[End]'),
+        ];
+        final bookmarks = BookmarkManager.autoAddBracketBookmarks(sentences);
+
+        // 只有完全被 [] 包裹的才算
+        expect(bookmarks, {0, 3});
+      });
+
+      test('空列表返回空集合', () {
+        final bookmarks = BookmarkManager.autoAddBracketBookmarks([]);
+        expect(bookmarks, isEmpty);
+      });
+
+      test('前后有空格的 [text] 也被识别（trim）', () {
+        final sentences = [
+          createSentence(0, '  [Title]  '),
+        ];
+        final bookmarks = BookmarkManager.autoAddBracketBookmarks(sentences);
+        expect(bookmarks, {0});
+      });
+    });
+
+    group('updateSentenceBookmarkStatus', () {
+      test('正确设置 isBookmarked 标志', () {
+        final sentences = [
+          createSentence(0, 'A'),
+          createSentence(1, 'B'),
+          createSentence(2, 'C'),
+        ];
+        BookmarkManager.updateSentenceBookmarkStatus(sentences, {0, 2});
+
+        expect(sentences[0].isBookmarked, isTrue);
+        expect(sentences[1].isBookmarked, isFalse);
+        expect(sentences[2].isBookmarked, isTrue);
+      });
+
+      test('不在 set 中的句子标记为 false', () {
+        final sentences = [
+          createSentence(0, 'A')..isBookmarked = true,
+          createSentence(1, 'B')..isBookmarked = true,
+        ];
+        // 空集合 → 全部设为 false
+        BookmarkManager.updateSentenceBookmarkStatus(sentences, {});
+
+        expect(sentences[0].isBookmarked, isFalse);
+        expect(sentences[1].isBookmarked, isFalse);
+      });
+    });
+
+    group('toggleBookmark', () {
+      test('添加新书签（isRemoving=false）', () {
+        final sentences = [
+          createSentence(0, 'A'),
+          createSentence(1, 'B'),
+        ];
+        final (isRemoving, indicesToRemove, nextIndex) =
+            BookmarkManager.toggleBookmark(0, sentences, {}, false);
+
+        expect(isRemoving, isFalse);
+        expect(indicesToRemove, isEmpty);
+        expect(nextIndex, isNull);
+      });
+
+      test('移除已有书签（isRemoving=true）', () {
+        final sentences = [
+          createSentence(0, 'A'),
+          createSentence(1, 'B'),
+          createSentence(2, 'C'),
+        ];
+        final (isRemoving, indicesToRemove, nextIndex) =
+            BookmarkManager.toggleBookmark(0, sentences, {0, 1, 2}, false);
+
+        expect(isRemoving, isTrue);
+        expect(indicesToRemove.contains(0), isTrue);
+      });
+
+      test('智能去重：同文本不同大小写的句子一起移除', () {
+        final sentences = [
+          createSentence(0, 'Hello'),
+          createSentence(1, 'hello'),
+          createSentence(2, 'World'),
+        ];
+        // 所有句子都是书签
+        final (isRemoving, indicesToRemove, _) =
+            BookmarkManager.toggleBookmark(0, sentences, {0, 1, 2}, false);
+
+        expect(isRemoving, isTrue);
+        // 'Hello' 和 'hello' 标准化后相同，都应被移除
+        expect(indicesToRemove, contains(0));
+        expect(indicesToRemove, contains(1));
+        expect(indicesToRemove.contains(2), isFalse);
+      });
+
+      test('智能去重：同文本不同标点的句子一起移除', () {
+        final sentences = [
+          createSentence(0, 'Hello!'),
+          createSentence(1, 'Hello'),
+          createSentence(2, ',Hello.'),
+        ];
+        final (_, indicesToRemove, __) =
+            BookmarkManager.toggleBookmark(0, sentences, {0, 1, 2}, false);
+
+        // 标准化后 'Hello!', 'Hello', ',Hello.' 都是 'hello'
+        expect(indicesToRemove, {0, 1, 2});
+      });
+
+      test('书签模式下计算 nextIndex（跳过将被移除的）', () {
+        final sentences = [
+          createSentence(0, 'A'),
+          createSentence(1, 'B'),
+          createSentence(2, 'C'),
+        ];
+        // 书签模式下，移除索引 0，下一个应该是索引 1
+        final (_, __, nextIndex) =
+            BookmarkManager.toggleBookmark(0, sentences, {0, 1, 2}, true);
+
+        expect(nextIndex, isNotNull);
+        expect(nextIndex, 1);
+      });
+
+      test('非书签模式 nextIndex 为 null', () {
+        final sentences = [
+          createSentence(0, 'A'),
+          createSentence(1, 'B'),
+        ];
+        final (_, __, nextIndex) =
+            BookmarkManager.toggleBookmark(0, sentences, {0, 1}, false);
+
+        expect(nextIndex, isNull);
+      });
+
+      test('书签模式移除最后一个书签时 nextIndex 为 null', () {
+        final sentences = [
+          createSentence(0, 'A'),
+        ];
+        final (_, __, nextIndex) =
+            BookmarkManager.toggleBookmark(0, sentences, {0}, true);
+
+        expect(nextIndex, isNull);
+      });
+
+      test('书签模式移除后跳过同文本书签找到下一个', () {
+        final sentences = [
+          createSentence(0, 'Same'),
+          createSentence(1, 'Same'),
+          createSentence(2, 'Different'),
+        ];
+        // 移除索引 0，索引 1 同文本也会被移除，下一个应该是索引 2
+        final (_, indicesToRemove, nextIndex) =
+            BookmarkManager.toggleBookmark(0, sentences, {0, 1, 2}, true);
+
+        expect(indicesToRemove, {0, 1});
+        expect(nextIndex, 2);
+      });
+    });
+  });
+}
