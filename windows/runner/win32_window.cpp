@@ -216,6 +216,14 @@ Win32Window::MessageHandler(HWND hwnd,
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);
       return 0;
+
+    // 设置最小窗口尺寸，避免内容过窄导致布局混乱
+    case WM_GETMINMAXINFO: {
+      MINMAXINFO* info = reinterpret_cast<MINMAXINFO*>(lparam);
+      info->ptMinTrackSize.x = 400;
+      info->ptMinTrackSize.y = 600;
+      return 0;
+    }
   }
 
   return DefWindowProc(window_handle_, message, wparam, lparam);

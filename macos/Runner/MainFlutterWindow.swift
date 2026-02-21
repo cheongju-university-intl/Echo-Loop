@@ -10,6 +10,9 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // 设置最小窗口尺寸，避免内容过窄导致布局混乱
+    self.minSize = NSSize(width: 400, height: 600)
+
     super.awakeFromNib()
   }
 }
