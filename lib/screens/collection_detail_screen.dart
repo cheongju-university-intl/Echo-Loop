@@ -153,8 +153,8 @@ class _CollectionAudioTile extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
         subtitle: Wrap(
-          spacing: 12,
-          runSpacing: 4,
+          spacing: 4,
+          runSpacing: 2,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             // 音频时长
@@ -375,8 +375,11 @@ class _CollectionAudioTile extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.warning_amber_rounded,
-            color: Theme.of(ctx).colorScheme.error, size: 32),
+        icon: Icon(
+          Icons.warning_amber_rounded,
+          color: Theme.of(ctx).colorScheme.error,
+          size: 32,
+        ),
         title: Text(l10n.removeFromCollection),
         content: Text(l10n.removeFromCollectionConfirm(audioItem.name)),
         actions: [
@@ -402,4 +405,3 @@ class _CollectionAudioTile extends ConsumerWidget {
     );
   }
 }
-

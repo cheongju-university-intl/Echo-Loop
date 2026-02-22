@@ -21,6 +21,7 @@ import '../router/app_router.dart';
 import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blind_listen_briefing_sheet.dart';
+import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
 
 /// 学习计划表页面
 class LearningPlanScreen extends ConsumerStatefulWidget {
@@ -68,38 +69,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
   /// 处理"开始学习/继续学习"按钮点击
   void _handleStartLearning(BuildContext context, LearningProgress? progress) {
-    // 判断当前子步骤是否为盲听
-    final isBlindListen =
-        progress == null ||
-        progress.currentSubStage == SubStageType.blindListen;
+    final currentSubStage =
+        progress?.currentSubStage ?? SubStageType.blindListen;
 
-    if (isBlindListen) {
-      // 显示简报弹窗
-      final isFirstStudy =
-          progress == null || progress.currentStage == LearningStage.firstLearn;
-      final reviewRound = progress != null ? progress.currentStage.index : 0;
-      final totalDuration = ref.read(audioEngineProvider).totalDuration;
-
-      showBlindListenBriefingSheet(
-        context: context,
-        isFirstStudy: isFirstStudy,
-        reviewRound: reviewRound,
-        audioDuration: totalDuration,
-        onStartPractice: () async {
-          // 进入盲听模式
-          await ref
-              .read(learningSessionProvider.notifier)
-              .enterBlindListenMode(widget.audioItemId);
-          if (mounted) {
-            context.push(
-              AppRoutes.blindListenPlayer(
-                widget.collectionId,
-                widget.audioItemId,
-              ),
-            );
-          }
-        },
-      );
+    if (currentSubStage == SubStageType.blindListen) {
+      _startBlindListen(context, progress);
+    } else if (currentSubStage == SubStageType.intensiveListen) {
+      _startIntensiveListen(context);
     } else {
       // 其他子步骤 → 直接导航到播放器
       if (widget.collectionId != null) {
@@ -110,6 +86,76 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         context.push(AppRoutes.audioPlayer(widget.audioItemId));
       }
     }
+  }
+
+  /// 进入全文盲听
+  void _startBlindListen(BuildContext context, LearningProgress? progress) {
+    final isFirstStudy =
+        progress == null || progress.currentStage == LearningStage.firstLearn;
+    final reviewRound = progress != null ? progress.currentStage.index : 0;
+    final totalDuration = ref.read(audioEngineProvider).totalDuration;
+
+    showBlindListenBriefingSheet(
+      context: context,
+      isFirstStudy: isFirstStudy,
+      reviewRound: reviewRound,
+      audioDuration: totalDuration,
+      onStartPractice: () async {
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterBlindListenMode(widget.audioItemId);
+        if (mounted) {
+          context.push(
+            AppRoutes.blindListenPlayer(
+              widget.collectionId,
+              widget.audioItemId,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// 进入逐句精听
+  void _startIntensiveListen(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final lpState = ref.read(listeningPracticeProvider);
+
+    // 无字幕则提示用户上传
+    if (lpState.sentences.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.intensiveListenNoSubtitle),
+          content: Text(l10n.intensiveListenNoSubtitleMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.ok),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showIntensiveListenBriefingSheet(
+      context: context,
+      sentenceCount: lpState.sentences.length,
+      onStartPractice: () async {
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterIntensiveListenMode(widget.audioItemId, lpState.sentences);
+        if (mounted) {
+          context.push(
+            AppRoutes.intensiveListenPlayer(
+              widget.collectionId,
+              widget.audioItemId,
+            ),
+          );
+        }
+      },
+    );
   }
 
   @override
@@ -422,10 +468,12 @@ class _FirstStudySection extends ConsumerWidget {
             }
           }
 
-          // 已完成的盲听步骤支持点击进入自由练习
+          // 已完成步骤支持点击进入自由练习
           VoidCallback? onTap;
           if (isCompleted && subStage == SubStageType.blindListen) {
             onTap = () => _startFreePlayBlindListen(context, ref);
+          } else if (isCompleted && subStage == SubStageType.intensiveListen) {
+            onTap = () => _startFreePlayIntensiveListen(context, ref);
           }
 
           return _StepCard(
@@ -454,6 +502,26 @@ class _FirstStudySection extends ConsumerWidget {
         .enterBlindListenMode(audioItemId, isFreePlay: true);
     if (context.mounted) {
       context.push(AppRoutes.blindListenPlayer(collectionId, audioItemId));
+    }
+  }
+
+  /// 进入自由练习精听模式（直接进入，不弹 briefing sheet）
+  Future<void> _startFreePlayIntensiveListen(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final lpState = ref.read(listeningPracticeProvider);
+    if (lpState.sentences.isEmpty) return;
+
+    await ref
+        .read(learningSessionProvider.notifier)
+        .enterIntensiveListenMode(
+          audioItemId,
+          lpState.sentences,
+          isFreePlay: true,
+        );
+    if (context.mounted) {
+      context.push(AppRoutes.intensiveListenPlayer(collectionId, audioItemId));
     }
   }
 }

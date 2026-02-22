@@ -145,17 +145,18 @@ class _BlindListenPlayerScreenState
       await ref.read(learningSessionProvider.notifier).replayBlindListen();
     } else {
       // 用户选择了难度 → 保存难度 → 推进子步骤 → 退出盲听模式 → 返回
-      await ref
-          .read(learningProgressNotifierProvider.notifier)
-          .setDifficulty(widget.audioItemId, result);
-      await ref
-          .read(learningProgressNotifierProvider.notifier)
-          .completeCurrentSubStage(widget.audioItemId);
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-
-      if (mounted) {
-        context.pop();
+      try {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .setDifficulty(widget.audioItemId, result);
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .completeCurrentSubStage(widget.audioItemId);
+      } catch (e) {
+        debugPrint('盲听完成处理出错: $e');
       }
+      await ref.read(learningSessionProvider.notifier).exitLearningMode();
+      if (mounted) context.pop();
     }
   }
 
