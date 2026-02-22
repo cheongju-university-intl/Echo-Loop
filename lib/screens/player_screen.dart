@@ -55,7 +55,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   void deactivate() {
     // 延迟到下一帧执行，避免在 widget 树销毁过程中修改 provider state
     final notifier = ref.read(listeningPracticeProvider.notifier);
-    Future(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       notifier.pause();
       notifier.saveCurrentPlaybackState();
     });
