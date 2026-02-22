@@ -431,6 +431,39 @@ void main() {
       expect(indices, {0, 2, 4});
     });
 
+    test('addBookmark 相同 audioItemId+sentenceIndex 执行 upsert', () async {
+      final now = DateTime.now();
+      // 第一次插入
+      await db.bookmarkDao.addBookmark(
+        BookmarksCompanion(
+          audioItemId: Value('audio-1'),
+          sentenceIndex: Value(5),
+          sentenceText: Value('Hello'),
+          startTime: Value(10.0),
+          endTime: Value(12.0),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      // 相同 key，不同 text
+      await db.bookmarkDao.addBookmark(
+        BookmarksCompanion(
+          audioItemId: Value('audio-1'),
+          sentenceIndex: Value(5),
+          sentenceText: Value('Updated'),
+          startTime: Value(10.0),
+          endTime: Value(12.0),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      final bookmarks = await db.bookmarkDao.getByAudioId('audio-1');
+      expect(bookmarks.length, 1);
+      expect(bookmarks.first.sentenceText, 'Updated');
+    });
+
     test('CASCADE 删除：音频删除后书签自动清理', () async {
       final now = DateTime.now();
       await db.bookmarkDao.addBookmark(

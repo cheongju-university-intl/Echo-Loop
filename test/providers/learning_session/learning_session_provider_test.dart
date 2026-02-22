@@ -157,9 +157,10 @@ void main() {
   });
 
   group('LearningMode', () {
-    test('blindListen 枚举存在', () {
+    test('blindListen 和 intensiveListen 枚举存在', () {
       expect(LearningMode.blindListen, isNotNull);
-      expect(LearningMode.values.length, 1);
+      expect(LearningMode.intensiveListen, isNotNull);
+      expect(LearningMode.values.length, 2);
     });
   });
 }

@@ -238,7 +238,7 @@ void main() {
       expect(find.text('Blind Listen'), findsOneWidget);
     });
 
-    testWidgets('非盲听子步骤直接导航到播放器', (tester) async {
+    testWidgets('精听子步骤无字幕时显示提示对话框', (tester) async {
       final progressState = LearningProgressState(
         progressMap: {
           'test-1': LearningProgress(
@@ -256,7 +256,8 @@ void main() {
       await tester.tap(find.text('Continue Learning'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Player'), findsOneWidget);
+      // LP 无句子时应弹出"无字幕"提示对话框
+      expect(find.text('No Subtitle Available'), findsOneWidget);
     });
 
     testWidgets('中文本地化正确显示', (tester) async {
