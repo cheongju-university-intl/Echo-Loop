@@ -171,6 +171,15 @@
       }
     }
   },
+  "audioAlreadyInLibrary": "Duplicate Audio",
+  "audioAlreadyInLibraryMessage": "An audio named \"{name}\" already exists in the library.",
+  "@audioAlreadyInLibraryMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "study": "Study",
   "favorites": "Favorites",
   "profile": "Profile",
@@ -269,5 +278,30 @@
   },
   "exitBlindListenTitle": "Exit Listening?",
   "exitBlindListenMessage": "Audio is still playing. Are you sure you want to exit?",
-  "confirmExit": "Exit"
+  "confirmExit": "Exit",
+  "library": "Library",
+  "collectionsTab": "Collections",
+  "audioTab": "Audio",
+  "uncategorized": "Uncategorized",
+  "manageCollections": "Manage Collections",
+  "noAudioItems": "No audio files yet",
+  "noAudioItemsHint": "Import audio files to start learning",
+  "audioWillBeKept": "{count} audio files in this collection will be kept in the library",
+  "@audioWillBeKept": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "done": "Done",
+  "sortAudio": "Sort",
+  "deleteAudioConfirm": "Are you sure you want to delete \"{name}\"? This audio will be removed from all collections.",
+  "@deleteAudioConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "uploadTranscript": "Upload Transcript",
+  "replaceTranscriptTitle": "Replace Transcript",
+  "replaceTranscriptMessage": "A transcript already exists. Do you want to replace it?",
+  "replace": "Replace"
 }

@@ -15,8 +15,8 @@ void collectionTests() {
       await tester.pumpWidget(createTestApp());
       await tester.pumpAndSettle();
 
-      // 切换到合集页
-      await tester.tap(find.text('Collections'));
+      // 切换到资源库页（通过导航图标）
+      await tester.tap(find.byIcon(Icons.library_music_outlined));
       await tester.pumpAndSettle();
 
       // 初始为空状态

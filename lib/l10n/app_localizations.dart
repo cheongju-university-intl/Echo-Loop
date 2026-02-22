@@ -830,6 +830,18 @@ abstract class AppLocalizations {
   /// **'An audio named \"{name}\" already exists in this collection.'**
   String audioAlreadyInCollectionMessage(String name);
 
+  /// No description provided for @audioAlreadyInLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate Audio'**
+  String get audioAlreadyInLibrary;
+
+  /// No description provided for @audioAlreadyInLibraryMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'An audio named \"{name}\" already exists in the library.'**
+  String audioAlreadyInLibraryMessage(String name);
+
   /// No description provided for @study.
   ///
   /// In en, this message translates to:
@@ -1207,6 +1219,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exit'**
   String get confirmExit;
+
+  /// No description provided for @library.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get library;
+
+  /// No description provided for @collectionsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Collections'**
+  String get collectionsTab;
+
+  /// No description provided for @audioTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get audioTab;
+
+  /// No description provided for @uncategorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get uncategorized;
+
+  /// No description provided for @manageCollections.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Collections'**
+  String get manageCollections;
+
+  /// No description provided for @noAudioItems.
+  ///
+  /// In en, this message translates to:
+  /// **'No audio files yet'**
+  String get noAudioItems;
+
+  /// No description provided for @noAudioItemsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Import audio files to start learning'**
+  String get noAudioItemsHint;
+
+  /// No description provided for @audioWillBeKept.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} audio files in this collection will be kept in the library'**
+  String audioWillBeKept(int count);
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @sortAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get sortAudio;
+
+  /// No description provided for @deleteAudioConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? This audio will be removed from all collections.'**
+  String deleteAudioConfirm(String name);
+
+  /// No description provided for @uploadTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Transcript'**
+  String get uploadTranscript;
+
+  /// No description provided for @replaceTranscriptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace Transcript'**
+  String get replaceTranscriptTitle;
+
+  /// No description provided for @replaceTranscriptMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'A transcript already exists. Do you want to replace it?'**
+  String get replaceTranscriptMessage;
+
+  /// No description provided for @replace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get replace;
 }
 
 class _AppLocalizationsDelegate

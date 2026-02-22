@@ -25,15 +25,15 @@ import '../widgets/blind_listen_complete_dialog.dart';
 
 /// 盲听播放器页面
 class BlindListenPlayerScreen extends ConsumerStatefulWidget {
-  /// 合集 ID（用于返回导航）
-  final String collectionId;
+  /// 合集 ID（用于返回导航，从独立音频路由进入时为 null）
+  final String? collectionId;
 
   /// 音频项 ID
   final String audioItemId;
 
   const BlindListenPlayerScreen({
     super.key,
-    required this.collectionId,
+    this.collectionId,
     required this.audioItemId,
   });
 

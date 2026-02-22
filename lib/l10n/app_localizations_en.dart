@@ -391,6 +391,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get audioAlreadyInLibrary => 'Duplicate Audio';
+
+  @override
+  String audioAlreadyInLibraryMessage(String name) {
+    return 'An audio named \"$name\" already exists in the library.';
+  }
+
+  @override
   String get study => 'Study';
 
   @override
@@ -596,4 +604,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmExit => 'Exit';
+
+  @override
+  String get library => 'Library';
+
+  @override
+  String get collectionsTab => 'Collections';
+
+  @override
+  String get audioTab => 'Audio';
+
+  @override
+  String get uncategorized => 'Uncategorized';
+
+  @override
+  String get manageCollections => 'Manage Collections';
+
+  @override
+  String get noAudioItems => 'No audio files yet';
+
+  @override
+  String get noAudioItemsHint => 'Import audio files to start learning';
+
+  @override
+  String audioWillBeKept(int count) {
+    return '$count audio files in this collection will be kept in the library';
+  }
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get sortAudio => 'Sort';
+
+  @override
+  String deleteAudioConfirm(String name) {
+    return 'Are you sure you want to delete \"$name\"? This audio will be removed from all collections.';
+  }
+
+  @override
+  String get uploadTranscript => 'Upload Transcript';
+
+  @override
+  String get replaceTranscriptTitle => 'Replace Transcript';
+
+  @override
+  String get replaceTranscriptMessage =>
+      'A transcript already exists. Do you want to replace it?';
+
+  @override
+  String get replace => 'Replace';
 }

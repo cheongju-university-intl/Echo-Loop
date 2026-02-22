@@ -1,11 +1,9 @@
-/// CollectionScreen 测试
-///
-/// 测试合集页面的渲染和交互。
-library;
-
+// LibraryScreen 测试（原 CollectionScreen）
+//
+// 测试资源库页面的合集视图渲染和交互。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fluency/screens/collection_screen.dart';
+import 'package:fluency/screens/library_screen.dart';
 import 'package:fluency/providers/settings_provider.dart';
 import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
@@ -16,10 +14,10 @@ import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
 
 void main() {
-  group('CollectionScreen', () {
+  group('LibraryScreen（合集视图）', () {
     group('渲染', () {
       testWidgets('空状态显示提示文案', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         expect(
@@ -29,15 +27,16 @@ void main() {
         expect(find.text('No collections yet'), findsOneWidget);
       });
 
-      testWidgets('显示 AppBar 标题', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+      testWidgets('显示 SegmentedButton 切换', (tester) async {
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         expect(find.text('Collections'), findsOneWidget);
+        expect(find.text('Audio'), findsOneWidget);
       });
 
       testWidgets('显示创建按钮', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         // AppBar 中的 + 按钮和空状态 CTA 中都有 add 图标
@@ -45,7 +44,7 @@ void main() {
       });
 
       testWidgets('显示排序按钮', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         expect(find.byIcon(Icons.sort), findsOneWidget);
@@ -65,7 +64,7 @@ void main() {
 
         await tester.pumpWidget(
           createTestScreen(
-            const CollectionScreen(),
+            const LibraryScreen(),
             overrides: [
               appSettingsProvider.overrideWith(() => TestAppSettings()),
               audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
@@ -107,7 +106,7 @@ void main() {
 
         await tester.pumpWidget(
           createTestScreen(
-            const CollectionScreen(),
+            const LibraryScreen(),
             overrides: [
               appSettingsProvider.overrideWith(() => TestAppSettings()),
               audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
@@ -135,7 +134,7 @@ void main() {
       testWidgets('加载中显示进度指示器', (tester) async {
         await tester.pumpWidget(
           createTestScreen(
-            const CollectionScreen(),
+            const LibraryScreen(),
             overrides: [
               appSettingsProvider.overrideWith(() => TestAppSettings()),
               audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
@@ -158,7 +157,7 @@ void main() {
 
     group('交互', () {
       testWidgets('点击 + 创建新合集', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         // 点击 AppBar 中的创建按钮（第一个 add 图标）
@@ -171,7 +170,7 @@ void main() {
       });
 
       testWidgets('创建合集时空名称显示错误', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         // 打开创建对话框（AppBar 中的 + 按钮）
@@ -187,7 +186,7 @@ void main() {
       });
 
       testWidgets('切换 grid/list 视图模式', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         // 默认列表模式，显示 grid_view 切换图标
@@ -202,7 +201,7 @@ void main() {
       });
 
       testWidgets('点击排序按钮显示排序选项', (tester) async {
-        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         // 点击排序按钮
@@ -216,6 +215,18 @@ void main() {
         expect(find.text('Newest First'), findsOneWidget);
       });
 
+      testWidgets('SegmentedButton 切换到音频视图', (tester) async {
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
+        await tester.pumpAndSettle();
+
+        // 切换到音频视图
+        await tester.tap(find.text('Audio'));
+        await tester.pumpAndSettle();
+
+        // 应显示音频空状态
+        expect(find.text('No audio files yet'), findsOneWidget);
+      });
+
       testWidgets('点击星标切换', (tester) async {
         final c = createTestCollection(
           id: '1',
@@ -225,7 +236,7 @@ void main() {
 
         await tester.pumpWidget(
           createTestScreen(
-            const CollectionScreen(),
+            const LibraryScreen(),
             overrides: [
               appSettingsProvider.overrideWith(() => TestAppSettings()),
               audioLibraryProvider.overrideWith(() => TestAudioLibrary()),

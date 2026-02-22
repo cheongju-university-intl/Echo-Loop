@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../screens/collection_screen.dart';
+import '../screens/library_screen.dart';
 import '../screens/collection_detail_screen.dart';
 import '../screens/study_screen.dart';
 import '../screens/favorites_screen.dart';
@@ -42,8 +42,16 @@ abstract class AppRoutes {
       '/collections/$collectionId/$audioId/player';
 
   /// 盲听播放器页路径
-  static String blindListenPlayer(String collectionId, String audioId) =>
-      '/collections/$collectionId/$audioId/blind-listen';
+  static String blindListenPlayer(String? collectionId, String audioId) =>
+      collectionId != null
+          ? '/collections/$collectionId/$audioId/blind-listen'
+          : '/audio/$audioId/blind-listen';
+
+  /// 独立音频学习计划页路径（不依赖合集）
+  static String audioLearningPlan(String audioId) => '/audio/$audioId/plan';
+
+  /// 独立音频播放器页路径（不依赖合集）
+  static String audioPlayer(String audioId) => '/audio/$audioId/player';
 }
 
 /// GoRouter Provider（keepAlive，不可 invalidate）
@@ -64,7 +72,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/collections',
-                builder: (context, state) => const CollectionScreen(),
+                builder: (context, state) => const LibraryScreen(),
               ),
             ],
           ),
@@ -93,6 +101,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      // 独立音频路由（不依赖合集）
+      GoRoute(
+        path: '/audio/:audioId/plan',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final audioId = state.pathParameters['audioId']!;
+          return LearningPlanScreen(
+            collectionId: null,
+            audioItemId: audioId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/audio/:audioId/player',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const PlayerScreen(),
+      ),
+      GoRoute(
+        path: '/audio/:audioId/blind-listen',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final audioId = state.pathParameters['audioId']!;
+          return BlindListenPlayerScreen(
+            collectionId: null,
+            audioItemId: audioId,
+          );
+        },
       ),
       // 详情页放在 shell 外部，全屏显示
       GoRoute(

@@ -109,6 +109,126 @@ void main() {
       });
     });
 
+    group('audioIdsMap', () {
+      test('getAudioIds 返回对应合集的音频 ID 列表', () {
+        final state = CollectionState(
+          audioIdsMap: {
+            'c1': ['a1', 'a2'],
+            'c2': ['a3'],
+          },
+        );
+        expect(state.getAudioIds('c1'), ['a1', 'a2']);
+        expect(state.getAudioIds('c2'), ['a3']);
+        expect(state.getAudioIds('c3'), isEmpty);
+      });
+
+      test('getAudioCount 返回对应合集的音频数量', () {
+        final state = CollectionState(
+          audioIdsMap: {
+            'c1': ['a1', 'a2'],
+            'c2': ['a3'],
+          },
+        );
+        expect(state.getAudioCount('c1'), 2);
+        expect(state.getAudioCount('c2'), 1);
+        expect(state.getAudioCount('c3'), 0);
+      });
+
+      test('删除合集时 audioIdsMap 应同步移除对应 key', () {
+        // 模拟 deleteCollection 中的状态更新逻辑
+        final initialState = CollectionState(
+          rawCollections: [
+            createCollection(id: 'c1', name: '合集1'),
+            createCollection(id: 'c2', name: '合集2'),
+          ],
+          audioIdsMap: {
+            'c1': ['a1', 'a2'],
+            'c2': ['a3'],
+          },
+        );
+
+        // 模拟修复后的 deleteCollection 逻辑
+        const deleteId = 'c1';
+        final newMap = Map<String, List<String>>.from(
+          initialState.audioIdsMap,
+        )..remove(deleteId);
+        final newState = initialState.copyWith(
+          rawCollections: initialState.rawCollections
+              .where((c) => c.id != deleteId)
+              .toList(),
+          audioIdsMap: newMap,
+        );
+
+        expect(newState.rawCollections, hasLength(1));
+        expect(newState.rawCollections.first.id, 'c2');
+        expect(newState.audioIdsMap.containsKey('c1'), isFalse);
+        expect(newState.audioIdsMap['c2'], ['a3']);
+      });
+
+      test('删除合集不影响其他合集的音频关联', () {
+        final initialState = CollectionState(
+          rawCollections: [
+            createCollection(id: 'c1', name: '合集1'),
+            createCollection(id: 'c2', name: '合集2'),
+            createCollection(id: 'c3', name: '合集3'),
+          ],
+          audioIdsMap: {
+            'c1': ['a1', 'a2'],
+            'c2': ['a2', 'a3'],
+            'c3': ['a4'],
+          },
+        );
+
+        const deleteId = 'c2';
+        final newMap = Map<String, List<String>>.from(
+          initialState.audioIdsMap,
+        )..remove(deleteId);
+        final newState = initialState.copyWith(
+          rawCollections: initialState.rawCollections
+              .where((c) => c.id != deleteId)
+              .toList(),
+          audioIdsMap: newMap,
+        );
+
+        expect(newState.rawCollections, hasLength(2));
+        expect(newState.audioIdsMap, hasLength(2));
+        expect(newState.audioIdsMap['c1'], ['a1', 'a2']);
+        expect(newState.audioIdsMap['c3'], ['a4']);
+      });
+    });
+
+    group('audioToCollectionsMap 反向索引', () {
+      test('正确构建 audioId -> collectionIds 映射', () {
+        final state = CollectionState(
+          audioIdsMap: {
+            'c1': ['a1', 'a2'],
+            'c2': ['a2', 'a3'],
+            'c3': ['a1'],
+          },
+        );
+        final reverseMap = state.audioToCollectionsMap;
+
+        expect(reverseMap['a1'], unorderedEquals(['c1', 'c3']));
+        expect(reverseMap['a2'], unorderedEquals(['c1', 'c2']));
+        expect(reverseMap['a3'], ['c2']);
+      });
+
+      test('空 audioIdsMap 返回空映射', () {
+        const state = CollectionState();
+        expect(state.audioToCollectionsMap, isEmpty);
+      });
+
+      test('音频不在任何合集中时不出现在反向索引', () {
+        final state = CollectionState(
+          audioIdsMap: {
+            'c1': ['a1'],
+          },
+        );
+        final reverseMap = state.audioToCollectionsMap;
+        expect(reverseMap.containsKey('a2'), isFalse);
+      });
+    });
+
     group('copyWith', () {
       test('部分字段覆盖', () {
         const state = CollectionState();

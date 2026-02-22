@@ -60,12 +60,12 @@ class _MainShellState extends ConsumerState<MainShell> {
                   },
                   destinations: [
                     NavigationRailDestination(
-                      icon: const Icon(Icons.collections_bookmark_outlined),
+                      icon: const Icon(Icons.library_music_outlined),
                       selectedIcon: const Icon(
-                        Icons.collections_bookmark,
+                        Icons.library_music,
                         color: AppTheme.navActiveColor,
                       ),
-                      label: Text(l10n.collections),
+                      label: Text(l10n.library),
                     ),
                     NavigationRailDestination(
                       icon: const Icon(Icons.school_outlined),
@@ -110,12 +110,12 @@ class _MainShellState extends ConsumerState<MainShell> {
                   labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                   destinations: [
                     NavigationDestination(
-                      icon: const Icon(Icons.collections_bookmark_outlined),
+                      icon: const Icon(Icons.library_music_outlined),
                       selectedIcon: const Icon(
-                        Icons.collections_bookmark,
+                        Icons.library_music,
                         color: AppTheme.navActiveColor,
                       ),
-                      label: l10n.collections,
+                      label: l10n.library,
                     ),
                     NavigationDestination(
                       icon: const Icon(Icons.school_outlined),

@@ -5,6 +5,41 @@
 
 ---
 
+## 音频导入时提取并存储时长
+
+- [x] 新建 `lib/utils/audio_duration.dart` 工具函数，使用 just_audio 临时实例提取时长
+- [x] 修改 `AddAudioDialog._addAudio()` 在创建 AudioItem 前调用工具函数获取时长
+- [x] 清理 `ListeningPractice.loadAudio()` 中多余的时长回写逻辑
+
+**完成时间**: 2026-02-22
+
+---
+
+## 音频字幕上传/替换功能
+
+- [x] 为音频添加上传/替换字幕功能（菜单项 + 覆盖确认 + 公共工具方法）
+
+**完成时间**: 2026-02-22
+
+---
+
+## 资源库（Library）Tab 改造
+
+- [x] 任务 1：修复 deleteCollection 的 audioIdsMap Bug
+- [x] 任务 2：新增独立音频路由
+- [x] 任务 3：提取 AddAudioDialog
+- [x] 任务 4：CollectionState 新增反向索引
+- [x] 任务 5：新建 AudioListView + AudioListTile
+- [x] 任务 6：新建合集归属编辑 BottomSheet
+- [x] 任务 7：LibraryScreen 改造
+- [x] 任务 8：新建 audioListSettingsProvider
+- [x] 任务 9：i18n 更新
+- [x] 任务 10：测试（已有测试更新 + 新增反向索引测试）
+
+**完成时间**: 2026-02-22
+
+---
+
 ## 基础设施：迁移到 go_router
 
 - [x] 添加 go_router 依赖，创建路由配置（AppRoutes + appRouterProvider）

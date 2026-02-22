@@ -1,7 +1,7 @@
 # Fluency 项目规划
 
-> 最后更新：2026-02-21
-> 当前阶段：Milestone 1 已完成 ✅，Drift 迁移已完成 ✅，Milestone 2 计划中
+> 最后更新：2026-02-22
+> 当前阶段：Milestone 1 已完成 ✅，Drift 迁移已完成 ✅，资源库 Tab 改造已完成 ✅，Milestone 2 计划中
 
 ## 项目概述
 
@@ -54,7 +54,8 @@ lib/
 │   └── subtitle_parser.dart         #   SRT/VTT 字幕解析
 ├── providers/                       # Riverpod 状态管理（代码生成）
 │   ├── audio_library_provider.dart  #   音频库管理（导入/删除/路径迁移）
-│   ├── collection_provider.dart     #   合集 CRUD + 排序
+│   ├── collection_provider.dart     #   合集 CRUD + 排序 + 反向索引
+│   ├── audio_list_settings_provider.dart # 音频列表排序设置
 │   ├── settings_provider.dart       #   全局设置（主题/语言）
 │   ├── audio_engine/
 │   │   └── audio_engine_provider.dart  # 底层音频控制（封装 just_audio）

@@ -389,6 +389,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get audioAlreadyInLibrary => '音频重复';
+
+  @override
+  String audioAlreadyInLibraryMessage(String name) {
+    return '音频库中已存在名为「$name」的音频。';
+  }
+
+  @override
   String get study => '学习';
 
   @override
@@ -590,4 +598,53 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get confirmExit => '退出';
+
+  @override
+  String get library => '资源库';
+
+  @override
+  String get collectionsTab => '合集';
+
+  @override
+  String get audioTab => '音频';
+
+  @override
+  String get uncategorized => '未归类';
+
+  @override
+  String get manageCollections => '管理合集';
+
+  @override
+  String get noAudioItems => '还没有添加音频';
+
+  @override
+  String get noAudioItemsHint => '导入音频文件开始学习吧';
+
+  @override
+  String audioWillBeKept(int count) {
+    return '合集中的 $count 个音频将保留在资源库中';
+  }
+
+  @override
+  String get done => '完成';
+
+  @override
+  String get sortAudio => '排序';
+
+  @override
+  String deleteAudioConfirm(String name) {
+    return '确定要删除「$name」吗？该音频将从所有合集中移除。';
+  }
+
+  @override
+  String get uploadTranscript => '上传字幕';
+
+  @override
+  String get replaceTranscriptTitle => '替换字幕';
+
+  @override
+  String get replaceTranscriptMessage => '字幕已存在，是否替换？';
+
+  @override
+  String get replace => '替换';
 }

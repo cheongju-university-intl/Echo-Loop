@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:universal_io/io.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as path;
 import '../models/audio_item.dart';
 import '../models/collection.dart';
 import '../providers/collection_provider.dart';
@@ -15,6 +11,8 @@ import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
+import '../utils/transcript_picker.dart';
+import '../widgets/add_audio_dialog.dart';
 
 /// 合集详情页面 - 展示合集中的音频，支持上传音频
 class CollectionDetailScreen extends ConsumerWidget {
@@ -101,12 +99,11 @@ class CollectionDetailScreen extends ConsumerWidget {
     );
   }
 
-  /// 显示添加音频对话框（复用音频库的上传逻辑）
+  /// 显示添加音频对话框
   void _showAddAudioDialog(BuildContext context, Collection collection) {
     showDialog(
       context: context,
-      builder: (context) =>
-          _AddAudioToCollectionDialog(collectionId: collection.id),
+      builder: (context) => AddAudioDialog(collectionId: collection.id),
     );
   }
 }
@@ -173,6 +170,20 @@ class _CollectionAudioTile extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
             ],
+            // 音频时长
+            if (audioItem.totalDuration > 0) ...[
+              Icon(
+                Icons.schedule,
+                size: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                _formatDuration(audioItem.totalDuration),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(width: 12),
+            ],
             Text(
               l10n.addedOn(_formatDate(audioItem.addedDate)),
               style: Theme.of(context).textTheme.bodySmall,
@@ -235,6 +246,16 @@ class _CollectionAudioTile extends ConsumerWidget {
                   ),
                 ),
                 PopupMenuItem(
+                  value: 'transcript',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.subtitles_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Text(l10n.uploadTranscript),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
@@ -252,6 +273,8 @@ class _CollectionAudioTile extends ConsumerWidget {
               onSelected: (value) {
                 if (value == 'rename') {
                   _showRenameAudioDialog(context, ref);
+                } else if (value == 'transcript') {
+                  uploadTranscriptForAudio(context, ref, audioItem);
                 } else if (value == 'delete') {
                   _confirmRemove(context, ref);
                 }
@@ -282,6 +305,17 @@ class _CollectionAudioTile extends ConsumerWidget {
 
   String _formatDate(DateTime date) {
     return '${date.month}/${date.day}/${date.year}';
+  }
+
+  /// 格式化音频时长（秒 → mm:ss 或 h:mm:ss）
+  String _formatDuration(int totalSeconds) {
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    if (h > 0) {
+      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   /// 重命名音频对话框
@@ -334,6 +368,8 @@ class _CollectionAudioTile extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded,
+            color: Theme.of(ctx).colorScheme.error, size: 32),
         title: Text(l10n.removeFromCollection),
         content: Text(l10n.removeFromCollectionConfirm(audioItem.name)),
         actions: [
@@ -341,15 +377,16 @@ class _CollectionAudioTile extends ConsumerWidget {
             onPressed: () => Navigator.pop(ctx),
             child: Text(l10n.cancel),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () {
               ref
                   .read(collectionListProvider.notifier)
                   .removeAudioFromCollection(collectionId, audioItem.id);
               Navigator.pop(ctx);
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             child: Text(l10n.delete),
           ),
@@ -359,297 +396,3 @@ class _CollectionAudioTile extends ConsumerWidget {
   }
 }
 
-/// 添加音频到合集对话框 - 复用音频库的上传逻辑
-class _AddAudioToCollectionDialog extends ConsumerStatefulWidget {
-  final String collectionId;
-
-  const _AddAudioToCollectionDialog({required this.collectionId});
-
-  @override
-  ConsumerState<_AddAudioToCollectionDialog> createState() =>
-      _AddAudioToCollectionDialogState();
-}
-
-class _AddAudioToCollectionDialogState
-    extends ConsumerState<_AddAudioToCollectionDialog> {
-  String? _audioPath;
-  String? _transcriptPath;
-  String _audioName = '';
-  bool _isLoading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return AlertDialog(
-      title: Text(l10n.addAudioToCollection),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _pickAudioFile,
-              icon: const Icon(Icons.audiotrack),
-              label: Text(l10n.selectAudioFile),
-            ),
-            if (_audioPath != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                path.basename(_audioPath!),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _pickTranscriptFile,
-              icon: const Icon(Icons.subtitles),
-              label: Text(l10n.selectTranscript),
-            ),
-            if (_transcriptPath != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      path.basename(_transcriptPath!),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 16),
-                    onPressed: () {
-                      setState(() {
-                        _transcriptPath = null;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: _audioPath == null || _isLoading ? null : _addAudio,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(l10n.add),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _pickAudioFile() async {
-    try {
-      final FilePickerResult? result;
-
-      if (!kIsWeb && Platform.isIOS) {
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'flac'],
-        );
-      } else {
-        final initialDir = !kIsWeb && Platform.isMacOS
-            ? await _getDownloadsDirectory()
-            : null;
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'flac'],
-          initialDirectory: initialDir,
-        );
-      }
-
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.single;
-        final dest = await _savePickedFileToSandbox(file, 'audios');
-        if (!mounted) return;
-        setState(() {
-          _audioPath = dest;
-          _audioName = path.basenameWithoutExtension(dest);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.pickAudioFileFailed}: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _pickTranscriptFile() async {
-    try {
-      final FilePickerResult? result;
-
-      if (!kIsWeb && Platform.isIOS) {
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['srt', 'lrc', 'txt', 'vtt', 'ass', 'ssa'],
-          allowMultiple: false,
-        );
-      } else {
-        final initialDir = !kIsWeb && Platform.isMacOS
-            ? await _getDownloadsDirectory()
-            : null;
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['srt', 'lrc', 'txt', 'vtt', 'ass', 'ssa'],
-          initialDirectory: initialDir,
-          allowMultiple: false,
-        );
-      }
-
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.single;
-        final dest = await _savePickedFileToSandbox(file, 'transcripts');
-        if (!mounted) return;
-        setState(() {
-          _transcriptPath = dest;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.pickTranscriptFileFailed}: $e')),
-        );
-      }
-    }
-  }
-
-  Future<String?> _getDownloadsDirectory() async {
-    try {
-      final home = Platform.environment['HOME'];
-      if (home == null) return null;
-      return path.join(home, 'Downloads');
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// 保存文件到应用沙盒，返回相对于Documents目录的相对路径
-  Future<String> _savePickedFileToSandbox(
-    PlatformFile file,
-    String subdir,
-  ) async {
-    final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory(path.join(docs.path, subdir));
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-
-    final baseName = file.name.isNotEmpty
-        ? file.name
-        : (file.path != null ? path.basename(file.path!) : 'file');
-    final destPath = path.join(dir.path, baseName);
-
-    // 如果文件已存在，直接返回相对路径
-    if (await File(destPath).exists()) {
-      return path.join(subdir, baseName);
-    }
-
-    // 文件不存在，复制到沙盒
-    if (file.path != null) {
-      await File(file.path!).copy(destPath);
-    } else if (file.bytes != null) {
-      await File(destPath).writeAsBytes(file.bytes!);
-    } else if (file.readStream != null) {
-      final out = File(destPath).openWrite();
-      await file.readStream!.pipe(out);
-      await out.close();
-    } else {
-      throw Exception('Unable to access picked file');
-    }
-
-    return path.join(subdir, baseName);
-  }
-
-  Future<void> _addAudio() async {
-    if (_audioPath == null) return;
-
-    final l10n = AppLocalizations.of(context)!;
-
-    // 检查当前合集中是否已存在同名音频
-    final collectionState = ref.read(collectionListProvider);
-    final collection = collectionState.rawCollections
-        .where((c) => c.id == widget.collectionId)
-        .firstOrNull;
-    if (collection != null) {
-      final libraryNotifier = ref.read(audioLibraryProvider.notifier);
-      final existingAudioIds = collectionState.getAudioIds(widget.collectionId);
-      for (final existingId in existingAudioIds) {
-        final existingAudio = libraryNotifier.getItemById(existingId);
-        if (existingAudio != null && existingAudio.name == _audioName) {
-          // 合集中已存在同名音频，弹出提醒
-          if (mounted) {
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(l10n.audioAlreadyInCollection),
-                content: Text(l10n.audioAlreadyInCollectionMessage(_audioName)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text(l10n.ok),
-                  ),
-                ],
-              ),
-            );
-          }
-          return;
-        }
-      }
-    }
-
-    // 检查是否已存在同名文件
-    final library = ref.read(audioLibraryProvider.notifier);
-    final libraryState = ref.read(audioLibraryProvider);
-    final existingItem = libraryState.audioItems.firstWhere(
-      (item) => item.name == _audioName,
-      orElse: () =>
-          AudioItem(id: '', name: '', audioPath: '', addedDate: DateTime.now()),
-    );
-
-    String audioId;
-
-    if (existingItem.id.isNotEmpty) {
-      // 音频已存在于音频库中，直接关联到合集
-      audioId = existingItem.id;
-    } else {
-      // 新音频，先添加到音频库
-      setState(() {
-        _isLoading = true;
-      });
-
-      final audioItem = AudioItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _audioName,
-        audioPath: _audioPath!,
-        transcriptPath: _transcriptPath,
-        addedDate: DateTime.now(),
-      );
-
-      await library.addAudioItem(audioItem);
-      audioId = audioItem.id;
-    }
-
-    // 添加到合集
-    if (mounted) {
-      await ref
-          .read(collectionListProvider.notifier)
-          .addAudioToCollection(widget.collectionId, audioId);
-      Navigator.pop(context);
-    }
-  }
-}

@@ -22,15 +22,15 @@ import '../widgets/blind_listen_briefing_sheet.dart';
 
 /// 学习计划表页面
 class LearningPlanScreen extends ConsumerStatefulWidget {
-  /// 合集 ID
-  final String collectionId;
+  /// 合集 ID（从独立音频路由进入时为 null）
+  final String? collectionId;
 
   /// 音频项 ID
   final String audioItemId;
 
   const LearningPlanScreen({
     super.key,
-    required this.collectionId,
+    this.collectionId,
     required this.audioItemId,
   });
 
@@ -100,7 +100,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       );
     } else {
       // 其他子步骤 → 直接导航到播放器
-      context.push(AppRoutes.player(widget.collectionId, widget.audioItemId));
+      if (widget.collectionId != null) {
+        context.push(
+          AppRoutes.player(widget.collectionId!, widget.audioItemId),
+        );
+      } else {
+        context.push(AppRoutes.audioPlayer(widget.audioItemId));
+      }
     }
   }
 
@@ -318,8 +324,8 @@ class _FirstStudySection extends ConsumerWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
 
-  /// 合集 ID（导航用）
-  final String collectionId;
+  /// 合集 ID（导航用，从独立音频路由进入时为 null）
+  final String? collectionId;
 
   /// 音频项 ID（导航用）
   final String audioItemId;

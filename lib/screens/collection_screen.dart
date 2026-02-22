@@ -1,3 +1,8 @@
+// 合集列表页面及可复用组件
+//
+// 原 CollectionScreen 保留用于 import，
+// 内部组件（排序按钮、列表/网格视图、空状态、对话框）
+// 导出供 LibraryScreen 复用。
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,129 +12,10 @@ import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 
-/// 合集列表页面
-class CollectionScreen extends ConsumerWidget {
-  const CollectionScreen({super.key});
+/// 合集排序按钮（公开供 LibraryScreen 使用）
+class CollectionSortButton extends ConsumerWidget {
+  const CollectionSortButton({super.key});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context)!;
-    final collectionState = ref.watch(collectionListProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.collections),
-        actions: [
-          // 排序按钮
-          _SortButton(),
-          // 视图切换按钮
-          Builder(
-            builder: (context) {
-              final isGrid =
-                  collectionState.viewMode == CollectionViewMode.grid;
-              return IconButton(
-                icon: Icon(isGrid ? Icons.view_list : Icons.grid_view),
-                tooltip: isGrid ? l10n.listView : l10n.gridView,
-                onPressed: () =>
-                    ref.read(collectionListProvider.notifier).toggleViewMode(),
-              );
-            },
-          ),
-          // 创建合集按钮
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: l10n.createCollection,
-            onPressed: () => _showCreateDialog(context),
-          ),
-        ],
-      ),
-      body: () {
-        if (collectionState.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (collectionState.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.collections_bookmark_outlined,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(height: AppSpacing.m),
-                Text(
-                  l10n.noCollectionsYet,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: AppSpacing.s),
-                Text(
-                  l10n.tapToCreateCollection,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.l),
-                FilledButton.icon(
-                  onPressed: () => _showCreateDialog(context),
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n.createCollection),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final collections = collectionState.collections;
-
-        if (collectionState.viewMode == CollectionViewMode.grid) {
-          return _buildGridView(context, collections);
-        } else {
-          return _buildListView(context, collections);
-        }
-      }(),
-    );
-  }
-
-  /// 网格/文件夹视图
-  Widget _buildGridView(BuildContext context, List<Collection> collections) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 180,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: collections.length,
-      itemBuilder: (context, index) {
-        return _CollectionGridTile(collection: collections[index]);
-      },
-    );
-  }
-
-  /// 列表视图
-  Widget _buildListView(BuildContext context, List<Collection> collections) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: collections.length,
-      itemBuilder: (context, index) {
-        return _CollectionListTile(collection: collections[index]);
-      },
-    );
-  }
-
-  void _showCreateDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const _CreateCollectionDialog(),
-    );
-  }
-}
-
-/// 排序按钮
-class _SortButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
@@ -142,21 +28,13 @@ class _SortButton extends ConsumerWidget {
       itemBuilder: (context) {
         final current = ref.read(collectionListProvider).sortType;
         return [
-          _sortMenuItem(
-            l10n.sortByNameAsc,
-            CollectionSortType.nameAsc,
-            current,
-          ),
+          _sortMenuItem(l10n.sortByNameAsc, CollectionSortType.nameAsc, current),
           _sortMenuItem(
             l10n.sortByNameDesc,
             CollectionSortType.nameDesc,
             current,
           ),
-          _sortMenuItem(
-            l10n.sortByDateAsc,
-            CollectionSortType.dateAsc,
-            current,
-          ),
+          _sortMenuItem(l10n.sortByDateAsc, CollectionSortType.dateAsc, current),
           _sortMenuItem(
             l10n.sortByDateDesc,
             CollectionSortType.dateDesc,
@@ -186,6 +64,96 @@ class _SortButton extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 合集空状态视图
+class CollectionEmptyState extends StatelessWidget {
+  const CollectionEmptyState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.collections_bookmark_outlined,
+            size: 64,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: AppSpacing.m),
+          Text(
+            l10n.noCollectionsYet,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.s),
+          Text(
+            l10n.tapToCreateCollection,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.l),
+          FilledButton.icon(
+            onPressed: () => showCreateCollectionDialog(context),
+            icon: const Icon(Icons.add),
+            label: Text(l10n.createCollection),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 合集网格视图
+class CollectionGridView extends StatelessWidget {
+  final List<Collection> collections;
+
+  const CollectionGridView({super.key, required this.collections});
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 180,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.85,
+      ),
+      itemCount: collections.length,
+      itemBuilder: (context, index) {
+        return _CollectionGridTile(collection: collections[index]);
+      },
+    );
+  }
+}
+
+/// 合集列表视图
+class CollectionListView extends StatelessWidget {
+  final List<Collection> collections;
+
+  const CollectionListView({super.key, required this.collections});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: collections.length,
+      itemBuilder: (context, index) {
+        return _CollectionListTile(collection: collections[index]);
+      },
+    );
+  }
+}
+
+/// 显示创建合集对话框（公开供 LibraryScreen 使用）
+void showCreateCollectionDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => const _CreateCollectionDialog(),
+  );
 }
 
 /// 文件夹网格卡片
@@ -356,7 +324,6 @@ class _CollectionListTile extends ConsumerWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 星标按钮
             SizedBox(
               width: 36,
               child: IconButton(
@@ -376,7 +343,6 @@ class _CollectionListTile extends ConsumerWidget {
                 },
               ),
             ),
-            // 更多操作菜单
             SizedBox(
               width: 36,
               child: PopupMenuButton(
@@ -486,7 +452,6 @@ class _CreateCollectionDialogState
       return;
     }
 
-    // 检查是否同名
     final collectionState = ref.read(collectionListProvider);
     final exists = collectionState.collections.any(
       (c) => c.name.toLowerCase() == name.toLowerCase(),
@@ -562,6 +527,8 @@ void _showDeleteConfirmDialog(
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
+      icon: Icon(Icons.warning_amber_rounded,
+          color: Theme.of(ctx).colorScheme.error, size: 32),
       title: Text(l10n.deleteCollection),
       content: Text(l10n.deleteCollectionConfirm(collection.name)),
       actions: [
@@ -569,15 +536,16 @@ void _showDeleteConfirmDialog(
           onPressed: () => Navigator.pop(ctx),
           child: Text(l10n.cancel),
         ),
-        TextButton(
+        FilledButton(
           onPressed: () {
             ref
                 .read(collectionListProvider.notifier)
                 .deleteCollection(collection.id);
             Navigator.pop(ctx);
           },
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(ctx).colorScheme.error,
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(ctx).colorScheme.error,
+            foregroundColor: Theme.of(ctx).colorScheme.onError,
           ),
           child: Text(l10n.delete),
         ),

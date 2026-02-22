@@ -40,6 +40,17 @@ class CollectionState {
     return audioIdsMap[collectionId]?.length ?? 0;
   }
 
+  /// 反向索引：audioId -> 所属合集 ID 列表
+  Map<String, List<String>> get audioToCollectionsMap {
+    final result = <String, List<String>>{};
+    for (final entry in audioIdsMap.entries) {
+      for (final audioId in entry.value) {
+        (result[audioId] ??= []).add(entry.key);
+      }
+    }
+    return result;
+  }
+
   List<Collection> get collections {
     final sorted = List<Collection>.from(rawCollections);
     switch (sortType) {
@@ -143,8 +154,10 @@ class CollectionList extends _$CollectionList {
   }
 
   Future<void> deleteCollection(String id) async {
+    final newMap = Map<String, List<String>>.from(state.audioIdsMap)..remove(id);
     state = state.copyWith(
       rawCollections: state.rawCollections.where((c) => c.id != id).toList(),
+      audioIdsMap: newMap,
     );
     final dao = ref.read(collectionDaoProvider);
     await dao.hardDelete(id);
@@ -209,6 +222,26 @@ class CollectionList extends _$CollectionList {
       newMap[key] = List<String>.from(newMap[key]!)..remove(audioId);
     }
     state = state.copyWith(audioIdsMap: newMap);
+  }
+
+  /// 批量更新音频的合集归属（diff 模式）
+  ///
+  /// 对比当前归属和目标归属，只执行增删操作。
+  Future<void> updateAudioCollectionMembership(
+    String audioId,
+    Set<String> targetCollectionIds,
+  ) async {
+    final currentCollections =
+        state.audioToCollectionsMap[audioId]?.toSet() ?? <String>{};
+    final toAdd = targetCollectionIds.difference(currentCollections);
+    final toRemove = currentCollections.difference(targetCollectionIds);
+
+    for (final collectionId in toAdd) {
+      await addAudioToCollection(collectionId, audioId);
+    }
+    for (final collectionId in toRemove) {
+      await removeAudioFromCollection(collectionId, audioId);
+    }
   }
 
   /// 获取合集中的音频 ID 列表

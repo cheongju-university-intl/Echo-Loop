@@ -3,6 +3,7 @@
 /// 验证 App 启动默认页面、各 Tab 切换是否正常。
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_notifiers.dart';
@@ -26,17 +27,17 @@ void navigationTests() {
       expect(find.text('Study feature coming soon'), findsOneWidget);
 
       // 切换到收藏页
-      await tester.tap(find.text('Favorites'));
+      await tester.tap(find.byIcon(Icons.favorite_border));
       await tester.pumpAndSettle();
       expect(find.text('Favorites feature coming soon'), findsOneWidget);
 
       // 切换到我的页
-      await tester.tap(find.text('Profile'));
+      await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
       expect(find.text('Appearance'), findsOneWidget);
 
-      // 切换回合集页
-      await tester.tap(find.text('Collections'));
+      // 切换回资源库页
+      await tester.tap(find.byIcon(Icons.library_music_outlined));
       await tester.pumpAndSettle();
       expect(find.text('No collections yet'), findsOneWidget);
     });
