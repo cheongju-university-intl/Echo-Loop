@@ -21,6 +21,7 @@
 - [x] 代码生成 — `build_runner build` + `flutter gen-l10n`
 - [x] 测试 — Tag Model 测试(4) + Tag DAO 测试(10) + TagState 测试(4) + EditTagMembershipSheet Widget 测试(4) + smoke test 修复
 - [x] UI — 标签删除功能 — 删除按钮 + 确认对话框 + 国际化(+2 key) + Widget 测试(+1)
+- [x] UX — 标签/合集 Sheet 改为即时生效 — 去掉"完成"按钮和本地 `_selectedIds`，勾选/取消直接调 Provider，ConsumerStatefulWidget→ConsumerWidget，创建后自动关联
 
 **完成时间**: 2026-02-23
 

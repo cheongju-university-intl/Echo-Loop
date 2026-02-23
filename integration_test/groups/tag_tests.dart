@@ -1,6 +1,6 @@
 /// 标签管理集成测试
 ///
-/// 验证标签的创建、关联音频、显示标签 chips 等管理流程。
+/// 验证标签的创建、关联音频、显示标签 chips、删除标签等管理流程。
 library;
 
 import 'package:flutter/material.dart';
@@ -26,11 +26,11 @@ void tagTests() {
       // 验证音频项存在
       expect(find.text('Test Audio'), findsOneWidget);
 
-      // 打开弹出菜单（使用 byType 查找 PopupMenuButton）
+      // 打开弹出菜单
       await tester.tap(find.byType(PopupMenuButton<String>));
       await tester.pumpAndSettle();
 
-      // 点击"管理标签"菜单项（通过文本查找）
+      // 点击"管理标签"
       await tester.tap(find.text('Manage Tags'));
       await tester.pumpAndSettle();
 
@@ -49,15 +49,70 @@ void tagTests() {
       await tester.tap(find.text('Add'));
       await tester.pumpAndSettle();
 
-      // 创建对话框关闭后，标签应出现在列表中且自动勾选
-      expect(find.text('Business English'), findsOneWidget);
+      // 即时生效 — 标签自动创建并关联
+      // 标签在 Sheet 列表中显示且自动勾选
+      final checkbox = tester.widget<CheckboxListTile>(
+        find.byType(CheckboxListTile),
+      );
+      expect(checkbox.value, isTrue);
 
-      // 点击 Done 保存
-      await tester.tap(find.text('Done'));
+      // 关闭 BottomSheet — 点击 Sheet 外部（屏幕顶部 scrim 区域）
+      final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+      await tester.tapAt(Offset(size.width / 2, 10));
       await tester.pumpAndSettle();
 
       // 返回音频列表 — 应能看到彩色标签 chip
       expect(find.text('Business English'), findsOneWidget);
+    });
+
+    testWidgets('删除标签后从列表和音频中移除', (tester) async {
+      await tester.pumpWidget(createTestAppWithAudio());
+      await tester.pumpAndSettle();
+
+      // 导航到资源库页 → 音频 Tab
+      await tester.tap(find.byIcon(Icons.library_music_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Audio'));
+      await tester.pumpAndSettle();
+
+      // 打开管理标签 Sheet
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage Tags'));
+      await tester.pumpAndSettle();
+
+      // 先创建一个标签
+      await tester.tap(find.text('Create Tag'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'ToDelete');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      // 标签已创建且关联
+      expect(find.text('ToDelete'), findsAtLeast(1));
+
+      // 点击删除按钮
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      // 确认对话框应出现
+      expect(find.text('Delete Tag'), findsOneWidget);
+
+      // 确认删除
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      // Sheet 内标签消失，回到空状态
+      expect(find.text('No tags yet'), findsOneWidget);
+
+      // 关闭 BottomSheet
+      final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+      await tester.tapAt(Offset(size.width / 2, 10));
+      await tester.pumpAndSettle();
+
+      // 音频列表上也不再有标签 chip
+      expect(find.text('ToDelete'), findsNothing);
     });
   });
 }

@@ -1,7 +1,7 @@
 // 标签归属编辑 BottomSheet
 //
 // Checkbox 多选方式编辑音频所属的标签，
-// 支持底部"创建新标签"入口（名称 + 颜色选择）。
+// 勾选/取消即时生效，支持底部"创建新标签"入口（名称 + 颜色选择）。
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/tag.dart';
@@ -11,35 +11,21 @@ import '../theme/app_theme.dart';
 import '../theme/tag_colors.dart';
 
 /// 标签归属编辑 BottomSheet
-class EditTagMembershipSheet extends ConsumerStatefulWidget {
+///
+/// 所有操作即时生效：勾选/取消、创建、删除均立刻写入数据库。
+class EditTagMembershipSheet extends ConsumerWidget {
   /// 要编辑归属的音频 ID
   final String audioId;
 
   const EditTagMembershipSheet({super.key, required this.audioId});
 
   @override
-  ConsumerState<EditTagMembershipSheet> createState() =>
-      _EditTagMembershipSheetState();
-}
-
-class _EditTagMembershipSheetState
-    extends ConsumerState<EditTagMembershipSheet> {
-  /// 当前选中的标签 ID 集合
-  late Set<String> _selectedIds;
-
-  @override
-  void initState() {
-    super.initState();
-    final tagState = ref.read(tagListProvider);
-    final currentTags = tagState.audioToTagsMap[widget.audioId] ?? [];
-    _selectedIds = Set<String>.from(currentTags);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final tags = ref.watch(tagListProvider.select((s) => s.tags));
+    final tagState = ref.watch(tagListProvider);
+    final tags = tagState.tags;
+    final audioTagIds = tagState.audioToTagsMap[audioId] ?? [];
 
     return SafeArea(
       child: Padding(
@@ -51,17 +37,11 @@ class _EditTagMembershipSheetState
             // 标题栏
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-              child: Row(
-                children: [
-                  Text(
-                    l10n.manageTags,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(onPressed: _onDone, child: Text(l10n.done)),
-                ],
+              child: Text(
+                l10n.manageTags,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const Divider(),
@@ -88,7 +68,7 @@ class _EditTagMembershipSheetState
                   itemCount: tags.length,
                   itemBuilder: (context, index) {
                     final tag = tags[index];
-                    final isSelected = _selectedIds.contains(tag.id);
+                    final isSelected = audioTagIds.contains(tag.id);
                     return CheckboxListTile(
                       secondary: Container(
                         width: 24,
@@ -104,20 +84,19 @@ class _EditTagMembershipSheetState
                           IconButton(
                             icon: const Icon(Icons.delete_outline, size: 20),
                             onPressed: () =>
-                                _showDeleteTagDialog(context, tag),
+                                _showDeleteTagDialog(context, ref, tag),
                             tooltip: l10n.deleteTag,
                           ),
                         ],
                       ),
                       value: isSelected,
                       onChanged: (value) {
-                        setState(() {
-                          if (value == true) {
-                            _selectedIds.add(tag.id);
-                          } else {
-                            _selectedIds.remove(tag.id);
-                          }
-                        });
+                        final notifier = ref.read(tagListProvider.notifier);
+                        if (value == true) {
+                          notifier.addAudioToTag(tag.id, audioId);
+                        } else {
+                          notifier.removeAudioFromTag(tag.id, audioId);
+                        }
                       },
                     );
                   },
@@ -134,7 +113,7 @@ class _EditTagMembershipSheetState
                 l10n.createTag,
                 style: TextStyle(color: theme.colorScheme.primary),
               ),
-              onTap: () => _showCreateTagDialog(context),
+              onTap: () => _showCreateTagDialog(context, ref),
             ),
           ],
         ),
@@ -142,18 +121,8 @@ class _EditTagMembershipSheetState
     );
   }
 
-  /// 点击完成 — 批量更新标签归属
-  Future<void> _onDone() async {
-    await ref
-        .read(tagListProvider.notifier)
-        .updateAudioTagMembership(widget.audioId, _selectedIds);
-    if (mounted) {
-      Navigator.pop(context);
-    }
-  }
-
   /// 删除标签确认对话框
-  void _showDeleteTagDialog(BuildContext context, Tag tag) {
+  void _showDeleteTagDialog(BuildContext context, WidgetRef ref, Tag tag) {
     final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
@@ -172,9 +141,6 @@ class _EditTagMembershipSheetState
           FilledButton(
             onPressed: () {
               ref.read(tagListProvider.notifier).deleteTag(tag.id);
-              setState(() {
-                _selectedIds.remove(tag.id);
-              });
               Navigator.pop(ctx);
             },
             style: FilledButton.styleFrom(
@@ -189,7 +155,7 @@ class _EditTagMembershipSheetState
   }
 
   /// 创建新标签对话框
-  void _showCreateTagDialog(BuildContext context) {
+  void _showCreateTagDialog(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     int selectedColor = kTagColors[0];
@@ -210,7 +176,8 @@ class _EditTagMembershipSheetState
                   labelText: l10n.tagName,
                   hintText: l10n.enterTagName,
                 ),
-                onSubmitted: (_) => _createAndSelect(ctx, controller, selectedColor),
+                onSubmitted: (_) =>
+                    _createAndAssign(ctx, ref, controller, selectedColor),
               ),
               const SizedBox(height: 16),
               Text(
@@ -243,7 +210,8 @@ class _EditTagMembershipSheetState
                             : null,
                       ),
                       child: isChosen
-                          ? const Icon(Icons.check, size: 18, color: Colors.white)
+                          ? const Icon(Icons.check,
+                              size: 18, color: Colors.white)
                           : null,
                     ),
                   );
@@ -257,7 +225,8 @@ class _EditTagMembershipSheetState
               child: Text(l10n.cancel),
             ),
             ElevatedButton(
-              onPressed: () => _createAndSelect(ctx, controller, selectedColor),
+              onPressed: () =>
+                  _createAndAssign(ctx, ref, controller, selectedColor),
               child: Text(l10n.add),
             ),
           ],
@@ -266,24 +235,23 @@ class _EditTagMembershipSheetState
     );
   }
 
-  /// 创建标签并自动勾选
-  Future<void> _createAndSelect(
+  /// 创建标签并自动关联到当前音频
+  Future<void> _createAndAssign(
     BuildContext dialogContext,
+    WidgetRef ref,
     TextEditingController controller,
     int colorValue,
   ) async {
     final name = controller.text.trim();
     if (name.isEmpty) return;
 
-    await ref.read(tagListProvider.notifier).createTag(name, colorValue);
+    final notifier = ref.read(tagListProvider.notifier);
+    await notifier.createTag(name, colorValue);
 
-    // 获取新创建的标签 ID
+    // 获取新创建的标签 ID 并立刻关联
     final tags = ref.read(tagListProvider).tags;
     final newTag = tags.lastWhere((t) => t.name == name);
-
-    setState(() {
-      _selectedIds.add(newTag.id);
-    });
+    await notifier.addAudioToTag(newTag.id, audioId);
 
     if (dialogContext.mounted) {
       Navigator.pop(dialogContext);

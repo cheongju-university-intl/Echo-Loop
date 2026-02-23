@@ -1,7 +1,7 @@
 // 合集归属编辑 BottomSheet
 //
 // Checkbox 多选方式编辑音频所属的合集，
-// 支持底部"创建新合集"入口。
+// 勾选/取消即时生效，支持底部"创建新合集"入口。
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/collection_provider.dart';
@@ -9,38 +9,22 @@ import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 
 /// 合集归属编辑 BottomSheet
-class EditCollectionMembershipSheet extends ConsumerStatefulWidget {
+///
+/// 所有操作即时生效：勾选/取消、创建均立刻写入数据库。
+class EditCollectionMembershipSheet extends ConsumerWidget {
   /// 要编辑归属的音频 ID
   final String audioId;
 
   const EditCollectionMembershipSheet({super.key, required this.audioId});
 
   @override
-  ConsumerState<EditCollectionMembershipSheet> createState() =>
-      _EditCollectionMembershipSheetState();
-}
-
-class _EditCollectionMembershipSheetState
-    extends ConsumerState<EditCollectionMembershipSheet> {
-  /// 当前选中的合集 ID 集合
-  late Set<String> _selectedIds;
-
-  @override
-  void initState() {
-    super.initState();
-    final collectionState = ref.read(collectionListProvider);
-    final currentCollections =
-        collectionState.audioToCollectionsMap[widget.audioId] ?? [];
-    _selectedIds = Set<String>.from(currentCollections);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final collections = ref.watch(
-      collectionListProvider.select((s) => s.collections),
-    );
+    final collectionState = ref.watch(collectionListProvider);
+    final collections = collectionState.collections;
+    final audioCollectionIds =
+        collectionState.audioToCollectionsMap[audioId] ?? [];
 
     return SafeArea(
       child: Padding(
@@ -52,17 +36,11 @@ class _EditCollectionMembershipSheetState
             // 标题栏
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-              child: Row(
-                children: [
-                  Text(
-                    l10n.manageCollections,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(onPressed: _onDone, child: Text(l10n.done)),
-                ],
+              child: Text(
+                l10n.manageCollections,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const Divider(),
@@ -89,18 +67,21 @@ class _EditCollectionMembershipSheetState
                   itemCount: collections.length,
                   itemBuilder: (context, index) {
                     final collection = collections[index];
-                    final isSelected = _selectedIds.contains(collection.id);
+                    final isSelected =
+                        audioCollectionIds.contains(collection.id);
                     return CheckboxListTile(
                       title: Text(collection.name),
                       value: isSelected,
                       onChanged: (value) {
-                        setState(() {
-                          if (value == true) {
-                            _selectedIds.add(collection.id);
-                          } else {
-                            _selectedIds.remove(collection.id);
-                          }
-                        });
+                        final notifier =
+                            ref.read(collectionListProvider.notifier);
+                        if (value == true) {
+                          notifier.addAudioToCollection(
+                              collection.id, audioId);
+                        } else {
+                          notifier.removeAudioFromCollection(
+                              collection.id, audioId);
+                        }
                       },
                     );
                   },
@@ -117,7 +98,7 @@ class _EditCollectionMembershipSheetState
                 l10n.createCollection,
                 style: TextStyle(color: theme.colorScheme.primary),
               ),
-              onTap: () => _showCreateCollectionDialog(context),
+              onTap: () => _showCreateCollectionDialog(context, ref),
             ),
           ],
         ),
@@ -125,18 +106,8 @@ class _EditCollectionMembershipSheetState
     );
   }
 
-  /// 点击完成 — 批量更新合集归属
-  Future<void> _onDone() async {
-    await ref
-        .read(collectionListProvider.notifier)
-        .updateAudioCollectionMembership(widget.audioId, _selectedIds);
-    if (mounted) {
-      Navigator.pop(context);
-    }
-  }
-
   /// 创建新合集对话框
-  void _showCreateCollectionDialog(BuildContext context) {
+  void _showCreateCollectionDialog(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
 
@@ -151,7 +122,7 @@ class _EditCollectionMembershipSheetState
             labelText: l10n.collectionName,
             hintText: l10n.enterCollectionName,
           ),
-          onSubmitted: (_) => _createAndSelect(ctx, controller),
+          onSubmitted: (_) => _createAndAssign(ctx, ref, controller),
         ),
         actions: [
           TextButton(
@@ -159,7 +130,7 @@ class _EditCollectionMembershipSheetState
             child: Text(l10n.cancel),
           ),
           ElevatedButton(
-            onPressed: () => _createAndSelect(ctx, controller),
+            onPressed: () => _createAndAssign(ctx, ref, controller),
             child: Text(l10n.add),
           ),
         ],
@@ -167,23 +138,22 @@ class _EditCollectionMembershipSheetState
     );
   }
 
-  /// 创建合集并自动勾选
-  Future<void> _createAndSelect(
+  /// 创建合集并自动关联到当前音频
+  Future<void> _createAndAssign(
     BuildContext dialogContext,
+    WidgetRef ref,
     TextEditingController controller,
   ) async {
     final name = controller.text.trim();
     if (name.isEmpty) return;
 
-    await ref.read(collectionListProvider.notifier).createCollection(name);
+    final notifier = ref.read(collectionListProvider.notifier);
+    await notifier.createCollection(name);
 
-    // 获取新创建的合集 ID
+    // 获取新创建的合集 ID 并立刻关联
     final collections = ref.read(collectionListProvider).rawCollections;
     final newCollection = collections.lastWhere((c) => c.name == name);
-
-    setState(() {
-      _selectedIds.add(newCollection.id);
-    });
+    await notifier.addAudioToCollection(newCollection.id, audioId);
 
     if (dialogContext.mounted) {
       Navigator.pop(dialogContext);
