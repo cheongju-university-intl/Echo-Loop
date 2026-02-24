@@ -20,9 +20,13 @@ import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
+import '../models/retell_settings.dart';
+import '../utils/keyword_extraction.dart';
+import '../utils/paragraph_grouping.dart';
 import '../widgets/blind_listen_briefing_sheet.dart';
 import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
+import '../widgets/retell/retell_briefing_sheet.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
 import '../database/providers.dart';
 import '../providers/learning_session/sentence_playback_engine.dart';
@@ -57,8 +61,14 @@ class LearningPlanScreen extends ConsumerStatefulWidget {
 }
 
 class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
+  /// 首学区域是否展开（默认展开）
+  bool _isFirstLearnExpanded = true;
+
   /// 复习区域是否展开
   bool _isReviewExpanded = false;
+
+  /// 自动展开复习区域是否已触发（只触发一次，不覆盖手动折叠）
+  bool _hasAutoExpandedReview = false;
 
   @override
   void initState() {
@@ -93,6 +103,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       _startIntensiveListen(context);
     } else if (currentSubStage == SubStageType.listenAndRepeat) {
       _startListenAndRepeat(context);
+    } else if (currentSubStage == SubStageType.retell) {
+      _startRetelling(context);
     } else {
       // 其他子步骤 → 直接导航到播放器
       if (widget.collectionId != null) {
@@ -245,6 +257,61 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     });
   }
 
+  /// 进入段级复述
+  void _startRetelling(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final lpState = ref.read(listeningPracticeProvider);
+
+    // 无字幕则提示
+    if (lpState.sentences.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.intensiveListenNoSubtitle),
+          content: Text(l10n.intensiveListenNoSubtitleMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.ok),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showRetellBriefingSheet(
+      context: context,
+      sentences: lpState.sentences,
+      onStartPractice: (targetDuration) async {
+        final paragraphs = groupSentencesIntoParagraphs(
+          lpState.sentences,
+          targetDuration,
+        );
+        final keywordsMap = extractKeywords(
+          lpState.sentences,
+          ratio: KeywordRatio.oneThird,
+        );
+
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterRetellMode(
+              widget.audioItemId,
+              paragraphs,
+              keywordsMap,
+            );
+        if (mounted) {
+          context.push(
+            AppRoutes.retellPlayer(
+              widget.collectionId,
+              widget.audioItemId,
+            ),
+          );
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -271,16 +338,15 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       );
     }
 
-    // 当活跃阶段在复习区域时自动展开
-    if (progress != null &&
+    // 当活跃阶段在复习区域时自动展开（仅触发一次，不覆盖手动折叠）
+    if (!_hasAutoExpandedReview &&
+        progress != null &&
         progress.currentStage.index >= LearningStage.review0.index &&
-        !progress.isCompleted &&
-        !_isReviewExpanded) {
+        !progress.isCompleted) {
+      _hasAutoExpandedReview = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          setState(() {
-            _isReviewExpanded = true;
-          });
+          setState(() => _isReviewExpanded = true);
         }
       });
     }
@@ -308,6 +374,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                   progress: progress,
                   collectionId: widget.collectionId,
                   audioItemId: widget.audioItemId,
+                  isExpanded: _isFirstLearnExpanded,
+                  onToggle: () => setState(
+                    () => _isFirstLearnExpanded = !_isFirstLearnExpanded,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.l),
                 _ReviewSection(
@@ -477,11 +547,19 @@ class _FirstStudySection extends ConsumerWidget {
   /// 音频项 ID（导航用）
   final String audioItemId;
 
+  /// 是否展开
+  final bool isExpanded;
+
+  /// 折叠/展开切换回调
+  final VoidCallback onToggle;
+
   const _FirstStudySection({
     required this.l10n,
     this.progress,
     required this.collectionId,
     required this.audioItemId,
+    required this.isExpanded,
+    required this.onToggle,
   });
 
   @override
@@ -519,30 +597,50 @@ class _FirstStudySection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          child: Row(
-            children: [
-              Icon(Icons.school, color: theme.colorScheme.primary, size: 20),
-              const SizedBox(width: AppSpacing.s),
-              Text(
-                l10n.firstStudy,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+        // 标题行（可点击展开/折叠）
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.school, color: theme.colorScheme.primary, size: 20),
+                const SizedBox(width: AppSpacing.s),
+                Text(
+                  l10n.firstStudy,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Text(
-                l10n.stepProgress(completedCount, subStages.length),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                const Spacer(),
+                Text(
+                  l10n.stepProgress(completedCount, subStages.length),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: AppSpacing.xs),
+                AnimatedRotation(
+                  turns: isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.expand_more,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: AppSpacing.s),
-        ...List.generate(subStages.length, (index) {
+        // 展开的步骤列表
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Column(
+            children: List.generate(subStages.length, (index) {
           final subStage = subStages[index];
           final stepData = stepDataMap[subStage]!;
           final isCompleted =
@@ -576,6 +674,11 @@ class _FirstStudySection extends ConsumerWidget {
             if (isCompleted || isCurrent) {
               subtitle = _buildShadowingSubtitle(ref, l10n);
             }
+          } else if (subStage == SubStageType.retell) {
+            // 复述：仅当前或已完成步骤显示统计
+            if (isCompleted || isCurrent) {
+              subtitle = _buildRetellSubtitle(l10n);
+            }
           }
 
           // 已完成步骤支持点击进入自由练习
@@ -586,6 +689,8 @@ class _FirstStudySection extends ConsumerWidget {
             onTap = () => _startFreePlayIntensiveListen(context, ref);
           } else if (isCompleted && subStage == SubStageType.listenAndRepeat) {
             onTap = () => _startFreePlayListenAndRepeat(context, ref);
+          } else if (isCompleted && subStage == SubStageType.retell) {
+            onTap = () => _startFreePlayRetell(context, ref);
           }
 
           return _StepCard(
@@ -600,6 +705,12 @@ class _FirstStudySection extends ConsumerWidget {
             onTap: onTap,
           );
         }),
+          ),
+          crossFadeState: isExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 300),
+        ),
       ],
     );
   }
@@ -697,6 +808,49 @@ class _FirstStudySection extends ConsumerWidget {
         AppRoutes.listenAndRepeatPlayer(collectionId, audioItemId),
       );
     }
+  }
+
+  /// 构建复述卡片副标题（总完成遍数）
+  String? _buildRetellSubtitle(AppLocalizations l10n) {
+    if (progress?.retellPassCount case final count? when count > 0) {
+      return l10n.retellPassInfo(count);
+    }
+    return null;
+  }
+
+  /// 进入自由练习复述模式（弹 briefing sheet 选择段落时长）
+  void _startFreePlayRetell(BuildContext context, WidgetRef ref) {
+    final lpState = ref.read(listeningPracticeProvider);
+    if (lpState.sentences.isEmpty) return;
+
+    showRetellBriefingSheet(
+      context: context,
+      sentences: lpState.sentences,
+      onStartPractice: (targetDuration) async {
+        final paragraphs = groupSentencesIntoParagraphs(
+          lpState.sentences,
+          targetDuration,
+        );
+        final keywordsMap = extractKeywords(
+          lpState.sentences,
+          ratio: KeywordRatio.oneThird,
+        );
+
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterRetellMode(
+              audioItemId,
+              paragraphs,
+              keywordsMap,
+              isFreePlay: true,
+            );
+        if (context.mounted) {
+          context.push(
+            AppRoutes.retellPlayer(collectionId, audioItemId),
+          );
+        }
+      },
+    );
   }
 }
 

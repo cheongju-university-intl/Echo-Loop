@@ -19,6 +19,7 @@ import '../screens/player_screen.dart';
 import '../screens/blind_listen_player_screen.dart';
 import '../screens/intensive_listen_player_screen.dart';
 import '../screens/listen_and_repeat_player_screen.dart';
+import '../screens/retell_player_screen.dart';
 import 'main_shell.dart';
 
 /// 全局根导航器 key
@@ -60,6 +61,12 @@ abstract class AppRoutes {
       collectionId != null
       ? '/collections/$collectionId/$audioId/listen-and-repeat'
       : '/audio/$audioId/listen-and-repeat';
+
+  /// 复述播放器页路径
+  static String retellPlayer(String? collectionId, String audioId) =>
+      collectionId != null
+      ? '/collections/$collectionId/$audioId/retell'
+      : '/audio/$audioId/retell';
 
   /// 独立音频学习计划页路径（不依赖合集）
   static String audioLearningPlan(String audioId) => '/audio/$audioId/plan';
@@ -163,6 +170,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      GoRoute(
+        path: '/audio/:audioId/retell',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final audioId = state.pathParameters['audioId']!;
+          return RetellPlayerScreen(
+            collectionId: null,
+            audioItemId: audioId,
+          );
+        },
+      ),
       // 详情页放在 shell 外部，全屏显示
       GoRoute(
         path: '/collections/:collectionId',
@@ -220,6 +238,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               final collectionId = state.pathParameters['collectionId']!;
               final audioId = state.pathParameters['audioId']!;
               return ListenAndRepeatPlayerScreen(
+                collectionId: collectionId,
+                audioItemId: audioId,
+              );
+            },
+          ),
+          GoRoute(
+            path: ':audioId/retell',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) {
+              final collectionId = state.pathParameters['collectionId']!;
+              final audioId = state.pathParameters['audioId']!;
+              return RetellPlayerScreen(
                 collectionId: collectionId,
                 audioItemId: audioId,
               );

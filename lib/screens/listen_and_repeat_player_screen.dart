@@ -16,9 +16,15 @@ import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/listen_and_repeat_player_provider.dart';
+import '../providers/listening_practice/listening_practice_provider.dart';
+import '../router/app_router.dart';
 import '../theme/app_theme.dart';
+import '../models/retell_settings.dart';
+import '../utils/keyword_extraction.dart';
+import '../utils/paragraph_grouping.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
+import '../widgets/retell/retell_briefing_sheet.dart';
 
 /// 跟读播放器页面
 class ListenAndRepeatPlayerScreen extends ConsumerStatefulWidget {
@@ -249,10 +255,60 @@ class _ListenAndRepeatPlayerScreenState
         debugPrint('跟读完成处理出错: $e');
       }
 
-      // 目前跟读后的步骤暂无播放器，统一返回计划页
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) context.pop();
+      if (result == true) {
+        // 继续下一步：段级复述
+        await _navigateToRetell();
+      } else {
+        // 返回计划页
+        await ref.read(learningSessionProvider.notifier).exitLearningMode();
+        if (mounted) context.pop();
+      }
     }
+  }
+
+  /// 导航到段级复述播放器
+  ///
+  /// 退出跟读模式 → 显示复述简报弹窗 → 分段 + 提取关键词 → 进入复述模式 → pushReplacement
+  Future<void> _navigateToRetell() async {
+    await ref.read(learningSessionProvider.notifier).exitLearningMode();
+    if (!mounted) return;
+
+    final lpState = ref.read(listeningPracticeProvider);
+    if (lpState.sentences.isEmpty) {
+      if (mounted) context.pop();
+      return;
+    }
+
+    showRetellBriefingSheet(
+      context: context,
+      sentences: lpState.sentences,
+      onStartPractice: (targetDuration) async {
+        final paragraphs = groupSentencesIntoParagraphs(
+          lpState.sentences,
+          targetDuration,
+        );
+        final keywordsMap = extractKeywords(
+          lpState.sentences,
+          ratio: KeywordRatio.oneThird,
+        );
+
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterRetellMode(
+              widget.audioItemId,
+              paragraphs,
+              keywordsMap,
+            );
+        if (mounted) {
+          context.pushReplacement(
+            AppRoutes.retellPlayer(
+              widget.collectionId,
+              widget.audioItemId,
+            ),
+          );
+        }
+      },
+    );
   }
 
   @override
@@ -690,7 +746,7 @@ bool _hasPlayerScreen(SubStageType type) => switch (type) {
   SubStageType.blindListen => true,
   SubStageType.intensiveListen => true,
   SubStageType.listenAndRepeat => true,
-  SubStageType.retell => false,
+  SubStageType.retell => true,
 };
 
 /// 获取子步骤的本地化名称

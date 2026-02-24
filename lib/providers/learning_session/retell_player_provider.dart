@@ -1,0 +1,474 @@
+/// 复述专用播放器 Provider
+///
+/// 段级复述播放器，直接操作 AudioEngine。
+/// 核心功能：
+/// - 段落播放（playRangeOnce：首句 startTime → 末句 endTime）
+/// - 播放期间句子高亮（监听 absolutePositionStream + 二分查找）
+/// - 复述倒计时（段落播放完→倒计时→下一段）
+/// - 遍数循环（播放→复述为一遍，达到遍数后推进下一段）
+/// - 文本遮盖/关键词显示模式切换
+library;
+
+import 'dart:async';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../models/retell_settings.dart';
+import '../../models/sentence.dart';
+import '../../utils/keyword_extraction.dart';
+import '../audio_engine/audio_engine_provider.dart';
+
+part 'retell_player_provider.g.dart';
+
+/// 复述阶段
+enum RetellPhase {
+  /// 正在播放段落音频
+  listening,
+
+  /// 复述停顿阶段
+  retelling,
+}
+
+/// 复述播放器状态
+class RetellPlayerState {
+  /// 当前段落索引（0-based）
+  final int currentParagraphIndex;
+
+  /// 总段落数
+  final int totalParagraphs;
+
+  /// listening phase: 段内正在播放的句子索引（-1 = 未播放）
+  final int playingSentenceIndex;
+
+  /// 当前阶段
+  final RetellPhase phase;
+
+  /// 当前遍数（1-based，播放→复述为一遍）
+  final int currentRepeatCount;
+
+  /// 文本显示模式
+  final RetellDisplayMode displayMode;
+
+  /// 复述设置
+  final RetellSettings settings;
+
+  /// listening phase 的播放状态
+  final bool isPlaying;
+
+  /// 复述倒计时进行中
+  final bool isRetellCountdown;
+
+  /// 倒计时剩余时间
+  final Duration pauseRemaining;
+
+  /// 倒计时总时长
+  final Duration pauseDuration;
+
+  /// 是否已完成所有段落
+  final bool isCompleted;
+
+  const RetellPlayerState({
+    this.currentParagraphIndex = 0,
+    this.totalParagraphs = 0,
+    this.playingSentenceIndex = -1,
+    this.phase = RetellPhase.listening,
+    this.currentRepeatCount = 1,
+    this.displayMode = RetellDisplayMode.keywordsOnly,
+    this.settings = const RetellSettings(),
+    this.isPlaying = false,
+    this.isRetellCountdown = false,
+    this.pauseRemaining = Duration.zero,
+    this.pauseDuration = Duration.zero,
+    this.isCompleted = false,
+  });
+
+  RetellPlayerState copyWith({
+    int? currentParagraphIndex,
+    int? totalParagraphs,
+    int? playingSentenceIndex,
+    RetellPhase? phase,
+    int? currentRepeatCount,
+    RetellDisplayMode? displayMode,
+    RetellSettings? settings,
+    bool? isPlaying,
+    bool? isRetellCountdown,
+    Duration? pauseRemaining,
+    Duration? pauseDuration,
+    bool? isCompleted,
+  }) {
+    return RetellPlayerState(
+      currentParagraphIndex:
+          currentParagraphIndex ?? this.currentParagraphIndex,
+      totalParagraphs: totalParagraphs ?? this.totalParagraphs,
+      playingSentenceIndex: playingSentenceIndex ?? this.playingSentenceIndex,
+      phase: phase ?? this.phase,
+      currentRepeatCount: currentRepeatCount ?? this.currentRepeatCount,
+      displayMode: displayMode ?? this.displayMode,
+      settings: settings ?? this.settings,
+      isPlaying: isPlaying ?? this.isPlaying,
+      isRetellCountdown: isRetellCountdown ?? this.isRetellCountdown,
+      pauseRemaining: pauseRemaining ?? this.pauseRemaining,
+      pauseDuration: pauseDuration ?? this.pauseDuration,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
+}
+
+/// 复述专用播放器 Provider
+@Riverpod(keepAlive: true)
+class RetellPlayer extends _$RetellPlayer {
+  /// 段落列表
+  List<List<Sentence>> _paragraphs = [];
+
+  /// 所有句子列表（用于重新生成关键词）
+  List<Sentence> _allSentences = [];
+
+  /// 关键词映射：段落内句子索引 → 词索引集合
+  Map<int, Set<int>> _keywordsMap = {};
+
+  /// position 监听（用于句子高亮）
+  StreamSubscription<Duration>? _positionSub;
+
+  /// 复述倒计时定时器
+  Timer? _countdownTimer;
+
+  /// 当前 AudioEngine sessionId
+  int _sessionId = -1;
+
+  @override
+  RetellPlayerState build() {
+    ref.onDispose(() {
+      _positionSub?.cancel();
+      _countdownTimer?.cancel();
+    });
+    return const RetellPlayerState();
+  }
+
+  /// 初始化复述播放器
+  ///
+  /// [paragraphs] DP 分段结果
+  /// [keywordsMap] 关键词提取结果
+  /// [startSentenceIndex] 断点续学句子索引（段落第一句的全局索引）
+  void initialize(
+    List<List<Sentence>> paragraphs,
+    Map<int, Set<int>> keywordsMap, {
+    int? startSentenceIndex,
+  }) {
+    _cleanup();
+    _paragraphs = paragraphs;
+    _allSentences = paragraphs.expand((p) => p).toList();
+    _keywordsMap = keywordsMap;
+
+    // 根据句子索引查找对应段落
+    var safeIndex = 0;
+    if (startSentenceIndex != null && paragraphs.isNotEmpty) {
+      for (var i = 0; i < paragraphs.length; i++) {
+        if (paragraphs[i].any((s) => s.index == startSentenceIndex)) {
+          safeIndex = i;
+          break;
+        }
+      }
+    }
+
+    state = RetellPlayerState(
+      currentParagraphIndex: safeIndex,
+      totalParagraphs: paragraphs.length,
+    );
+  }
+
+  /// 获取当前段落第一句的全局句子索引（用于保存断点）
+  int? get currentParagraphFirstSentenceIndex {
+    final sentences = currentParagraphSentences;
+    return sentences.isNotEmpty ? sentences.first.index : null;
+  }
+
+  /// 获取当前段落的句子列表
+  List<Sentence> get currentParagraphSentences =>
+      _paragraphs.isNotEmpty &&
+              state.currentParagraphIndex < _paragraphs.length
+          ? _paragraphs[state.currentParagraphIndex]
+          : [];
+
+  /// 获取所有段落
+  List<List<Sentence>> get paragraphs => List.unmodifiable(_paragraphs);
+
+  /// 获取关键词映射
+  Map<int, Set<int>> get keywordsMap => Map.unmodifiable(_keywordsMap);
+
+  /// 获取当前段落时长
+  Duration get currentParagraphDuration {
+    final sentences = currentParagraphSentences;
+    if (sentences.isEmpty) return Duration.zero;
+    return sentences.last.endTime - sentences.first.startTime;
+  }
+
+  /// 重新开始：重置到第一段，重新播放
+  Future<void> restart() async {
+    _cancelAll();
+    state = RetellPlayerState(
+      currentParagraphIndex: 0,
+      totalParagraphs: _paragraphs.length,
+      settings: state.settings,
+      displayMode: RetellDisplayMode.keywordsOnly,
+    );
+    await _playCurrentParagraph();
+  }
+
+  /// 开始播放当前段落
+  Future<void> startPlaying() async {
+    if (_paragraphs.isEmpty) {
+      state = state.copyWith(isCompleted: true);
+      return;
+    }
+    await _playCurrentParagraph();
+  }
+
+  /// 暂停播放
+  ///
+  /// 使旧 session 失效 + 真正停止底层音频播放。
+  /// resume 时从段落开头重新播放（不是从暂停位置继续），
+  /// 因为复述练习需要连贯听完整段。
+  Future<void> pause() async {
+    final engine = ref.read(audioEngineProvider.notifier);
+    _sessionId = engine.newSession();
+    _positionSub?.cancel();
+    _countdownTimer?.cancel();
+    await engine.stopPlayback();
+    state = state.copyWith(
+      isPlaying: false,
+      isRetellCountdown: false,
+    );
+  }
+
+  /// 恢复播放
+  Future<void> resume() async {
+    if (state.phase == RetellPhase.listening) {
+      await _playCurrentParagraph();
+    } else {
+      // 复述阶段恢复倒计时
+      _startRetellCountdown(state.pauseRemaining);
+    }
+  }
+
+  /// 跳转到下一段
+  Future<void> goToNextParagraph() async {
+    if (state.currentParagraphIndex >= state.totalParagraphs - 1) {
+      // 最后一段完成
+      _cancelAll();
+      state = state.copyWith(isCompleted: true, isPlaying: false);
+      return;
+    }
+
+    _cancelAll();
+    state = state.copyWith(
+      currentParagraphIndex: state.currentParagraphIndex + 1,
+      phase: RetellPhase.listening,
+      currentRepeatCount: 1,
+      playingSentenceIndex: -1,
+      isRetellCountdown: false,
+      displayMode: RetellDisplayMode.keywordsOnly,
+    );
+
+    await _playCurrentParagraph();
+  }
+
+  /// 跳转到上一段
+  Future<void> goToPreviousParagraph() async {
+    if (state.currentParagraphIndex <= 0) return;
+
+    _cancelAll();
+    state = state.copyWith(
+      currentParagraphIndex: state.currentParagraphIndex - 1,
+      phase: RetellPhase.listening,
+      currentRepeatCount: 1,
+      playingSentenceIndex: -1,
+      isRetellCountdown: false,
+      displayMode: RetellDisplayMode.keywordsOnly,
+    );
+
+    await _playCurrentParagraph();
+  }
+
+  /// 跳过复述倒计时
+  Future<void> skipRetelling() async {
+    _countdownTimer?.cancel();
+    await _onRetellCountdownFinished();
+  }
+
+  /// 设置显示模式
+  void setDisplayMode(RetellDisplayMode mode) {
+    state = state.copyWith(displayMode: mode);
+  }
+
+  /// 更新设置
+  ///
+  /// 当 [keywordRatio] 变化时自动重新生成关键词。
+  void updateSettings(RetellSettings newSettings) {
+    final ratioChanged = newSettings.keywordRatio != state.settings.keywordRatio;
+    state = state.copyWith(settings: newSettings);
+    if (ratioChanged) {
+      regenerateKeywords();
+    }
+  }
+
+  /// 重新生成关键词
+  ///
+  /// 根据当前设置中的 [KeywordRatio] 重新提取关键词。
+  void regenerateKeywords() {
+    if (_allSentences.isEmpty) return;
+    _keywordsMap = extractKeywords(
+      _allSentences,
+      ratio: state.settings.keywordRatio,
+    );
+  }
+
+  /// 释放资源
+  void disposePlayer() {
+    _cleanup();
+    _paragraphs = [];
+    _allSentences = [];
+    _keywordsMap = {};
+    state = const RetellPlayerState();
+  }
+
+  // ========== 内部方法 ==========
+
+  /// 播放当前段落
+  ///
+  /// 使用局部变量 `sid` 捕获 sessionId，防止 pause/其他操作
+  /// 覆写实例变量 `_sessionId` 后导致 guard 失效。
+  Future<void> _playCurrentParagraph() async {
+    final sentences = currentParagraphSentences;
+    if (sentences.isEmpty) return;
+
+    final engine = ref.read(audioEngineProvider.notifier);
+    _sessionId = engine.newSession();
+    final sid = _sessionId; // 捕获局部变量
+
+    state = state.copyWith(
+      phase: RetellPhase.listening,
+      isPlaying: true,
+      playingSentenceIndex: 0,
+      isRetellCountdown: false,
+    );
+
+    // 订阅 position stream 实现句子高亮
+    _startPositionTracking(sentences);
+
+    final start = sentences.first.startTime;
+    final end = sentences.last.endTime;
+
+    await engine.playRangeOnce(start, end, sid);
+
+    // 播放完成后进入复述阶段（用局部变量检查）
+    if (!engine.isActiveSession(sid)) return;
+
+    _positionSub?.cancel();
+    _enterRetellingPhase();
+  }
+
+  /// 订阅 position stream，二分查找定位当前句子
+  void _startPositionTracking(List<Sentence> sentences) {
+    _positionSub?.cancel();
+    final engine = ref.read(audioEngineProvider.notifier);
+
+    _positionSub = engine.absolutePositionStream.listen((position) {
+      if (!engine.isActiveSession(_sessionId)) return;
+      if (state.phase != RetellPhase.listening) return;
+
+      final idx = _findSentenceIndex(sentences, position);
+      if (idx != state.playingSentenceIndex && idx >= 0) {
+        state = state.copyWith(playingSentenceIndex: idx);
+      }
+    });
+  }
+
+  /// 二分查找当前播放位置对应的句子索引
+  int _findSentenceIndex(List<Sentence> sentences, Duration position) {
+    var lo = 0;
+    var hi = sentences.length - 1;
+
+    while (lo <= hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (position < sentences[mid].startTime) {
+        hi = mid - 1;
+      } else if (position >= sentences[mid].endTime) {
+        lo = mid + 1;
+      } else {
+        return mid;
+      }
+    }
+
+    // 如果没有精确匹配，返回最近的
+    return lo.clamp(0, sentences.length - 1);
+  }
+
+  /// 进入复述阶段
+  void _enterRetellingPhase() {
+    final paragraphDuration = currentParagraphDuration;
+    final pauseDuration =
+        state.settings.calculatePauseDuration(paragraphDuration);
+
+    state = state.copyWith(
+      phase: RetellPhase.retelling,
+      isPlaying: false,
+      playingSentenceIndex: -1,
+    );
+
+    _startRetellCountdown(pauseDuration);
+  }
+
+  /// 开始复述倒计时（100ms 更新，进度条平滑移动）
+  void _startRetellCountdown(Duration duration) {
+    _countdownTimer?.cancel();
+
+    state = state.copyWith(
+      isRetellCountdown: true,
+      pauseDuration: duration,
+      pauseRemaining: duration,
+    );
+
+    const tick = Duration(milliseconds: 100);
+    _countdownTimer = Timer.periodic(tick, (timer) {
+      final remaining = state.pauseRemaining - tick;
+      if (remaining <= Duration.zero) {
+        timer.cancel();
+        _onRetellCountdownFinished();
+      } else {
+        state = state.copyWith(pauseRemaining: remaining);
+      }
+    });
+  }
+
+  /// 复述倒计时结束
+  Future<void> _onRetellCountdownFinished() async {
+    state = state.copyWith(isRetellCountdown: false);
+
+    // 检查遍数
+    if (state.currentRepeatCount < state.settings.repeatCount) {
+      // 还有遍数 → 回到 listening phase
+      state = state.copyWith(
+        currentRepeatCount: state.currentRepeatCount + 1,
+        );
+      await _playCurrentParagraph();
+    } else {
+      // 推进下一段
+      await goToNextParagraph();
+    }
+  }
+
+  /// 取消所有异步操作并停止音频
+  void _cancelAll() {
+    final engine = ref.read(audioEngineProvider.notifier);
+    _sessionId = engine.newSession();
+    _positionSub?.cancel();
+    _countdownTimer?.cancel();
+    engine.stopPlayback();
+  }
+
+  /// 清理资源
+  void _cleanup() {
+    _positionSub?.cancel();
+    _countdownTimer?.cancel();
+    _positionSub = null;
+    _countdownTimer = null;
+  }
+}

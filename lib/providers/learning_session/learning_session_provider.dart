@@ -16,6 +16,7 @@ import '../listening_practice/listening_practice_provider.dart';
 import 'blind_listen_player_provider.dart';
 import 'intensive_listen_player_provider.dart';
 import 'listen_and_repeat_player_provider.dart';
+import 'retell_player_provider.dart';
 import 'sentence_playback_engine.dart';
 import '../../database/providers.dart';
 
@@ -31,6 +32,9 @@ enum LearningMode {
 
   /// 难句跟读
   listenAndRepeat,
+
+  /// 段级复述
+  retell,
 }
 
 /// 学习会话状态
@@ -266,6 +270,43 @@ class LearningSession extends _$LearningSession {
     );
   }
 
+  /// 进入段级复述模式
+  ///
+  /// 1. 保存当前用户播放设置
+  /// 2. 暂停 LP 的 stream 监听
+  /// 3. 初始化 RetellPlayer（段落分组 + 关键词映射 + 断点索引）
+  Future<void> enterRetellMode(
+    String audioItemId,
+    List<List<Sentence>> paragraphs,
+    Map<int, Set<int>> keywordsMap, {
+    bool isFreePlay = false,
+  }) async {
+    final practice = ref.read(listeningPracticeProvider.notifier);
+    final currentSettings = ref.read(listeningPracticeProvider).settings;
+
+    // 从数据库读取断点句子索引
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[audioItemId];
+    final startSentenceIndex = progress?.retellParagraphIndex;
+
+    state = state.copyWith(
+      learningMode: LearningMode.retell,
+      blindListenCompleted: false,
+      audioItemId: audioItemId,
+      savedSettings: currentSettings,
+      isFreePlay: isFreePlay,
+    );
+
+    // 暂停 LP 的 stream 监听
+    practice.suspendListeners();
+
+    // 初始化复述播放器
+    final player = ref.read(retellPlayerProvider.notifier);
+    player.initialize(paragraphs, keywordsMap,
+        startSentenceIndex: startSentenceIndex);
+  }
+
   /// 退出学习模式
   ///
   /// 根据当前学习模式分支处理：停止播放、释放资源、恢复 LP 监听。
@@ -288,6 +329,10 @@ class LearningSession extends _$LearningSession {
       // 释放跟读播放器资源
       final player = ref.read(listenAndRepeatPlayerProvider.notifier);
       player.disposePlayer();
+    } else if (mode == LearningMode.retell) {
+      // 释放复述播放器资源
+      final retellPlayer = ref.read(retellPlayerProvider.notifier);
+      retellPlayer.disposePlayer();
     }
 
     // 通用：清除 clip 防止残留影响 LP 的 absolutePositionStream

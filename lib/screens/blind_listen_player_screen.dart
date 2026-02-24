@@ -457,7 +457,7 @@ bool _hasPlayerScreen(SubStageType type) => switch (type) {
   SubStageType.blindListen => true,
   SubStageType.intensiveListen => true,
   SubStageType.listenAndRepeat => true,
-  SubStageType.retell => false,
+  SubStageType.retell => true,
 };
 
 /// 获取子步骤的本地化名称
