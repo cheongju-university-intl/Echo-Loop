@@ -25,9 +25,9 @@ void learningPlanTests() {
       // 通过 appRouterProvider 直接导航到学习计划页
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/plan',
-      );
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/plan');
       await tester.pumpAndSettle();
     }
 
@@ -36,7 +36,7 @@ void learningPlanTests() {
       await navigateToLearningPlan(tester);
 
       // 验证 4 个首学步骤卡片
-      expect(find.text('Blind Listening'), findsOneWidget);
+      expect(find.text('Blind Listening'), findsWidgets);
       expect(find.text('Intensive Listening'), findsOneWidget);
       expect(find.text('Listen & Repeat'), findsOneWidget);
       expect(find.text('Retelling'), findsOneWidget);
@@ -64,16 +64,14 @@ void learningPlanTests() {
 
     testWidgets('无字幕时按钮禁用且显示警告横幅', (tester) async {
       // 使用无 transcriptPath 的 AudioItem
-      final audioItemNoTranscript = createTestAudioItem(
-        transcriptPath: null,
-      );
+      final audioItemNoTranscript = createTestAudioItem(transcriptPath: null);
       final progress = createTestLearningProgress(
         currentStageStartedAt: DateTime.now(),
       );
 
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: progress,
-      ));
+      await tester.pumpWidget(
+        createTestAppWithAudio(progressOverride: progress),
+      );
       await tester.pumpAndSettle();
 
       // 替换音频为无字幕版本
@@ -86,9 +84,9 @@ void learningPlanTests() {
       await audioLib.addAudioItem(audioItemNoTranscript);
 
       // 导航到学习计划页
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/plan',
-      );
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/plan');
       await tester.pumpAndSettle();
 
       // 验证警告横幅出现（warning 图标）
@@ -110,9 +108,9 @@ void learningPlanTests() {
         currentStageStartedAt: DateTime.now(),
       );
 
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: progress,
-      ));
+      await tester.pumpWidget(
+        createTestAppWithAudio(progressOverride: progress),
+      );
       await navigateToLearningPlan(tester);
 
       // 验证盲听步骤显示完成标记（绿色勾图标）
@@ -132,9 +130,9 @@ void learningPlanTests() {
         currentStageStartedAt: DateTime.now(),
       );
 
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: progress,
-      ));
+      await tester.pumpWidget(
+        createTestAppWithAudio(progressOverride: progress),
+      );
       await navigateToLearningPlan(tester);
 
       // 点击"Continue Learning"

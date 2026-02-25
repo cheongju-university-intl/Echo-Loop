@@ -121,13 +121,13 @@ void main() {
       expect(find.text('First Study'), findsOneWidget);
       expect(find.text('0/4 completed'), findsOneWidget);
 
-      expect(find.text('Blind Listening'), findsOneWidget);
+      expect(find.text('Blind Listening'), findsWidgets);
       expect(find.text('Intensive Listening'), findsOneWidget);
       expect(find.text('Listen & Repeat'), findsOneWidget);
       expect(find.text('Retelling'), findsOneWidget);
     });
 
-    testWidgets('复习区域默认折叠', (tester) async {
+    testWidgets('复习区显示七个同级轮次', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -137,36 +137,61 @@ void main() {
       await tester.pumpAndSettle();
 
       // 滚动到复习区域
-      await tester.scrollUntilVisible(find.text('Review'), 200);
+      await tester.scrollUntilVisible(find.text('Review 1'), 200);
       await tester.pumpAndSettle();
 
-      expect(find.text('Review'), findsOneWidget);
-      expect(find.text('0/7 completed'), findsOneWidget);
-      // 复习区域的 AnimatedRotation 是第二个（首学区域有第一个）
-      final expandIcons = tester.widgetList<AnimatedRotation>(
-        find.byType(AnimatedRotation),
-      ).toList();
-      expect(expandIcons.last.turns, 0.0);
+      expect(find.text('Review 1'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Review 7'), 200);
+      expect(find.text('Review 7'), findsOneWidget);
     });
 
-    testWidgets('点击复习标题展开复习区域', (tester) async {
+    testWidgets('当前复习轮次显示子阶段和时间标签', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(createTestWidget());
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review0,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            lastStageCompletedAt: DateTime(2026, 1, 1),
+            updatedAt: DateTime(2026, 1, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
       await tester.pumpAndSettle();
 
-      // 滚动到复习区域并点击
-      await tester.scrollUntilVisible(find.text('Review'), 200);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Review'));
-      await tester.pumpAndSettle();
-
-      // 复习步骤可见（可能需要继续滚动）
+      // 滚动到首轮复习并检查其子阶段
       await tester.scrollUntilVisible(find.text('Review 1'), 200);
+      await tester.pumpAndSettle();
       expect(find.text('Review 1'), findsOneWidget);
+      expect(find.text('0/2 completed'), findsOneWidget); // 默认折叠
+      final expandedBeforeTap = tester
+          .widgetList<AnimatedRotation>(find.byType(AnimatedRotation))
+          .where((widget) => widget.turns == 0.5)
+          .length;
+      expect(expandedBeforeTap, 1); // 仅首学展开
+
+      await tester.tap(find.text('Review 1'));
+      await tester.pumpAndSettle();
+      final expandedAfterFirstTap = tester
+          .widgetList<AnimatedRotation>(find.byType(AnimatedRotation))
+          .where((widget) => widget.turns == 0.5)
+          .length;
+      expect(expandedAfterFirstTap, 2); // 首学 + 首轮复习展开
+
+      await tester.tap(find.text('Review 1'));
+      await tester.pumpAndSettle();
+      final expandedAfterSecondTap = tester
+          .widgetList<AnimatedRotation>(find.byType(AnimatedRotation))
+          .where((widget) => widget.turns == 0.5)
+          .length;
+      expect(expandedAfterSecondTap, 1); // 再次折叠后仅首学展开
       expect(find.text('Now'), findsOneWidget);
     });
 
@@ -274,12 +299,12 @@ void main() {
       expect(find.text('未开始'), findsOneWidget);
       expect(find.text('首学'), findsOneWidget);
       expect(find.text('0/4 完成'), findsOneWidget);
-      expect(find.text('全文盲听'), findsOneWidget);
+      expect(find.text('全文盲听'), findsWidgets);
       expect(find.text('开始学习'), findsOneWidget);
 
-      // 滚动到复习区域
-      await tester.scrollUntilVisible(find.text('复习'), 200);
-      expect(find.text('复习'), findsOneWidget);
+      // 滚动到复习轮次区域
+      await tester.scrollUntilVisible(find.text('首轮复习'), 200);
+      expect(find.text('首轮复习'), findsOneWidget);
     });
 
     testWidgets('audioItem 找不到时显示错误页面', (tester) async {
@@ -352,7 +377,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 盲听步骤已完成，点击直接导航到盲听播放器（不弹 briefing sheet）
-      await tester.tap(find.text('Blind Listening'));
+      await tester.tap(find.text('Blind Listening').first);
       await tester.pumpAndSettle();
 
       // 不应弹出简报弹窗，而是直接导航到盲听播放器
@@ -365,7 +390,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 盲听步骤是当前步骤（未完成），点击不应弹出简报弹窗
-      await tester.tap(find.text('Blind Listening'));
+      await tester.tap(find.text('Blind Listening').first);
       await tester.pumpAndSettle();
 
       // 不应弹出简报弹窗（因为没有 onTap）

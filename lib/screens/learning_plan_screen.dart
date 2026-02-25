@@ -34,8 +34,10 @@ import '../providers/learning_session/sentence_playback_engine.dart';
 /// 实时查询指定音频的书签数量（难句数）
 ///
 /// 使用 StreamProvider 监听 bookmarks 表变化，确保难句数实时更新。
-final _bookmarkCountProvider =
-    StreamProvider.family.autoDispose<int, String>((ref, audioItemId) {
+final _bookmarkCountProvider = StreamProvider.family.autoDispose<int, String>((
+  ref,
+  audioItemId,
+) {
   final bookmarkDao = ref.watch(bookmarkDaoProvider);
   return bookmarkDao
       .watchByAudioId(audioItemId)
@@ -64,11 +66,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   /// 首学区域是否展开（默认展开）
   bool _isFirstLearnExpanded = true;
 
-  /// 复习区域是否展开
-  bool _isReviewExpanded = false;
-
-  /// 自动展开复习区域是否已触发（只触发一次，不覆盖手动折叠）
-  bool _hasAutoExpandedReview = false;
+  /// 各复习轮次的展开状态（key 为复习大阶段）
+  final Map<LearningStage, bool> _reviewRoundExpandedMap = {};
 
   @override
   void initState() {
@@ -94,6 +93,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
   /// 处理"开始学习/继续学习"按钮点击
   void _handleStartLearning(BuildContext context, LearningProgress? progress) {
+    if (progress != null &&
+        progress.currentStage.index >= LearningStage.review0.index &&
+        progress.currentStage.index <= LearningStage.review28.index) {
+      context.push(AppRoutes.audioReviewHub(widget.audioItemId));
+      return;
+    }
+
     final currentSubStage =
         progress?.currentSubStage ?? SubStageType.blindListen;
 
@@ -212,10 +218,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
     // 读取难句书签数量
     final bookmarkDao = ref.read(bookmarkDaoProvider);
-    BookmarkManager.loadBookmarks(
-      widget.audioItemId,
-      dao: bookmarkDao,
-    ).then((difficultIndices) {
+    BookmarkManager.loadBookmarks(widget.audioItemId, dao: bookmarkDao).then((
+      difficultIndices,
+    ) {
       if (!mounted) return;
 
       if (difficultIndices.isEmpty) {
@@ -230,8 +235,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       final progress = ref
           .read(learningProgressNotifierProvider)
           .progressMap[widget.audioItemId];
-      final playCount =
-          targetPlayCountForDifficulty(progress?.difficulty.index ?? 2);
+      final playCount = targetPlayCountForDifficulty(
+        progress?.difficulty.index ?? 2,
+      );
 
       showListenAndRepeatBriefingSheet(
         context: context,
@@ -240,10 +246,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         onStartPractice: () async {
           await ref
               .read(learningSessionProvider.notifier)
-              .enterListenAndRepeatMode(
-                widget.audioItemId,
-                lpState.sentences,
-              );
+              .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
           if (mounted) {
             context.push(
               AppRoutes.listenAndRepeatPlayer(
@@ -295,17 +298,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
         await ref
             .read(learningSessionProvider.notifier)
-            .enterRetellMode(
-              widget.audioItemId,
-              paragraphs,
-              keywordsMap,
-            );
+            .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
         if (mounted) {
           context.push(
-            AppRoutes.retellPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
+            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
           );
         }
       },
@@ -317,9 +313,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     final l10n = AppLocalizations.of(context)!;
     final audioItem = ref.watch(
       audioLibraryProvider.select(
-        (s) => s.audioItems
-            .where((i) => i.id == widget.audioItemId)
-            .firstOrNull,
+        (s) =>
+            s.audioItems.where((i) => i.id == widget.audioItemId).firstOrNull,
       ),
     );
 
@@ -338,18 +333,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       );
     }
 
-    // 当活跃阶段在复习区域时自动展开（仅触发一次，不覆盖手动折叠）
-    if (!_hasAutoExpandedReview &&
-        progress != null &&
-        progress.currentStage.index >= LearningStage.review0.index &&
-        !progress.isCompleted) {
-      _hasAutoExpandedReview = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() => _isReviewExpanded = true);
-        }
-      });
-    }
+    final reviewStages = _buildReviewStages(l10n);
 
     final hasTranscript = audioItem.hasTranscript;
 
@@ -380,16 +364,26 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.l),
-                _ReviewSection(
-                  l10n: l10n,
-                  progress: progress,
-                  isExpanded: _isReviewExpanded,
-                  onToggle: () {
-                    setState(() {
-                      _isReviewExpanded = !_isReviewExpanded;
-                    });
-                  },
-                ),
+                ...List.generate(reviewStages.length, (index) {
+                  final review = reviewStages[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index == reviewStages.length - 1
+                          ? 0
+                          : AppSpacing.l,
+                    ),
+                    child: _ReviewRoundSection(
+                      l10n: l10n,
+                      progress: progress,
+                      review: review,
+                      isExpanded: _isReviewRoundExpanded(
+                        review.stage,
+                        progress,
+                      ),
+                      onToggle: () => _toggleReviewRoundExpanded(review.stage),
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -403,6 +397,67 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         ],
       ),
     );
+  }
+
+  /// 构建复习阶段列表（review0 ~ review28，共 7 个）
+  List<_ReviewStageData> _buildReviewStages(AppLocalizations l10n) {
+    return [
+      _ReviewStageData(
+        name: l10n.reviewRound0,
+        interval: l10n.reviewIntervalNow,
+        stage: LearningStage.review0,
+      ),
+      _ReviewStageData(
+        name: l10n.reviewRound1,
+        interval: l10n.reviewInterval1d,
+        stage: LearningStage.review1,
+      ),
+      _ReviewStageData(
+        name: l10n.reviewRound2,
+        interval: l10n.reviewInterval2d,
+        stage: LearningStage.review2,
+      ),
+      _ReviewStageData(
+        name: l10n.reviewRound4,
+        interval: l10n.reviewInterval4d,
+        stage: LearningStage.review4,
+      ),
+      _ReviewStageData(
+        name: l10n.reviewRound7,
+        interval: l10n.reviewInterval7d,
+        stage: LearningStage.review7,
+      ),
+      _ReviewStageData(
+        name: l10n.reviewRound14,
+        interval: l10n.reviewInterval14d,
+        stage: LearningStage.review14,
+      ),
+      _ReviewStageData(
+        name: l10n.reviewRound28,
+        interval: l10n.reviewInterval28d,
+        stage: LearningStage.review28,
+      ),
+    ];
+  }
+
+  /// 读取复习轮次展开态（仅首次按默认规则初始化）
+  ///
+  /// 默认规则：
+  /// - 已完成轮次：展开
+  /// - 未完成轮次：折叠
+  bool _isReviewRoundExpanded(LearningStage stage, LearningProgress? progress) {
+    return _reviewRoundExpandedMap.putIfAbsent(
+      stage,
+      () => progress?.isStageCompleted(stage) ?? false,
+    );
+  }
+
+  /// 切换单个复习轮次的展开态
+  void _toggleReviewRoundExpanded(LearningStage stage) {
+    setState(() {
+      _reviewRoundExpandedMap[stage] =
+          !(_reviewRoundExpandedMap[stage] ?? false);
+    });
   }
 }
 
@@ -636,81 +691,79 @@ class _FirstStudySection extends ConsumerWidget {
             ),
           ),
         ),
-        // 展开的步骤列表
-        AnimatedCrossFade(
-          firstChild: const SizedBox.shrink(),
-          secondChild: Column(
+        // 展开的步骤列表（无动画，直接切换）
+        if (isExpanded)
+          Column(
             children: List.generate(subStages.length, (index) {
-          final subStage = subStages[index];
-          final stepData = stepDataMap[subStage]!;
-          final isCompleted =
-              progress?.isSubStageCompleted(firstLearnStage, subStage) ?? false;
-          final isCurrent =
-              progress?.isCurrentSubStage(firstLearnStage, subStage) ?? false;
+              final subStage = subStages[index];
+              final stepData = stepDataMap[subStage]!;
+              final isCompleted =
+                  progress?.isSubStageCompleted(firstLearnStage, subStage) ??
+                  false;
+              final isCurrent =
+                  progress?.isCurrentSubStage(firstLearnStage, subStage) ??
+                  false;
 
-          // 各步骤显示完成统计
-          String? subtitle;
-          if (subStage == SubStageType.blindListen) {
-            // 盲听：已听遍数 + 难度
-            final passCount = progress?.blindListenPassCount ?? 0;
-            final parts = <String>[];
-            if (passCount > 0) {
-              parts.add(l10n.blindListenPassInfo(passCount));
-            }
-            if (progress?.isSubStageCompleted(firstLearnStage, subStage) ??
-                false) {
-              parts.add(l10n.difficultyLabel(progress!.difficulty.label));
-            }
-            if (parts.isNotEmpty) {
-              subtitle = parts.join(' · ');
-            }
-          } else if (subStage == SubStageType.intensiveListen) {
-            // 精听：仅当前或已完成步骤显示统计
-            if (isCompleted || isCurrent) {
-              subtitle = _buildIntensiveListenSubtitle(ref, l10n);
-            }
-          } else if (subStage == SubStageType.listenAndRepeat) {
-            // 跟读：仅当前或已完成步骤显示统计
-            if (isCompleted || isCurrent) {
-              subtitle = _buildShadowingSubtitle(ref, l10n);
-            }
-          } else if (subStage == SubStageType.retell) {
-            // 复述：仅当前或已完成步骤显示统计
-            if (isCompleted || isCurrent) {
-              subtitle = _buildRetellSubtitle(l10n);
-            }
-          }
+              // 各步骤显示完成统计
+              String? subtitle;
+              if (subStage == SubStageType.blindListen) {
+                // 盲听：已听遍数 + 难度
+                final passCount = progress?.blindListenPassCount ?? 0;
+                final parts = <String>[];
+                if (passCount > 0) {
+                  parts.add(l10n.blindListenPassInfo(passCount));
+                }
+                if (progress?.isSubStageCompleted(firstLearnStage, subStage) ??
+                    false) {
+                  parts.add(l10n.difficultyLabel(progress!.difficulty.label));
+                }
+                if (parts.isNotEmpty) {
+                  subtitle = parts.join(' · ');
+                }
+              } else if (subStage == SubStageType.intensiveListen) {
+                // 精听：仅当前或已完成步骤显示统计
+                if (isCompleted || isCurrent) {
+                  subtitle = _buildIntensiveListenSubtitle(ref, l10n);
+                }
+              } else if (subStage == SubStageType.listenAndRepeat) {
+                // 跟读：仅当前或已完成步骤显示统计
+                if (isCompleted || isCurrent) {
+                  subtitle = _buildShadowingSubtitle(ref, l10n);
+                }
+              } else if (subStage == SubStageType.retell) {
+                // 复述：仅当前或已完成步骤显示统计
+                if (isCompleted || isCurrent) {
+                  subtitle = _buildRetellSubtitle(l10n);
+                }
+              }
 
-          // 已完成步骤支持点击进入自由练习
-          VoidCallback? onTap;
-          if (isCompleted && subStage == SubStageType.blindListen) {
-            onTap = () => _startFreePlayBlindListen(context, ref);
-          } else if (isCompleted && subStage == SubStageType.intensiveListen) {
-            onTap = () => _startFreePlayIntensiveListen(context, ref);
-          } else if (isCompleted && subStage == SubStageType.listenAndRepeat) {
-            onTap = () => _startFreePlayListenAndRepeat(context, ref);
-          } else if (isCompleted && subStage == SubStageType.retell) {
-            onTap = () => _startFreePlayRetell(context, ref);
-          }
+              // 已完成步骤支持点击进入自由练习
+              VoidCallback? onTap;
+              if (isCompleted && subStage == SubStageType.blindListen) {
+                onTap = () => _startFreePlayBlindListen(context, ref);
+              } else if (isCompleted &&
+                  subStage == SubStageType.intensiveListen) {
+                onTap = () => _startFreePlayIntensiveListen(context, ref);
+              } else if (isCompleted &&
+                  subStage == SubStageType.listenAndRepeat) {
+                onTap = () => _startFreePlayListenAndRepeat(context, ref);
+              } else if (isCompleted && subStage == SubStageType.retell) {
+                onTap = () => _startFreePlayRetell(context, ref);
+              }
 
-          return _StepCard(
-            stepNumber: index + 1,
-            icon: stepData.icon,
-            name: stepData.name,
-            description: stepData.description,
-            isCompleted: isCompleted,
-            isCurrent: isCurrent,
-            isLast: index == subStages.length - 1,
-            subtitle: subtitle,
-            onTap: onTap,
-          );
-        }),
+              return _StepCard(
+                stepNumber: index + 1,
+                icon: stepData.icon,
+                name: stepData.name,
+                description: stepData.description,
+                isCompleted: isCompleted,
+                isCurrent: isCurrent,
+                isLast: index == subStages.length - 1,
+                subtitle: subtitle,
+                onTap: onTap,
+              );
+            }),
           ),
-          crossFadeState: isExpanded
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 300),
-        ),
       ],
     );
   }
@@ -720,9 +773,8 @@ class _FirstStudySection extends ConsumerWidget {
     final parts = <String>[];
 
     // 实时查询书签数量（难句数）
-    final bookmarkCount = ref.watch(
-      _bookmarkCountProvider(audioItemId),
-    ).valueOrNull ?? 0;
+    final bookmarkCount =
+        ref.watch(_bookmarkCountProvider(audioItemId)).valueOrNull ?? 0;
     if (bookmarkCount > 0) {
       parts.add(l10n.difficultSentenceCount(bookmarkCount));
     }
@@ -740,9 +792,8 @@ class _FirstStudySection extends ConsumerWidget {
     final parts = <String>[];
 
     // 实时查询书签数量（难句数）
-    final bookmarkCount = ref.watch(
-      _bookmarkCountProvider(audioItemId),
-    ).valueOrNull ?? 0;
+    final bookmarkCount =
+        ref.watch(_bookmarkCountProvider(audioItemId)).valueOrNull ?? 0;
     if (bookmarkCount > 0) {
       parts.add(l10n.difficultSentenceCount(bookmarkCount));
     }
@@ -804,9 +855,7 @@ class _FirstStudySection extends ConsumerWidget {
           isFreePlay: true,
         );
     if (context.mounted) {
-      context.push(
-        AppRoutes.listenAndRepeatPlayer(collectionId, audioItemId),
-      );
+      context.push(AppRoutes.listenAndRepeatPlayer(collectionId, audioItemId));
     }
   }
 
@@ -845,9 +894,7 @@ class _FirstStudySection extends ConsumerWidget {
               isFreePlay: true,
             );
         if (context.mounted) {
-          context.push(
-            AppRoutes.retellPlayer(collectionId, audioItemId),
-          );
+          context.push(AppRoutes.retellPlayer(collectionId, audioItemId));
         }
       },
     );
@@ -1014,24 +1061,55 @@ class _StepCard extends StatelessWidget {
   }
 }
 
-/// 复习区域 — 默认折叠，展开后显示 7 个复习阶段
-class _ReviewSection extends StatelessWidget {
+/// 单个复习轮次的数据模型
+class _ReviewStageData {
+  final String name;
+  final String interval;
+  final LearningStage stage;
+
+  const _ReviewStageData({
+    required this.name,
+    required this.interval,
+    required this.stage,
+  });
+}
+
+/// 单个复习轮次区块（与首学同级）
+///
+/// 视觉与首学区块保持一致：标题行可独立折叠/展开，展开后显示子阶段。
+class _ReviewRoundSection extends StatelessWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
+  final _ReviewStageData review;
   final bool isExpanded;
   final VoidCallback onToggle;
 
-  const _ReviewSection({
+  const _ReviewRoundSection({
     required this.l10n,
     this.progress,
+    required this.review,
     required this.isExpanded,
     required this.onToggle,
   });
 
-  /// 获取当前复习阶段的倒计时文案
-  String? _getReviewTimingText(LearningStage stage) {
+  /// 计算当前轮次已完成子阶段数
+  int _completedSubStageCount() {
+    if (progress == null) return 0;
+    if (progress!.isStageCompleted(review.stage)) {
+      return review.stage.subStageCount;
+    }
+    if (progress!.isCurrentStage(review.stage)) {
+      return progress!.currentSubStageIndex
+          .clamp(0, review.stage.subStageCount)
+          .toInt();
+    }
+    return 0;
+  }
+
+  /// 当前复习轮次倒计时文案（仅当前轮次显示）
+  String? _reviewTimingText() {
     if (progress == null) return null;
-    if (!progress!.isCurrentStage(stage)) return null;
+    if (!progress!.isCurrentStage(review.stage)) return null;
 
     final nextReview = progress!.nextReviewAt;
     if (nextReview == null) return null;
@@ -1040,7 +1118,6 @@ class _ReviewSection extends StatelessWidget {
     if (now.isAfter(nextReview) || now.isAtSameMomentAs(nextReview)) {
       return l10n.reviewReady;
     }
-
     final diff = nextReview.difference(now);
     if (diff.inDays > 0) {
       return l10n.reviewCountdown(diff.inDays);
@@ -1048,54 +1125,66 @@ class _ReviewSection extends StatelessWidget {
     return l10n.reviewCountdownHours(diff.inHours.clamp(1, 999));
   }
 
+  /// 复习子阶段名称与描述映射
+  _StepData _subStageData(BuildContext context, SubStageType subStage) {
+    final isZh = Localizations.localeOf(context).languageCode == 'zh';
+    return switch (subStage) {
+      SubStageType.blindListen => _StepData(
+        icon: Icons.headphones,
+        name: l10n.stepBlindListening,
+        description: isZh
+            ? '全文盲听，不看字幕先听一遍。'
+            : 'Listen to the full audio once without subtitles.',
+      ),
+      SubStageType.intensiveListen => _StepData(
+        icon: Icons.hearing,
+        name: l10n.stepIntensiveListening,
+        description: l10n.stepIntensiveListeningDesc,
+      ),
+      SubStageType.listenAndRepeat => _StepData(
+        icon: Icons.record_voice_over,
+        name: l10n.stepShadowing,
+        description: l10n.stepShadowingDesc,
+      ),
+      SubStageType.retell => _StepData(
+        icon: Icons.chat,
+        name: l10n.stepRetelling,
+        description: l10n.stepRetellingDesc,
+      ),
+      SubStageType.reviewDifficultPractice => _StepData(
+        icon: Icons.hearing,
+        name: isZh ? '难句补练' : 'Difficult sentence practice',
+        description: isZh
+            ? '先盲听，听不懂点击“听不懂”，再跟读补练。'
+            : 'Blind listen first; if unclear, tap can\'t understand and practice.',
+      ),
+      SubStageType.reviewRetellParagraph => _StepData(
+        icon: Icons.notes,
+        name: isZh ? '段级复述' : 'Paragraph retelling',
+        description: isZh
+            ? '按段复述本轮复习内容。'
+            : 'Retell this review round paragraph by paragraph.',
+      ),
+      SubStageType.reviewRetellSummary => _StepData(
+        icon: Icons.summarize,
+        name: isZh ? '全文总结复述' : 'Summary retelling',
+        description: isZh
+            ? '用 3-5 句话概述全文大意。'
+            : 'Summarize the full audio in 3-5 sentences.',
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final completedCount = progress?.completedReviewStages ?? 0;
-
-    /// 复习阶段列表（review0 ~ review28，共 7 个）
-    final reviews = [
-      _ReviewData(
-        name: l10n.reviewRound0,
-        interval: l10n.reviewIntervalNow,
-        stage: LearningStage.review0,
-      ),
-      _ReviewData(
-        name: l10n.reviewRound1,
-        interval: l10n.reviewInterval1d,
-        stage: LearningStage.review1,
-      ),
-      _ReviewData(
-        name: l10n.reviewRound2,
-        interval: l10n.reviewInterval2d,
-        stage: LearningStage.review2,
-      ),
-      _ReviewData(
-        name: l10n.reviewRound4,
-        interval: l10n.reviewInterval4d,
-        stage: LearningStage.review4,
-      ),
-      _ReviewData(
-        name: l10n.reviewRound7,
-        interval: l10n.reviewInterval7d,
-        stage: LearningStage.review7,
-      ),
-      _ReviewData(
-        name: l10n.reviewRound14,
-        interval: l10n.reviewInterval14d,
-        stage: LearningStage.review14,
-      ),
-      _ReviewData(
-        name: l10n.reviewRound28,
-        interval: l10n.reviewInterval28d,
-        stage: LearningStage.review28,
-      ),
-    ];
+    final subStages = review.stage.subStages;
+    final completedCount = _completedSubStageCount();
+    final timingText = _reviewTimingText();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题行（可点击展开/折叠）
         InkWell(
           onTap: onToggle,
           borderRadius: BorderRadius.circular(8),
@@ -1104,228 +1193,89 @@ class _ReviewSection extends StatelessWidget {
               horizontal: AppSpacing.xs,
               vertical: AppSpacing.xs,
             ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.refresh,
-                  color: theme.colorScheme.tertiary,
-                  size: 20,
-                ),
-                const SizedBox(width: AppSpacing.s),
-                Text(
-                  l10n.review,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  l10n.stepProgress(completedCount, 7),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                AnimatedRotation(
-                  turns: isExpanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    Icons.expand_more,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // 展开的复习步骤列表
-        AnimatedCrossFade(
-          firstChild: const SizedBox.shrink(),
-          secondChild: Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.s),
-            child: Column(
-              children: List.generate(reviews.length, (index) {
-                final review = reviews[index];
-                final isCompleted =
-                    progress?.isStageCompleted(review.stage) ?? false;
-                final isCurrent =
-                    progress?.isCurrentStage(review.stage) ?? false;
-                final timingText = _getReviewTimingText(review.stage);
-                return _ReviewStepCard(
-                  stepNumber: index + 1,
-                  name: review.name,
-                  interval: review.interval,
-                  isCompleted: isCompleted,
-                  isCurrent: isCurrent,
-                  isLast: index == reviews.length - 1,
-                  timingText: timingText,
-                );
-              }),
-            ),
-          ),
-          crossFadeState: isExpanded
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 300),
-        ),
-      ],
-    );
-  }
-}
-
-/// 复习数据模型（内部使用）
-class _ReviewData {
-  final String name;
-  final String interval;
-  final LearningStage stage;
-
-  const _ReviewData({
-    required this.name,
-    required this.interval,
-    required this.stage,
-  });
-}
-
-/// 复习步骤卡片 — 带竖向时间线，支持三态
-class _ReviewStepCard extends StatelessWidget {
-  final int stepNumber;
-  final String name;
-  final String interval;
-  final bool isCompleted;
-  final bool isCurrent;
-  final bool isLast;
-
-  /// 当前阶段的复习倒计时文案（仅 isCurrent 时显示）
-  final String? timingText;
-
-  const _ReviewStepCard({
-    required this.stepNumber,
-    required this.name,
-    required this.interval,
-    required this.isCompleted,
-    required this.isCurrent,
-    required this.isLast,
-    this.timingText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 左侧时间线
-          SizedBox(
-            width: 40,
             child: Column(
               children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? Colors.green.shade50
-                        : isCurrent
-                        ? null
-                        : theme.colorScheme.surfaceContainerHighest,
-                    border: isCurrent
-                        ? Border.all(
-                            color: theme.colorScheme.tertiary,
-                            width: 2,
-                          )
-                        : null,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: isCompleted
-                        ? Icon(Icons.check, size: 16, color: Colors.green)
-                        : Text(
-                            '$stepNumber',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: isCurrent
-                                  ? theme.colorScheme.tertiary
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                  ),
-                ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 2,
-                      color: theme.colorScheme.surfaceContainerHighest,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.refresh,
+                      color: theme.colorScheme.primary,
+                      size: 20,
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.s),
+                    Expanded(
+                      child: Text(
+                        review.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s),
+                    Text(
+                      l10n.stepProgress(completedCount, subStages.length),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Icons.expand_more,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Text(
+                      review.interval,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (timingText != null) ...[
+                      const SizedBox(width: AppSpacing.s),
+                      Text(
+                        timingText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.tertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
-          // 右侧卡片
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.s),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.m,
-                    vertical: 12,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w500,
-                                color: isCompleted
-                                    ? theme.colorScheme.outline
-                                    : null,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s,
-                              vertical: AppSpacing.xs,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              interval,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onTertiaryContainer,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // 复习倒计时提示
-                      if (timingText != null) ...[
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          timingText!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.tertiary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
+        ),
+        if (isExpanded)
+          Column(
+            children: List.generate(subStages.length, (index) {
+              final subStage = subStages[index];
+              final subStageData = _subStageData(context, subStage);
+              final isCompleted =
+                  progress?.isSubStageCompleted(review.stage, subStage) ??
+                  false;
+              final isCurrent =
+                  progress?.isCurrentSubStage(review.stage, subStage) ?? false;
+              return _StepCard(
+                stepNumber: index + 1,
+                icon: subStageData.icon,
+                name: subStageData.name,
+                description: subStageData.description,
+                isCompleted: isCompleted,
+                isCurrent: isCurrent,
+                isLast: index == subStages.length - 1,
+              );
+            }),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -1344,38 +1294,48 @@ class _AudioInfoRow extends StatelessWidget {
 
     // 时长
     if (audioItem.totalDuration > 0) {
-      chips.add(_InfoChip(
-        icon: Icons.timer_outlined,
-        label: SubtitleParser.formatDuration(
-          Duration(seconds: audioItem.totalDuration),
+      chips.add(
+        _InfoChip(
+          icon: Icons.timer_outlined,
+          label: SubtitleParser.formatDuration(
+            Duration(seconds: audioItem.totalDuration),
+          ),
+          theme: theme,
         ),
-        theme: theme,
-      ));
+      );
     }
 
     // 句子数
     if (audioItem.sentenceCount > 0) {
-      chips.add(_InfoChip(
-        icon: Icons.format_list_numbered,
-        label: l10n.sentenceCountLabel(audioItem.sentenceCount),
-        theme: theme,
-      ));
+      chips.add(
+        _InfoChip(
+          icon: Icons.format_list_numbered,
+          label: l10n.sentenceCountLabel(audioItem.sentenceCount),
+          theme: theme,
+        ),
+      );
     }
 
     // 单词数
     if (audioItem.wordCount > 0) {
-      chips.add(_InfoChip(
-        icon: Icons.text_fields,
-        label: l10n.wordCountLabel(audioItem.wordCount),
-        theme: theme,
-      ));
+      chips.add(
+        _InfoChip(
+          icon: Icons.text_fields,
+          label: l10n.wordCountLabel(audioItem.wordCount),
+          theme: theme,
+        ),
+      );
     }
 
     if (chips.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-      child: Wrap(spacing: AppSpacing.s, runSpacing: AppSpacing.xs, children: chips),
+      child: Wrap(
+        spacing: AppSpacing.s,
+        runSpacing: AppSpacing.xs,
+        children: chips,
+      ),
     );
   }
 }
