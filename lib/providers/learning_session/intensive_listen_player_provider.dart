@@ -8,16 +8,17 @@
 /// - 偷看字幕（不暂停、不标记、切句时重置）
 /// - 手动上一句/下一句
 /// - 三种停顿模式（智能/固定/倍数）
+/// - 倒计时控制（暂停/快进/重播）
 ///
 /// 使用 sessionId 守护防止异步竞态。
 library;
 
-import 'dart:async';
 import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import 'countdown_controller.dart';
 
 part 'intensive_listen_player_provider.g.dart';
 
@@ -88,6 +89,12 @@ class IntensiveListenState {
   /// 本次标记的难句索引集合
   final Set<int> difficultSentences;
 
+  /// 倒计时是否暂停中
+  final bool isCountdownPaused;
+
+  /// 倒计时是否快进中（10 倍速）
+  final bool isCountdownFastForward;
+
   const IntensiveListenState({
     this.currentSentenceIndex = 0,
     this.totalSentences = 0,
@@ -103,6 +110,8 @@ class IntensiveListenState {
     this.isCompleted = false,
     this.isTextRevealed = false,
     this.difficultSentences = const {},
+    this.isCountdownPaused = false,
+    this.isCountdownFastForward = false,
   });
 
   IntensiveListenState copyWith({
@@ -120,6 +129,8 @@ class IntensiveListenState {
     bool? isCompleted,
     bool? isTextRevealed,
     Set<int>? difficultSentences,
+    bool? isCountdownPaused,
+    bool? isCountdownFastForward,
   }) {
     return IntensiveListenState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -137,6 +148,9 @@ class IntensiveListenState {
       isCompleted: isCompleted ?? this.isCompleted,
       isTextRevealed: isTextRevealed ?? this.isTextRevealed,
       difficultSentences: difficultSentences ?? this.difficultSentences,
+      isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
+      isCountdownFastForward:
+          isCountdownFastForward ?? this.isCountdownFastForward,
     );
   }
 }
@@ -150,8 +164,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
   /// 深拷贝的句子列表（避免与 LP 共享可变状态）
   List<Sentence> _sentences = [];
 
-  /// 倒计时 Timer（遍间停顿 UI 更新用）
-  Timer? _countdownTimer;
+  /// 可控倒计时控制器
+  final CountdownController _countdown = CountdownController();
 
   /// 当前播放循环的 sessionId
   int _currentSessionId = -1;
@@ -210,8 +224,13 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
   Future<void> pause() async {
     final engine = ref.read(audioEngineProvider.notifier);
     engine.pause();
-    _cancelCountdown();
-    state = state.copyWith(isPlaying: false, isPauseBetweenPlays: false);
+    _countdown.cancel();
+    state = state.copyWith(
+      isPlaying: false,
+      isPauseBetweenPlays: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
   }
 
   /// 恢复播放（从当前句子重新开始播放循环）
@@ -224,7 +243,6 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
 
     _invalidateSession();
-    _cancelCountdown();
 
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex + 1,
@@ -233,6 +251,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationReplay: false,
       isTextRevealed: false,
       isPauseBetweenPlays: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     await _startSentence();
@@ -243,7 +263,6 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     if (state.currentSentenceIndex <= 0) return;
 
     _invalidateSession();
-    _cancelCountdown();
 
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex - 1,
@@ -252,6 +271,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationReplay: false,
       isTextRevealed: false,
       isPauseBetweenPlays: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     await _startSentence();
@@ -264,7 +285,6 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     if (state.isAnnotationMode) return;
 
     _invalidateSession();
-    _cancelCountdown();
 
     final engine = ref.read(audioEngineProvider.notifier);
     engine.pause();
@@ -279,6 +299,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isPauseBetweenPlays: false,
       isTextRevealed: false,
       difficultSentences: newDifficult,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
   }
 
@@ -348,6 +370,47 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     state = state.copyWith(isTextRevealed: revealed);
   }
 
+  /// 暂停倒计时
+  void pauseCountdown() {
+    _countdown.pause();
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  /// 恢复倒计时
+  void resumeCountdown() {
+    _countdown.resume();
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  /// 切换倒计时快进（10 倍速/正常速）
+  ///
+  /// 如果当前暂停中，快进会同时恢复倒计时。
+  void toggleCountdownFastForward() {
+    final isFF = !state.isCountdownFastForward;
+    _countdown.setSpeed(isFF ? 10.0 : 1.0);
+    if (state.isCountdownPaused) {
+      _countdown.resume();
+    }
+    state = state.copyWith(
+      isCountdownFastForward: isFF,
+      isCountdownPaused: false,
+    );
+  }
+
+  /// 倒计时期间重播当前句子
+  ///
+  /// 取消倒计时，重新播放当前句子的循环。
+  Future<void> replayDuringCountdown() async {
+    _invalidateSession();
+    state = state.copyWith(
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
+    await _startSentence();
+  }
+
   /// 更新精听设置（仅会话内生效，不持久化）
   ///
   /// 当 repeatCount 调小时，clamp currentPlayCount 避免越界显示（如"第3/1遍"），
@@ -368,7 +431,6 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     // repeatCount 变化时中断当前循环，以新设置重新开始
     if (needRestart && state.isPlaying) {
       _invalidateSession();
-      _cancelCountdown();
       _startSentence();
     }
   }
@@ -400,6 +462,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isPlaying: true,
       currentPlayCount: 1,
       isPauseBetweenPlays: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     final engine = ref.read(audioEngineProvider.notifier);
@@ -433,20 +497,23 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
         state = state.copyWith(
           isPauseBetweenPlays: true,
           isPlaying: false,
+          isCountdownPaused: false,
+          isCountdownFastForward: false,
           pauseDuration: pauseDur,
           pauseRemaining: pauseDur,
         );
 
-        // 启动倒计时 Timer 更新 UI
-        _startCountdown(pauseDur);
-
-        await Future.delayed(pauseDur);
-
-        _cancelCountdown();
+        await _countdown.start(pauseDur, (remaining) {
+          state = state.copyWith(pauseRemaining: remaining);
+        });
 
         if (!engine.isActiveSession(sessionId)) return;
 
-        state = state.copyWith(isPauseBetweenPlays: false);
+        state = state.copyWith(
+          isPauseBetweenPlays: false,
+          isCountdownPaused: false,
+          isCountdownFastForward: false,
+        );
       }
     }
 
@@ -458,8 +525,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
 
   /// 自动推进到下一句（最后一句也走停顿流程）
   ///
-  /// 推进前先停顿，停顿时长由设置决定，
-  /// 复用遍间停顿机制（倒计时 UI + Future.delayed）。
+  /// 推进前先停顿，停顿时长由设置决定。
   Future<void> _autoAdvance() async {
     final isLastSentence =
         state.currentSentenceIndex >= state.totalSentences - 1;
@@ -478,13 +544,15 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isPlaying: false,
       isPauseBetweenPlays: true,
       isPauseBetweenSentences: true,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
       pauseDuration: pauseDur,
       pauseRemaining: pauseDur,
     );
 
-    _startCountdown(pauseDur);
-    await Future.delayed(pauseDur);
-    _cancelCountdown();
+    await _countdown.start(pauseDur, (remaining) {
+      state = state.copyWith(pauseRemaining: remaining);
+    });
 
     // 停顿期间用户可能暂停/切句，检查 session 是否仍有效
     if (!engine.isActiveSession(sessionId)) return;
@@ -496,6 +564,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
         isPlaying: false,
         isPauseBetweenPlays: false,
         isPauseBetweenSentences: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
       );
     } else {
       // 非最后一句 → 推进到下一句
@@ -507,6 +577,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
         isPauseBetweenSentences: false,
         isAnnotationMode: false,
         isAnnotationReplay: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
       );
 
       _startSentence();
@@ -516,7 +588,6 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
   /// 重置到第一句并重新开始播放（供"再来一遍"使用）
   Future<void> resetToStart() async {
     _invalidateSession();
-    _cancelCountdown();
     state = state.copyWith(
       currentSentenceIndex: 0,
       currentPlayCount: 1,
@@ -527,6 +598,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationMode: false,
       isAnnotationReplay: false,
       isTextRevealed: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
     await startPlaying();
   }
@@ -542,35 +615,12 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     final engine = ref.read(audioEngineProvider.notifier);
     engine.pause();
     _currentSessionId = -1;
-  }
-
-  /// 启动倒计时 Timer（每 100ms 更新 UI）
-  void _startCountdown(Duration total) {
-    _cancelCountdown();
-    final startTime = DateTime.now();
-
-    _countdownTimer = Timer.periodic(const Duration(milliseconds: 100), (
-      timer,
-    ) {
-      final elapsed = DateTime.now().difference(startTime);
-      final remaining = total - elapsed;
-      if (remaining <= Duration.zero) {
-        timer.cancel();
-        return;
-      }
-      state = state.copyWith(pauseRemaining: remaining);
-    });
-  }
-
-  /// 取消倒计时
-  void _cancelCountdown() {
-    _countdownTimer?.cancel();
-    _countdownTimer = null;
+    _countdown.cancel();
   }
 
   /// 清理资源
   void _cleanup() {
-    _cancelCountdown();
+    _countdown.cancel();
     _currentSessionId = -1;
   }
 }

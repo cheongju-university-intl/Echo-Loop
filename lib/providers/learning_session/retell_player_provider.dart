@@ -15,6 +15,7 @@ import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/keyword_extraction.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import 'countdown_controller.dart';
 
 part 'retell_player_provider.g.dart';
 
@@ -65,6 +66,12 @@ class RetellPlayerState {
   /// 是否已完成所有段落
   final bool isCompleted;
 
+  /// 倒计时是否暂停中
+  final bool isCountdownPaused;
+
+  /// 倒计时是否快进中（10 倍速）
+  final bool isCountdownFastForward;
+
   const RetellPlayerState({
     this.currentParagraphIndex = 0,
     this.totalParagraphs = 0,
@@ -78,6 +85,8 @@ class RetellPlayerState {
     this.pauseRemaining = Duration.zero,
     this.pauseDuration = Duration.zero,
     this.isCompleted = false,
+    this.isCountdownPaused = false,
+    this.isCountdownFastForward = false,
   });
 
   RetellPlayerState copyWith({
@@ -93,6 +102,8 @@ class RetellPlayerState {
     Duration? pauseRemaining,
     Duration? pauseDuration,
     bool? isCompleted,
+    bool? isCountdownPaused,
+    bool? isCountdownFastForward,
   }) {
     return RetellPlayerState(
       currentParagraphIndex:
@@ -108,6 +119,9 @@ class RetellPlayerState {
       pauseRemaining: pauseRemaining ?? this.pauseRemaining,
       pauseDuration: pauseDuration ?? this.pauseDuration,
       isCompleted: isCompleted ?? this.isCompleted,
+      isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
+      isCountdownFastForward:
+          isCountdownFastForward ?? this.isCountdownFastForward,
     );
   }
 }
@@ -127,8 +141,8 @@ class RetellPlayer extends _$RetellPlayer {
   /// position 监听（用于句子高亮）
   StreamSubscription<Duration>? _positionSub;
 
-  /// 复述倒计时定时器
-  Timer? _countdownTimer;
+  /// 可控倒计时控制器
+  final CountdownController _countdown = CountdownController();
 
   /// 当前 AudioEngine sessionId
   int _sessionId = -1;
@@ -137,7 +151,7 @@ class RetellPlayer extends _$RetellPlayer {
   RetellPlayerState build() {
     ref.onDispose(() {
       _positionSub?.cancel();
-      _countdownTimer?.cancel();
+      _countdown.cancel();
     });
     return const RetellPlayerState();
   }
@@ -229,9 +243,14 @@ class RetellPlayer extends _$RetellPlayer {
     final engine = ref.read(audioEngineProvider.notifier);
     _sessionId = engine.newSession();
     _positionSub?.cancel();
-    _countdownTimer?.cancel();
+    _countdown.cancel();
     await engine.stopPlayback();
-    state = state.copyWith(isPlaying: false, isRetellCountdown: false);
+    state = state.copyWith(
+      isPlaying: false,
+      isRetellCountdown: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
   }
 
   /// 恢复播放
@@ -261,6 +280,8 @@ class RetellPlayer extends _$RetellPlayer {
       playingSentenceIndex: -1,
       isRetellCountdown: false,
       displayMode: RetellDisplayMode.hideAll,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     await _playCurrentParagraph();
@@ -278,15 +299,51 @@ class RetellPlayer extends _$RetellPlayer {
       playingSentenceIndex: -1,
       isRetellCountdown: false,
       displayMode: RetellDisplayMode.hideAll,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     await _playCurrentParagraph();
   }
 
-  /// 跳过复述倒计时
-  Future<void> skipRetelling() async {
-    _countdownTimer?.cancel();
-    await _onRetellCountdownFinished();
+  /// 暂停倒计时
+  void pauseCountdown() {
+    _countdown.pause();
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  /// 恢复倒计时
+  void resumeCountdown() {
+    _countdown.resume();
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  /// 切换倒计时快进（10 倍速/正常速）
+  ///
+  /// 如果当前暂停中，快进会同时恢复倒计时。
+  void toggleCountdownFastForward() {
+    final isFF = !state.isCountdownFastForward;
+    _countdown.setSpeed(isFF ? 10.0 : 1.0);
+    if (state.isCountdownPaused) {
+      _countdown.resume();
+    }
+    state = state.copyWith(
+      isCountdownFastForward: isFF,
+      isCountdownPaused: false,
+    );
+  }
+
+  /// 复述倒计时期间重播当前段落
+  ///
+  /// 取消倒计时，回到 listening 阶段重新播放。
+  Future<void> replayDuringCountdown() async {
+    _countdown.cancel();
+    state = state.copyWith(
+      isRetellCountdown: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
+    await _playCurrentParagraph();
   }
 
   /// 设置显示模式
@@ -415,26 +472,26 @@ class RetellPlayer extends _$RetellPlayer {
     _startRetellCountdown(pauseDuration);
   }
 
-  /// 开始复述倒计时（100ms 更新，进度条平滑移动）
+  /// 开始复述倒计时
   void _startRetellCountdown(Duration duration) {
-    _countdownTimer?.cancel();
-
     state = state.copyWith(
       isRetellCountdown: true,
       pauseDuration: duration,
       pauseRemaining: duration,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
-    const tick = Duration(milliseconds: 100);
-    _countdownTimer = Timer.periodic(tick, (timer) {
-      final remaining = state.pauseRemaining - tick;
-      if (remaining <= Duration.zero) {
-        timer.cancel();
-        _onRetellCountdownFinished();
-      } else {
-        state = state.copyWith(pauseRemaining: remaining);
-      }
-    });
+    _countdown
+        .start(duration, (remaining) {
+          state = state.copyWith(pauseRemaining: remaining);
+        })
+        .then((_) {
+          // 倒计时正常结束（非取消）时推进
+          if (state.isRetellCountdown) {
+            _onRetellCountdownFinished();
+          }
+        });
   }
 
   /// 复述倒计时结束
@@ -457,15 +514,14 @@ class RetellPlayer extends _$RetellPlayer {
     final engine = ref.read(audioEngineProvider.notifier);
     _sessionId = engine.newSession();
     _positionSub?.cancel();
-    _countdownTimer?.cancel();
+    _countdown.cancel();
     engine.stopPlayback();
   }
 
   /// 清理资源
   void _cleanup() {
     _positionSub?.cancel();
-    _countdownTimer?.cancel();
+    _countdown.cancel();
     _positionSub = null;
-    _countdownTimer = null;
   }
 }

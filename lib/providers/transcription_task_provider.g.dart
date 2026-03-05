@@ -27,7 +27,7 @@ final transcriptionFileOpsProvider = Provider<TranscriptionFileOps>.internal(
 // ignore: unused_element
 typedef TranscriptionFileOpsRef = ProviderRef<TranscriptionFileOps>;
 String _$transcriptionTaskManagerHash() =>
-    r'b3d4b6808b3d70d70a3960ca875c4910f0be7bb5';
+    r'0372270be70afdc5f48b2dd4038e28a7d93c78e4';
 
 /// 转录任务管理器
 ///

@@ -3,7 +3,7 @@
 /// 提取精听和跟读共享的播放循环逻辑：
 /// - N 遍播放 + 遍间停顿
 /// - 句间自动推进
-/// - 倒计时 UI 更新
+/// - 倒计时 UI 更新（支持暂停/快进）
 /// - sessionId 守护防止异步竞态
 ///
 /// 各 Provider 通过组合此类实现各自的播放流程，
@@ -14,6 +14,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import '../../models/sentence.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import 'countdown_controller.dart';
 
 /// 停顿时长计算器函数签名
 ///
@@ -29,14 +30,14 @@ class SentencePlaybackEngine {
   /// 获取 AudioEngine 实例的工厂函数
   final AudioEngine Function() _getEngine;
 
-  /// 倒计时 Timer（遍间/句间停顿 UI 更新用）
-  Timer? _countdownTimer;
+  /// 可控倒计时控制器
+  final CountdownController _countdown = CountdownController();
 
   /// 当前播放循环的 sessionId
   int _currentSessionId = -1;
 
   SentencePlaybackEngine({required AudioEngine Function() getEngine})
-      : _getEngine = getEngine;
+    : _getEngine = getEngine;
 
   /// 当前 sessionId（供外部查询）
   int get currentSessionId => _currentSessionId;
@@ -80,11 +81,8 @@ class SentencePlaybackEngine {
       if (playCount < repeatCount) {
         final pauseDur = pauseCalculator(sentence.duration);
         onPauseStarted(pauseDur);
-        _startCountdown(pauseDur, onTick);
 
-        await Future.delayed(pauseDur);
-
-        _cancelCountdown();
+        await _countdown.start(pauseDur, onTick);
 
         if (!engine.isActiveSession(sessionId)) return;
         onPauseEnded();
@@ -112,22 +110,28 @@ class SentencePlaybackEngine {
     final sessionId = _currentSessionId;
 
     onPauseStarted(pauseDuration);
-    _startCountdown(pauseDuration, onTick);
 
-    await Future.delayed(pauseDuration);
-
-    _cancelCountdown();
+    await _countdown.start(pauseDuration, onTick);
 
     if (!engine.isActiveSession(sessionId)) return;
     await onAdvance();
   }
+
+  /// 暂停倒计时
+  void pauseCountdown() => _countdown.pause();
+
+  /// 恢复倒计时
+  void resumeCountdown() => _countdown.resume();
+
+  /// 设置倒计时速度倍率
+  void setCountdownSpeed(double speed) => _countdown.setSpeed(speed);
 
   /// 使当前 session 失效并暂停引擎
   void invalidateSession() {
     final engine = _getEngine();
     engine.pause();
     _currentSessionId = -1;
-    _cancelCountdown();
+    _countdown.cancel();
   }
 
   /// 创建新 session 并返回 sessionId
@@ -152,36 +156,12 @@ class SentencePlaybackEngine {
 
   /// 清理资源
   void cleanup() {
-    _cancelCountdown();
+    _countdown.cancel();
     _currentSessionId = -1;
-  }
-
-  /// 启动倒计时 Timer（每 100ms 更新 UI）
-  void _startCountdown(Duration total, void Function(Duration) onTick) {
-    _cancelCountdown();
-    final startTime = DateTime.now();
-
-    _countdownTimer = Timer.periodic(const Duration(milliseconds: 100), (
-      timer,
-    ) {
-      final elapsed = DateTime.now().difference(startTime);
-      final remaining = total - elapsed;
-      if (remaining <= Duration.zero) {
-        timer.cancel();
-        return;
-      }
-      onTick(remaining);
-    });
-  }
-
-  /// 取消倒计时
-  void _cancelCountdown() {
-    _countdownTimer?.cancel();
-    _countdownTimer = null;
   }
 }
 
-/// 跟读模式停顿计算：max(句长×2, 2000ms)
+/// 跟读模式停顿计算：max(句长x2, 2000ms)
 ///
 /// 给用户足够的跟读时间。
 Duration listenAndRepeatPauseCalculator(Duration sentenceDuration) {

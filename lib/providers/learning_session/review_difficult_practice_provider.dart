@@ -60,6 +60,12 @@ class ReviewDifficultPracticeState {
   /// 是否已完成所有句子
   final bool isCompleted;
 
+  /// 倒计时是否暂停中
+  final bool isCountdownPaused;
+
+  /// 倒计时是否快进中（10 倍速）
+  final bool isCountdownFastForward;
+
   const ReviewDifficultPracticeState({
     this.currentSentenceIndex = 0,
     this.totalSentences = 0,
@@ -73,6 +79,8 @@ class ReviewDifficultPracticeState {
     this.isAnnotationReplay = false,
     this.isTextRevealed = false,
     this.isCompleted = false,
+    this.isCountdownPaused = false,
+    this.isCountdownFastForward = false,
   });
 
   ReviewDifficultPracticeState copyWith({
@@ -88,6 +96,8 @@ class ReviewDifficultPracticeState {
     bool? isAnnotationReplay,
     bool? isTextRevealed,
     bool? isCompleted,
+    bool? isCountdownPaused,
+    bool? isCountdownFastForward,
   }) {
     return ReviewDifficultPracticeState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -103,6 +113,9 @@ class ReviewDifficultPracticeState {
       isAnnotationReplay: isAnnotationReplay ?? this.isAnnotationReplay,
       isTextRevealed: isTextRevealed ?? this.isTextRevealed,
       isCompleted: isCompleted ?? this.isCompleted,
+      isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
+      isCountdownFastForward:
+          isCountdownFastForward ?? this.isCountdownFastForward,
     );
   }
 }
@@ -153,8 +166,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 获取当前句子
   Sentence? get currentSentence =>
       _sentences.isNotEmpty && state.currentSentenceIndex < _sentences.length
-          ? _sentences[state.currentSentenceIndex]
-          : null;
+      ? _sentences[state.currentSentenceIndex]
+      : null;
 
   /// 获取句子列表（只读）
   List<Sentence> get sentences => List.unmodifiable(_sentences);
@@ -174,6 +187,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
   }
 
@@ -305,6 +320,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isTextRevealed: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
     await _startSentence();
   }
@@ -321,6 +338,47 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isTextRevealed: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
+    await _startSentence();
+  }
+
+  /// 暂停倒计时
+  void pauseCountdown() {
+    _engine.pauseCountdown();
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  /// 恢复倒计时
+  void resumeCountdown() {
+    _engine.resumeCountdown();
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  /// 切换倒计时快进（10 倍速/正常速）
+  ///
+  /// 如果当前暂停中，快进会同时恢复倒计时。
+  void toggleCountdownFastForward() {
+    final isFF = !state.isCountdownFastForward;
+    _engine.setCountdownSpeed(isFF ? 10.0 : 1.0);
+    if (state.isCountdownPaused) {
+      _engine.resumeCountdown();
+    }
+    state = state.copyWith(
+      isCountdownFastForward: isFF,
+      isCountdownPaused: false,
+    );
+  }
+
+  /// 倒计时期间重播当前句子
+  Future<void> replayDuringCountdown() async {
+    _engine.invalidateSession();
+    state = state.copyWith(
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
     await _startSentence();
   }
@@ -388,6 +446,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
           isPlaying: false,
           isPauseBetweenPlays: true,
           isPauseBetweenSentences: true,
+          isCountdownPaused: false,
+          isCountdownFastForward: false,
           pauseDuration: dur,
           pauseRemaining: dur,
         );

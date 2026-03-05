@@ -55,6 +55,12 @@ class ListenAndRepeatPlayerState {
   /// 是否已完成所有句子
   final bool isCompleted;
 
+  /// 倒计时是否暂停中
+  final bool isCountdownPaused;
+
+  /// 倒计时是否快进中（10 倍速）
+  final bool isCountdownFastForward;
+
   const ListenAndRepeatPlayerState({
     this.currentSentenceIndex = 0,
     this.totalSentences = 0,
@@ -67,6 +73,8 @@ class ListenAndRepeatPlayerState {
     this.pauseRemaining = Duration.zero,
     this.pauseDuration = Duration.zero,
     this.isCompleted = false,
+    this.isCountdownPaused = false,
+    this.isCountdownFastForward = false,
   });
 
   ListenAndRepeatPlayerState copyWith({
@@ -81,6 +89,8 @@ class ListenAndRepeatPlayerState {
     Duration? pauseRemaining,
     Duration? pauseDuration,
     bool? isCompleted,
+    bool? isCountdownPaused,
+    bool? isCountdownFastForward,
   }) {
     return ListenAndRepeatPlayerState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -95,6 +105,9 @@ class ListenAndRepeatPlayerState {
       pauseRemaining: pauseRemaining ?? this.pauseRemaining,
       pauseDuration: pauseDuration ?? this.pauseDuration,
       isCompleted: isCompleted ?? this.isCompleted,
+      isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
+      isCountdownFastForward:
+          isCountdownFastForward ?? this.isCountdownFastForward,
     );
   }
 }
@@ -148,8 +161,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   /// 获取当前句子
   Sentence? get currentSentence =>
       _sentences.isNotEmpty && state.currentSentenceIndex < _sentences.length
-          ? _sentences[state.currentSentenceIndex]
-          : null;
+      ? _sentences[state.currentSentenceIndex]
+      : null;
 
   /// 获取句子列表（只读）
   List<Sentence> get sentences => List.unmodifiable(_sentences);
@@ -173,6 +186,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       isPlaying: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
   }
 
@@ -192,6 +207,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       currentPlayCount: 1,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     await _startSentence();
@@ -208,6 +225,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       currentPlayCount: 1,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
 
     await _startSentence();
@@ -278,6 +297,45 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     }
   }
 
+  /// 暂停倒计时
+  void pauseCountdown() {
+    _engine.pauseCountdown();
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  /// 恢复倒计时
+  void resumeCountdown() {
+    _engine.resumeCountdown();
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  /// 切换倒计时快进（10 倍速/正常速）
+  ///
+  /// 如果当前暂停中，快进会同时恢复倒计时。
+  void toggleCountdownFastForward() {
+    final isFF = !state.isCountdownFastForward;
+    _engine.setCountdownSpeed(isFF ? 10.0 : 1.0);
+    if (state.isCountdownPaused) {
+      _engine.resumeCountdown();
+    }
+    state = state.copyWith(
+      isCountdownFastForward: isFF,
+      isCountdownPaused: false,
+    );
+  }
+
+  /// 倒计时期间重播当前句子
+  Future<void> replayDuringCountdown() async {
+    _engine.invalidateSession();
+    state = state.copyWith(
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
+    await _startSentence();
+  }
+
   /// 释放资源
   void disposePlayer() {
     _engine.cleanup();
@@ -316,12 +374,18 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
         state = state.copyWith(
           isPauseBetweenPlays: true,
           isPlaying: false,
+          isCountdownPaused: false,
+          isCountdownFastForward: false,
           pauseDuration: pauseDur,
           pauseRemaining: pauseDur,
         );
       },
       onPauseEnded: () {
-        state = state.copyWith(isPauseBetweenPlays: false);
+        state = state.copyWith(
+          isPauseBetweenPlays: false,
+          isCountdownPaused: false,
+          isCountdownFastForward: false,
+        );
       },
       onTick: (remaining) {
         state = state.copyWith(pauseRemaining: remaining);
@@ -351,6 +415,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
           isPlaying: false,
           isPauseBetweenPlays: true,
           isPauseBetweenSentences: true,
+          isCountdownPaused: false,
+          isCountdownFastForward: false,
           pauseDuration: dur,
           pauseRemaining: dur,
         );
@@ -391,6 +457,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       isPlaying: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
     );
     await startPlaying();
   }
