@@ -18,6 +18,7 @@ import '../theme/app_theme.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
 import '../widgets/retell/retell_settings_sheet.dart';
+import '../widgets/player_hotkey_scope.dart';
 
 /// 复述播放器页面
 class RetellPlayerScreen extends ConsumerStatefulWidget {
@@ -212,146 +213,161 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen> {
         ? (state.currentParagraphIndex + 1) / state.totalParagraphs
         : 0.0;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        await _handleExit();
+    return LearningHotkeyScope(
+      onPlayPause: () {
+        if (state.phase == RetellPhase.listening) {
+          state.isPlaying ? player.pause() : player.resume();
+        } else if (state.isRetellCountdown) {
+          player.replayDuringCountdown();
+        } else {
+          player.resume();
+        }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.retellTitle),
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _handleExit,
+      onPrevious: () => player.goToPreviousParagraph(),
+      onNext: () => player.goToNextParagraph(),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+          await _handleExit();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.retellTitle),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _handleExit,
+            ),
+            actions: [
+              // 设置按钮
+              IconButton(
+                icon: const Icon(Icons.tune),
+                onPressed: () => showRetellSettingsSheet(context),
+              ),
+            ],
           ),
-          actions: [
-            // 设置按钮
-            IconButton(
-              icon: const Icon(Icons.tune),
-              onPressed: () => showRetellSettingsSheet(context),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            // 进度条
-            LinearProgressIndicator(value: progress),
+          body: Column(
+            children: [
+              // 进度条
+              LinearProgressIndicator(value: progress),
 
-            // 段落进度文字
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.m,
-                vertical: AppSpacing.s,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.retellParagraphProgress(
-                      state.currentParagraphIndex + 1,
-                      state.totalParagraphs,
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    l10n.retellParagraphDuration(
-                      _formatDuration(paragraphDuration),
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 显示模式切换（仅当前段落生效，可见词关闭时隐藏）
-            if (state.settings.keywordMethod != KeywordMethod.off)
+              // 段落进度文字
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-                child: SegmentedButton<RetellDisplayMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: RetellDisplayMode.keywordsOnly,
-                      label: Text(l10n.retellDisplayKeywordsOnly),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.m,
+                  vertical: AppSpacing.s,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      l10n.retellParagraphProgress(
+                        state.currentParagraphIndex + 1,
+                        state.totalParagraphs,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    ButtonSegment(
-                      value: RetellDisplayMode.showAll,
-                      label: Text(l10n.retellDisplayShowAll),
-                    ),
-                    ButtonSegment(
-                      value: RetellDisplayMode.hideAll,
-                      label: Text(l10n.retellDisplayHideAll),
+                    Text(
+                      l10n.retellParagraphDuration(
+                        _formatDuration(paragraphDuration),
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
-                  selected: {state.displayMode},
-                  onSelectionChanged: (selected) =>
-                      player.setDisplayMode(selected.first),
                 ),
               ),
-            const SizedBox(height: AppSpacing.s),
 
-            // 句子列表
-            Expanded(
-              child: Card(
-                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
-                  itemCount: sentences.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    indent: AppSpacing.m,
-                    endIndent: AppSpacing.m,
-                    color: theme.colorScheme.outlineVariant.withValues(
-                      alpha: 0.3,
-                    ),
+              // 显示模式切换（仅当前段落生效，可见词关闭时隐藏）
+              if (state.settings.keywordMethod != KeywordMethod.off)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+                  child: SegmentedButton<RetellDisplayMode>(
+                    segments: [
+                      ButtonSegment(
+                        value: RetellDisplayMode.keywordsOnly,
+                        label: Text(l10n.retellDisplayKeywordsOnly),
+                      ),
+                      ButtonSegment(
+                        value: RetellDisplayMode.showAll,
+                        label: Text(l10n.retellDisplayShowAll),
+                      ),
+                      ButtonSegment(
+                        value: RetellDisplayMode.hideAll,
+                        label: Text(l10n.retellDisplayHideAll),
+                      ),
+                    ],
+                    selected: {state.displayMode},
+                    onSelectionChanged: (selected) =>
+                        player.setDisplayMode(selected.first),
                   ),
-                  itemBuilder: (context, index) {
-                    final sentence = sentences[index];
-                    // 使用句子的全局索引来查找关键词
-                    final sentenceKeywords =
-                        keywords[sentence.index] ?? const {};
+                ),
+              const SizedBox(height: AppSpacing.s),
 
-                    return RetellSentenceTile(
-                      sentence: sentence,
-                      phase: state.phase,
-                      displayMode:
-                          state.settings.keywordMethod != KeywordMethod.off
-                          ? state.displayMode
-                          : RetellDisplayMode.hideAll,
-                      keywordIndices: sentenceKeywords,
-                      isPlayingSentence:
-                          state.phase == RetellPhase.listening &&
-                          index == state.playingSentenceIndex,
-                      onWordTap: (word) =>
-                          showWordDictionarySheet(context: context, word: word),
-                    );
-                  },
+              // 句子列表
+              Expanded(
+                child: Card(
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
+                    itemCount: sentences.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: AppSpacing.m,
+                      endIndent: AppSpacing.m,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.3,
+                      ),
+                    ),
+                    itemBuilder: (context, index) {
+                      final sentence = sentences[index];
+                      // 使用句子的全局索引来查找关键词
+                      final sentenceKeywords =
+                          keywords[sentence.index] ?? const {};
+
+                      return RetellSentenceTile(
+                        sentence: sentence,
+                        phase: state.phase,
+                        displayMode:
+                            state.settings.keywordMethod != KeywordMethod.off
+                            ? state.displayMode
+                            : RetellDisplayMode.hideAll,
+                        keywordIndices: sentenceKeywords,
+                        isPlayingSentence:
+                            state.phase == RetellPhase.listening &&
+                            index == state.playingSentenceIndex,
+                        onWordTap: (word) => showWordDictionarySheet(
+                          context: context,
+                          word: word,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: AppSpacing.s),
+              const SizedBox(height: AppSpacing.s),
 
-            // 阶段指示器 + 倒计时控制
-            _PhaseIndicator(
-              state: state,
-              l10n: l10n,
-              onPauseResume: state.isCountdownPaused
-                  ? () => player.resumeCountdown()
-                  : () => player.pauseCountdown(),
-            ),
+              // 阶段指示器 + 倒计时控制
+              _PhaseIndicator(
+                state: state,
+                l10n: l10n,
+                onPauseResume: state.isCountdownPaused
+                    ? () => player.resumeCountdown()
+                    : () => player.pauseCountdown(),
+              ),
 
-            const SizedBox(height: AppSpacing.m),
+              const SizedBox(height: AppSpacing.m),
 
-            // 底部控制
-            _BottomControls(state: state, player: player, l10n: l10n),
+              // 底部控制
+              _BottomControls(state: state, player: player, l10n: l10n),
 
-            const SizedBox(height: AppSpacing.l),
-          ],
+              const SizedBox(height: AppSpacing.l),
+            ],
+          ),
         ),
       ),
     );

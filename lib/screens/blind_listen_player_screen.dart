@@ -30,6 +30,7 @@ import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blind_listen_complete_dialog.dart';
+import '../widgets/player_hotkey_scope.dart';
 
 /// 盲听播放器页面
 class BlindListenPlayerScreen extends ConsumerStatefulWidget {
@@ -112,9 +113,8 @@ class _BlindListenPlayerScreenState
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _FreePlayCompleteDialog(
-        title: l10n.blindListenComplete,
-      ),
+      builder: (ctx) =>
+          _FreePlayCompleteDialog(title: l10n.blindListenComplete),
     );
 
     _isShowingDialog = false;
@@ -373,124 +373,134 @@ class _BlindListenPlayerScreenState
       }
     });
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-
-        // 自由练习模式直接退出，不弹确认对话框
-        // 正常学习模式播放中弹出退出确认对话框
-        if (playerState.isPlaying && !session.isFreePlay) {
-          final confirm = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text(l10n.exitBlindListenTitle),
-              content: Text(l10n.exitBlindListenMessage),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(l10n.cancel),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(l10n.confirmExit),
-                ),
-              ],
-            ),
-          );
-          if (confirm != true || !mounted) return;
+    return LearningHotkeyScope(
+      onPlayPause: () {
+        final player = ref.read(blindListenPlayerProvider.notifier);
+        if (playerState.isPlaying) {
+          player.pause();
+        } else {
+          player.play();
         }
-
-        await ref.read(learningSessionProvider.notifier).exitLearningMode();
-        if (mounted) context.pop();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.blindListenAppBarTitle),
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () {
-              // 触发 PopScope 的 onPopInvokedWithResult
-              Navigator.of(context).maybePop();
-            },
-          ),
-        ),
-        body: Column(
-          children: [
-            // 中央区域 — 大播放按钮 + 耳机图标
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 耳机图标
-                    Icon(
-                      Icons.headphones,
-                      size: 80,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
 
-                    // 播放/暂停按钮
-                    GestureDetector(
-                      onTap: () {
-                        final player = ref.read(
-                          blindListenPlayerProvider.notifier,
-                        );
-                        if (playerState.isPlaying) {
-                          player.pause();
-                        } else {
-                          player.play();
-                        }
-                      },
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: 0.3,
+          // 自由练习模式直接退出，不弹确认对话框
+          // 正常学习模式播放中弹出退出确认对话框
+          if (playerState.isPlaying && !session.isFreePlay) {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(l10n.exitBlindListenTitle),
+                content: Text(l10n.exitBlindListenMessage),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(l10n.cancel),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(l10n.confirmExit),
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true || !mounted) return;
+          }
+
+          await ref.read(learningSessionProvider.notifier).exitLearningMode();
+          if (mounted) context.pop();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.blindListenAppBarTitle),
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                // 触发 PopScope 的 onPopInvokedWithResult
+                Navigator.of(context).maybePop();
+              },
+            ),
+          ),
+          body: Column(
+            children: [
+              // 中央区域 — 大播放按钮 + 耳机图标
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 耳机图标
+                      Icon(
+                        Icons.headphones,
+                        size: 80,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+
+                      // 播放/暂停按钮
+                      GestureDetector(
+                        onTap: () {
+                          final player = ref.read(
+                            blindListenPlayerProvider.notifier,
+                          );
+                          if (playerState.isPlaying) {
+                            player.pause();
+                          } else {
+                            player.play();
+                          }
+                        },
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.3,
+                                ),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
                               ),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          playerState.isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
-                          size: 40,
-                          color: theme.colorScheme.onPrimary,
+                            ],
+                          ),
+                          child: Icon(
+                            playerState.isPlaying
+                                ? Icons.pause
+                                : Icons.play_arrow,
+                            size: 40,
+                            color: theme.colorScheme.onPrimary,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.l),
+                      const SizedBox(height: AppSpacing.l),
 
-                    // 倒计时信息区域（固定高度，避免布局跳动）
-                    SizedBox(
-                      height: 64,
-                      child: _countdownRemaining != null
-                          ? _CountdownIndicator(
-                              remaining: _countdownRemaining!,
-                              total: _countdownTotal,
-                              l10n: l10n,
-                              onSkip: _skipCountdown,
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
+                      // 倒计时信息区域（固定高度，避免布局跳动）
+                      SizedBox(
+                        height: 64,
+                        child: _countdownRemaining != null
+                            ? _CountdownIndicator(
+                                remaining: _countdownRemaining!,
+                                total: _countdownTotal,
+                                l10n: l10n,
+                                onSkip: _skipCountdown,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            // 底部进度条
-            _ProgressSection(formatDuration: _formatDuration),
-          ],
+              // 底部进度条
+              _ProgressSection(formatDuration: _formatDuration),
+            ],
+          ),
         ),
       ),
     );

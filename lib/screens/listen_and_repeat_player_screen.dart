@@ -25,6 +25,7 @@ import '../utils/paragraph_grouping.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
 import '../widgets/retell/retell_briefing_sheet.dart';
+import '../widgets/player_hotkey_scope.dart';
 
 /// 跟读播放器页面
 class ListenAndRepeatPlayerScreen extends ConsumerStatefulWidget {
@@ -355,126 +356,139 @@ class _ListenAndRepeatPlayerScreenState
               ' - ${_formatTimestamp(currentSentence.endTime)}'
         : null;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        _handleExit();
+    return LearningHotkeyScope(
+      onPlayPause: () {
+        if (playerState.isPauseBetweenPlays) {
+          player.replayDuringCountdown();
+        } else if (playerState.isPlaying) {
+          player.pause();
+        } else {
+          player.resume();
+        }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.listenAndRepeatAppBarTitle),
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _handleExit,
+      onPrevious: () => player.goToPrevious(),
+      onNext: () => player.goToNext(),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _handleExit();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.listenAndRepeatAppBarTitle),
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _handleExit,
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.tune),
+                onPressed: () =>
+                    showListenAndRepeatSettingsSheet(context: context),
+              ),
+            ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.tune),
-              onPressed: () =>
-                  showListenAndRepeatSettingsSheet(context: context),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            // 进度条
-            _ProgressSection(
-              playerState: playerState,
-              l10n: l10n,
-              durationText: durationText,
-              timestampText: timestampText,
-            ),
+          body: Column(
+            children: [
+              // 进度条
+              _ProgressSection(
+                playerState: playerState,
+                l10n: l10n,
+                durationText: durationText,
+                timestampText: timestampText,
+              ),
 
-            // 主体内容
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.l),
-                child: Column(
-                  children: [
-                    // 句子卡片（带★标记）
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: currentSentence != null
-                            ? SentenceAnnotationCard(
-                                text: currentSentence.text,
-                                isDifficult: true,
-                                onToggle: _handleRemoveDifficult,
-                              )
-                            : const SizedBox.shrink(),
+              // 主体内容
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.l),
+                  child: Column(
+                    children: [
+                      // 句子卡片（带★标记）
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: currentSentence != null
+                              ? SentenceAnnotationCard(
+                                  text: currentSentence.text,
+                                  isDifficult: true,
+                                  onToggle: _handleRemoveDifficult,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.m),
+                      const SizedBox(height: AppSpacing.m),
 
-                    // 跟读提示 / 倒计时控制（上） + 播放遍数（下）
-                    SizedBox(
-                      height: 96,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (playerState.isPauseBetweenPlays) ...[
-                            // 跟读提示
-                            Text(
-                              l10n.listenAndRepeatYourTurnHint,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.secondary,
-                                fontWeight: FontWeight.w600,
+                      // 跟读提示 / 倒计时控制（上） + 播放遍数（下）
+                      SizedBox(
+                        height: 96,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (playerState.isPauseBetweenPlays) ...[
+                              // 跟读提示
+                              Text(
+                                l10n.listenAndRepeatYourTurnHint,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: AppSpacing.xs),
+                              _CountdownChip(
+                                remaining: playerState.pauseRemaining,
+                                total: playerState.pauseDuration,
+                                isPaused: playerState.isCountdownPaused,
+                                onTap: playerState.isCountdownPaused
+                                    ? () => player.resumeCountdown()
+                                    : () => player.pauseCountdown(),
+                              ),
+                            ],
+                            // 播放中：先听提示 / 留白期：跟读提示
+                            if (!playerState.isPauseBetweenPlays)
+                              Text(
+                                l10n.listenAndRepeatListenHint,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                             const SizedBox(height: AppSpacing.xs),
-                            _CountdownChip(
-                              remaining: playerState.pauseRemaining,
-                              total: playerState.pauseDuration,
-                              isPaused: playerState.isCountdownPaused,
-                              onTap: playerState.isCountdownPaused
-                                  ? () => player.resumeCountdown()
-                                  : () => player.pauseCountdown(),
+                            Text(
+                              l10n.listenAndRepeatPlayCount(
+                                playerState.currentPlayCount,
+                                playerState.settings.repeatCount,
+                              ),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.5),
+                              ),
                             ),
                           ],
-                          // 播放中：先听提示 / 留白期：跟读提示
-                          if (!playerState.isPauseBetweenPlays)
-                            Text(
-                              l10n.listenAndRepeatListenHint,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            l10n.listenAndRepeatPlayCount(
-                              playerState.currentPlayCount,
-                              playerState.settings.repeatCount,
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.5),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            // 底部播放控制
-            _PlaybackControls(
-              playerState: playerState,
-              onPrevious: () => player.goToPrevious(),
-              onNext: () => player.goToNext(),
-              onPlayPause: () {
-                if (playerState.isPauseBetweenPlays) {
-                  player.replayDuringCountdown();
-                } else if (playerState.isPlaying) {
-                  player.pause();
-                } else {
-                  player.resume();
-                }
-              },
-            ),
-          ],
+              // 底部播放控制
+              _PlaybackControls(
+                playerState: playerState,
+                onPrevious: () => player.goToPrevious(),
+                onNext: () => player.goToNext(),
+                onPlayPause: () {
+                  if (playerState.isPauseBetweenPlays) {
+                    player.replayDuringCountdown();
+                  } else if (playerState.isPlaying) {
+                    player.pause();
+                  } else {
+                    player.resume();
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

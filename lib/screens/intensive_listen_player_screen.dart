@@ -23,6 +23,7 @@ import '../theme/app_theme.dart';
 import '../widgets/intensive_listen/intensive_listen_settings_sheet.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
+import '../widgets/player_hotkey_scope.dart';
 
 /// 精听播放器页面
 class IntensiveListenPlayerScreen extends ConsumerStatefulWidget {
@@ -467,96 +468,111 @@ class _IntensiveListenPlayerScreenState
               ' - ${_formatTimestamp(currentSentence.endTime)}'
         : null;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        _handleExit();
+    return LearningHotkeyScope(
+      onPlayPause: () {
+        if (playerState.isAnnotationMode) {
+          player.replayInAnnotationMode();
+        } else if (playerState.isPauseBetweenPlays) {
+          player.replayDuringCountdown();
+        } else if (playerState.isPlaying) {
+          player.pause();
+        } else {
+          player.resume();
+        }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.intensiveListenAppBarTitle),
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _handleExit,
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.tune),
-              tooltip: l10n.intensiveListenSettings,
-              onPressed: () {
-                showIntensiveListenSettingsSheet(context: context);
-              },
+      onPrevious: () => player.goToPrevious(),
+      onNext: () => player.goToNext(),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _handleExit();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.intensiveListenAppBarTitle),
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _handleExit,
             ),
-          ],
-        ),
-        body: Column(
-          children: [
-            // 进度条
-            _ProgressSection(
-              playerState: playerState,
-              l10n: l10n,
-              durationText: durationText,
-              timestampText: timestampText,
-            ),
-
-            // 主体内容
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: playerState.isAnnotationReplay
-                    ? _AnnotationReplayView(
-                        key: const ValueKey('replay'),
-                        text: currentSentence?.text ?? '',
-                        l10n: l10n,
-                      )
-                    : playerState.isAnnotationMode
-                    ? _AnnotationModeView(
-                        key: const ValueKey('annotation'),
-                        text: currentSentence?.text ?? '',
-                        isDifficult: playerState.difficultSentences.contains(
-                          playerState.currentSentenceIndex,
-                        ),
-                        l10n: l10n,
-                        onContinue: () => player.exitAnnotationMode(),
-                        onToggleDifficult: _toggleAndSaveDifficult,
-                      )
-                    : _NormalModeView(
-                        key: const ValueKey('normal'),
-                        playerState: playerState,
-                        l10n: l10n,
-                        theme: theme,
-                        onPeekStart: () => player.setTextRevealed(true),
-                        onPeekEnd: () => player.setTextRevealed(false),
-                        onCantUnderstand: () => player.enterAnnotationMode(),
-                        onToggleDifficult: _toggleAndSaveDifficult,
-                        onPauseCountdown: () => playerState.isCountdownPaused
-                            ? player.resumeCountdown()
-                            : player.pauseCountdown(),
-                        sentenceText: currentSentence?.text,
-                      ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.tune),
+                tooltip: l10n.intensiveListenSettings,
+                onPressed: () {
+                  showIntensiveListenSettingsSheet(context: context);
+                },
               ),
-            ),
+            ],
+          ),
+          body: Column(
+            children: [
+              // 进度条
+              _ProgressSection(
+                playerState: playerState,
+                l10n: l10n,
+                durationText: durationText,
+                timestampText: timestampText,
+              ),
 
-            // 底部播放控制
-            _PlaybackControls(
-              playerState: playerState,
-              onPrevious: () => player.goToPrevious(),
-              onNext: () => player.goToNext(),
-              onPlayPause: () {
-                if (playerState.isAnnotationMode) {
-                  player.replayInAnnotationMode();
-                } else if (playerState.isPauseBetweenPlays) {
-                  player.replayDuringCountdown();
-                } else if (playerState.isPlaying) {
-                  player.pause();
-                } else {
-                  player.resume();
-                }
-              },
-            ),
-          ],
+              // 主体内容
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: playerState.isAnnotationReplay
+                      ? _AnnotationReplayView(
+                          key: const ValueKey('replay'),
+                          text: currentSentence?.text ?? '',
+                          l10n: l10n,
+                        )
+                      : playerState.isAnnotationMode
+                      ? _AnnotationModeView(
+                          key: const ValueKey('annotation'),
+                          text: currentSentence?.text ?? '',
+                          isDifficult: playerState.difficultSentences.contains(
+                            playerState.currentSentenceIndex,
+                          ),
+                          l10n: l10n,
+                          onContinue: () => player.exitAnnotationMode(),
+                          onToggleDifficult: _toggleAndSaveDifficult,
+                        )
+                      : _NormalModeView(
+                          key: const ValueKey('normal'),
+                          playerState: playerState,
+                          l10n: l10n,
+                          theme: theme,
+                          onPeekStart: () => player.setTextRevealed(true),
+                          onPeekEnd: () => player.setTextRevealed(false),
+                          onCantUnderstand: () => player.enterAnnotationMode(),
+                          onToggleDifficult: _toggleAndSaveDifficult,
+                          onPauseCountdown: () => playerState.isCountdownPaused
+                              ? player.resumeCountdown()
+                              : player.pauseCountdown(),
+                          sentenceText: currentSentence?.text,
+                        ),
+                ),
+              ),
+
+              // 底部播放控制
+              _PlaybackControls(
+                playerState: playerState,
+                onPrevious: () => player.goToPrevious(),
+                onNext: () => player.goToNext(),
+                onPlayPause: () {
+                  if (playerState.isAnnotationMode) {
+                    player.replayInAnnotationMode();
+                  } else if (playerState.isPauseBetweenPlays) {
+                    player.replayDuringCountdown();
+                  } else if (playerState.isPlaying) {
+                    player.pause();
+                  } else {
+                    player.resume();
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

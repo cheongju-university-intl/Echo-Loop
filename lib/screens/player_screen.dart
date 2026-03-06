@@ -74,7 +74,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final playerState = ref.watch(listeningPracticeProvider);
     final controller = ref.read(listeningPracticeProvider.notifier);
 
-    return PlayerHotkeyScope(
+    final engineNotifier = ref.read(audioEngineProvider.notifier);
+
+    return LearningHotkeyScope(
+      onPlayPause: () =>
+          engineNotifier.isPlaying ? controller.pause() : controller.play(),
+      onPrevious: () {
+        if (playerState.hasSentences) controller.previousSentence();
+      },
+      onNext: () {
+        if (playerState.hasSentences) controller.nextSentence();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(playerState.currentAudioItem?.name ?? l10n.player),
