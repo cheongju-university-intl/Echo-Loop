@@ -477,6 +477,8 @@
       "seconds": { "type": "int" }
     }
   },
+  "listenAndRepeatListenHint": "Listen first, then repeat",
+  "listenAndRepeatYourTurnHint": "Your turn — repeat out loud!",
   "listenAndRepeatCompleteTitle": "Listen & Repeat Complete",
   "listenAndRepeatCompleteMessage": "You've completed listen & repeat for all {total} difficult sentences.",
   "@listenAndRepeatCompleteMessage": {

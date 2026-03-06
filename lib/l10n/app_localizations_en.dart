@@ -899,6 +899,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get listenAndRepeatListenHint => 'Listen first, then repeat';
+
+  @override
+  String get listenAndRepeatYourTurnHint => 'Your turn — repeat out loud!';
+
+  @override
   String get listenAndRepeatCompleteTitle => 'Listen & Repeat Complete';
 
   @override

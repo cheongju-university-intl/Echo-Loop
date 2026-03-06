@@ -881,6 +881,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get listenAndRepeatListenHint => '先听，听完后跟读';
+
+  @override
+  String get listenAndRepeatYourTurnHint => '请跟读这个句子';
+
+  @override
   String get listenAndRepeatCompleteTitle => '跟读完成';
 
   @override

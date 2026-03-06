@@ -1694,6 +1694,18 @@ abstract class AppLocalizations {
   /// **'Next sentence in {seconds}s'**
   String listenAndRepeatPauseBetweenSentences(int seconds);
 
+  /// No description provided for @listenAndRepeatListenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen first, then repeat'**
+  String get listenAndRepeatListenHint;
+
+  /// No description provided for @listenAndRepeatYourTurnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your turn — repeat out loud!'**
+  String get listenAndRepeatYourTurnHint;
+
   /// No description provided for @listenAndRepeatCompleteTitle.
   ///
   /// In en, this message translates to:

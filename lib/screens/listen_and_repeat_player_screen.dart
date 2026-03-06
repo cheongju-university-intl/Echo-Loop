@@ -403,26 +403,40 @@ class _ListenAndRepeatPlayerScreenState
                     ),
                     const SizedBox(height: AppSpacing.m),
 
-                    // 倒计时控制（上） + 播放遍数（下）
+                    // 跟读提示 / 倒计时控制（上） + 播放遍数（下）
                     SizedBox(
-                      height: 72,
+                      height: 96,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          if (playerState.isPauseBetweenPlays)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.xs,
-                              ),
-                              child: _CountdownChip(
-                                remaining: playerState.pauseRemaining,
-                                total: playerState.pauseDuration,
-                                isPaused: playerState.isCountdownPaused,
-                                onTap: playerState.isCountdownPaused
-                                    ? () => player.resumeCountdown()
-                                    : () => player.pauseCountdown(),
+                          if (playerState.isPauseBetweenPlays) ...[
+                            // 跟读提示
+                            Text(
+                              l10n.listenAndRepeatYourTurnHint,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.secondary,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                            const SizedBox(height: AppSpacing.xs),
+                            _CountdownChip(
+                              remaining: playerState.pauseRemaining,
+                              total: playerState.pauseDuration,
+                              isPaused: playerState.isCountdownPaused,
+                              onTap: playerState.isCountdownPaused
+                                  ? () => player.resumeCountdown()
+                                  : () => player.pauseCountdown(),
+                            ),
+                          ],
+                          // 播放中：先听提示 / 留白期：跟读提示
+                          if (!playerState.isPauseBetweenPlays)
+                            Text(
+                              l10n.listenAndRepeatListenHint,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                             l10n.listenAndRepeatPlayCount(
                               playerState.currentPlayCount,
