@@ -573,6 +573,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listenAgain => 'Listen Again';
 
   @override
+  String get practiceAgain => 'Practice Again';
+
+  @override
   String get nextStage => 'Next';
 
   @override
@@ -1152,6 +1155,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get exitReviewDifficultPracticeMessage =>
       'Your progress will not be saved for this step.';
+
+  @override
+  String get exitReviewDifficultPracticeConfirmMessage =>
+      'Your progress will be saved and you can continue next time.';
 
   @override
   String reviewDifficultPracticeAdvancing(int seconds) {

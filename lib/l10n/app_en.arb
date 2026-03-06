@@ -264,6 +264,7 @@
   "selectDifficulty": "How did it feel?",
   "selectDifficultyRequired": "Please select a difficulty to continue",
   "listenAgain": "Listen Again",
+  "practiceAgain": "Practice Again",
   "nextStage": "Next",
   "difficultyVeryEasy": "Very Easy",
   "difficultyEasy": "Easy",
@@ -644,6 +645,7 @@
   "reviewDifficultPracticeNone": "No difficult sentences to practice.",
   "exitReviewDifficultPracticeTitle": "Exit Practice?",
   "exitReviewDifficultPracticeMessage": "Your progress will not be saved for this step.",
+  "exitReviewDifficultPracticeConfirmMessage": "Your progress will be saved and you can continue next time.",
   "reviewDifficultPracticeAdvancing": "Next sentence in {seconds}s",
   "@reviewDifficultPracticeAdvancing": {
     "placeholders": {

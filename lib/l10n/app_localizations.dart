@@ -1160,6 +1160,12 @@ abstract class AppLocalizations {
   /// **'Listen Again'**
   String get listenAgain;
 
+  /// No description provided for @practiceAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice Again'**
+  String get practiceAgain;
+
   /// No description provided for @nextStage.
   ///
   /// In en, this message translates to:
@@ -2107,6 +2113,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your progress will not be saved for this step.'**
   String get exitReviewDifficultPracticeMessage;
+
+  /// No description provided for @exitReviewDifficultPracticeConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress will be saved and you can continue next time.'**
+  String get exitReviewDifficultPracticeConfirmMessage;
 
   /// No description provided for @reviewDifficultPracticeAdvancing.
   ///

@@ -177,6 +177,7 @@
   "selectDifficulty": "感觉如何？",
   "selectDifficultyRequired": "请选择难度后继续",
   "listenAgain": "再听一遍",
+  "practiceAgain": "再练一遍",
   "nextStage": "下一步",
   "difficultyVeryEasy": "很轻松",
   "difficultyEasy": "偏轻松",
@@ -502,6 +503,7 @@
   "reviewDifficultPracticeNone": "没有需要补练的难句。",
   "exitReviewDifficultPracticeTitle": "退出补练？",
   "exitReviewDifficultPracticeMessage": "当前步骤的进度不会保存。",
+  "exitReviewDifficultPracticeConfirmMessage": "进度会保存，下次可继续。",
   "reviewDifficultPracticeAdvancing": "{seconds}秒后进入下一句",
   "@reviewDifficultPracticeAdvancing": {
     "placeholders": {

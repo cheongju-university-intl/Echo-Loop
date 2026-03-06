@@ -361,6 +361,16 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     state = const ReviewDifficultPracticeState();
   }
 
+  /// 重置到第一句并重新开始播放（自由练习"再来一遍"）
+  Future<void> resetToStart() async {
+    _engine.cleanup();
+    state = ReviewDifficultPracticeState(
+      currentSentenceIndex: 0,
+      totalSentences: _sentences.length,
+    );
+    await startPlaying();
+  }
+
   // ========== 内部方法 ==========
 
   /// 开始跟读循环（显示字幕，播放 N 遍 + 跟读留白）

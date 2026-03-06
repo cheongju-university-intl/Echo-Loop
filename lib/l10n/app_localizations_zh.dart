@@ -568,6 +568,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get listenAgain => '再听一遍';
 
   @override
+  String get practiceAgain => '再练一遍';
+
+  @override
   String get nextStage => '下一步';
 
   @override
@@ -1122,6 +1125,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exitReviewDifficultPracticeMessage => '当前步骤的进度不会保存。';
+
+  @override
+  String get exitReviewDifficultPracticeConfirmMessage => '进度会保存，下次可继续。';
 
   @override
   String reviewDifficultPracticeAdvancing(int seconds) {
