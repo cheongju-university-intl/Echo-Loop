@@ -2270,6 +2270,18 @@ abstract class AppLocalizations {
   /// **'Something went wrong'**
   String get transcriptionErrorUnknown;
 
+  /// No description provided for @transcriptionErrorFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'File too large (max {maxMb}MB)'**
+  String transcriptionErrorFileTooLarge(int maxMb);
+
+  /// No description provided for @transcriptionErrorTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio too long (max {maxMin} minutes)'**
+  String transcriptionErrorTooLong(int maxMin);
+
   /// No description provided for @deleteSubtitleConfirm.
   ///
   /// In en, this message translates to:

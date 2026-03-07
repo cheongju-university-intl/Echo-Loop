@@ -1240,6 +1240,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transcriptionErrorUnknown => 'Something went wrong';
 
   @override
+  String transcriptionErrorFileTooLarge(int maxMb) {
+    return 'File too large (max ${maxMb}MB)';
+  }
+
+  @override
+  String transcriptionErrorTooLong(int maxMin) {
+    return 'Audio too long (max $maxMin minutes)';
+  }
+
+  @override
   String get deleteSubtitleConfirm =>
       'Are you sure you want to delete the subtitle?';
 

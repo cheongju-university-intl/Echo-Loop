@@ -1209,6 +1209,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get transcriptionErrorUnknown => '出了点问题';
 
   @override
+  String transcriptionErrorFileTooLarge(int maxMb) {
+    return '文件过大（最大 ${maxMb}MB）';
+  }
+
+  @override
+  String transcriptionErrorTooLong(int maxMin) {
+    return '音频过长（最长 $maxMin 分钟）';
+  }
+
+  @override
   String get deleteSubtitleConfirm => '确定删除字幕？';
 
   @override

@@ -617,12 +617,40 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     }
   }
 
+  /// AI 转录文件大小上限（50MB）
+  static const _maxFileSize = 50 * 1024 * 1024;
+
+  /// AI 转录时长上限（15 分钟）
+  static const _maxDurationSeconds = 15 * 60;
+
   /// 处理 AI 转录
   Future<void> _handleAiTranscription(
     BuildContext context,
     AudioItem audioItem,
   ) async {
     final l10n = AppLocalizations.of(context)!;
+
+    // 检查时长限制
+    if (audioItem.totalDuration > _maxDurationSeconds) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.transcriptionErrorTooLong(15))),
+        );
+      }
+      return;
+    }
+
+    // 检查文件大小限制
+    final fullPath = await audioItem.getFullAudioPath();
+    final fileSize = await File(fullPath).length();
+    if (fileSize > _maxFileSize) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.transcriptionErrorFileTooLarge(50))),
+        );
+      }
+      return;
+    }
 
     // 已有字幕时弹出覆盖确认
     if (audioItem.hasTranscript) {

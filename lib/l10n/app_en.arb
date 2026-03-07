@@ -683,6 +683,14 @@
   "transcriptionErrorTimeout": "Request timed out, please retry",
   "transcriptionErrorServer": "Server error, please retry later",
   "transcriptionErrorUnknown": "Something went wrong",
+  "transcriptionErrorFileTooLarge": "File too large (max {maxMb}MB)",
+  "@transcriptionErrorFileTooLarge": {
+    "placeholders": { "maxMb": { "type": "int" } }
+  },
+  "transcriptionErrorTooLong": "Audio too long (max {maxMin} minutes)",
+  "@transcriptionErrorTooLong": {
+    "placeholders": { "maxMin": { "type": "int" } }
+  },
   "deleteSubtitleConfirm": "Are you sure you want to delete the subtitle?",
   "deleteSubtitleWarning": "Deleting the subtitle will affect learning progress.",
   "languageMulti": "Mixed Languages",

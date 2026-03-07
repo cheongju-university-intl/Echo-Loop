@@ -536,6 +536,8 @@
   "transcriptionErrorTimeout": "请求超时，请重试",
   "transcriptionErrorServer": "服务器错误，请稍后重试",
   "transcriptionErrorUnknown": "出了点问题",
+  "transcriptionErrorFileTooLarge": "文件过大（最大 {maxMb}MB）",
+  "transcriptionErrorTooLong": "音频过长（最长 {maxMin} 分钟）",
   "deleteSubtitleConfirm": "确定删除字幕？",
   "deleteSubtitleWarning": "删除字幕将影响学习进度。",
   "languageMulti": "混合语言",
