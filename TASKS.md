@@ -1,7 +1,7 @@
 # Fluency 任务清单
 
-> 最后更新：2026-03-06
-> 当前焦点：AI 翻译 & AI 解析功能
+> 最后更新：2026-03-08
+> 当前焦点：Favorites Tab 功能
 
 ## 历史归档
 - [Milestone 2 - 学习流程引擎](./docs/tasks-archive/milestone-2-learning-engine.md)
@@ -55,13 +55,6 @@
 
   **完成时间**: 2026-03-05
 
-### 验证结果
-
-- flutter analyze: 通过（info，无错误）
-- flutter test: 全部通过
-- flutter test integration_test -d macos: 全部通过（61 个）
-- flutter build macos: 通过
-
 ---
 
 ## 已完成：AI 翻译 & AI 解析功能
@@ -98,12 +91,6 @@
 - [x] SentenceAiNotifier Provider 测试（9 个）
 - [x] AiContentSection Widget 测试（13 个）
 - [x] SentenceAnnotationCard Widget 测试
-
-### 验证结果
-
-- flutter analyze: 通过（36 info，无错误/警告）
-- flutter test: 全部通过（717 个）
-- flutter build macos: 通过（73.8MB）
 
   **完成时间**: 2026-03-06
 
@@ -182,9 +169,56 @@
 ## 已完成：本地词典功能
 
 - [x] 集成本地词典数据库（dict.db），点击单词弹出音标、释义、柯林斯星级、考试标签
-- [ ] 支持收藏单词，收藏的时候要记录这个单词来源的音频和句子。如果用户删除的音频或字幕，不删除单词，但是把音频或句子来源设置为NULL
+- [x] 支持收藏单词，收藏的时候要记录这个单词来源的音频和句子。如果用户删除的音频或字幕，不删除单词，但是把音频或句子来源设置为NULL
 
-  **完成时间**: 2026-03-05
+  **完成时间**: 2026-03-08
+
+## 已完成：Favorites Tab 功能（MVP）
+
+### 数据层
+- [x] saved_words 表定义 + DB 迁移 v14→v15
+- [x] SavedWordDao（watchAll / saveWord / removeWord / isWordSaved / watchIsWordSaved）
+- [x] BookmarkDao 扩展 — watchAllWithAudioName() JOIN audio_items
+- [x] SavedWordNotifier Provider（riverpod_generator 代码生成）
+- [x] isWordSavedProvider（流式监听单词收藏状态）
+
+### UI 层
+- [x] WordDictionarySheet 添加收藏按钮（bookmark 图标 + 来源信息传递）
+- [x] SentenceAnnotationCard 扩展（audioItemId + sentenceIndex 透传到词典弹窗）
+- [x] Favorites Tab 句子视图（按音频分组 ExpansionTile + Dismissible 左滑删除）
+- [x] Favorites Tab 单词视图（ExpansionTile 展开详情 + 词典释义 + 来源句子 + Dismissible）
+- [x] SegmentedButton 切换句子/单词视图
+- [x] 空状态引导
+
+### 国际化
+- [x] 新增 12 个 Favorites 相关 ARB key（en + zh）
+
+### 测试
+- [x] SavedWordDao 单元测试（8 个）
+- [x] BookmarkDao.watchAllWithAudioName 单元测试（5 个）
+
+  **完成时间**: 2026-03-08
+
+## 已完成：收藏句子一键复习功能
+
+- [x] i18n key（bookmarkReviewTitle / Start / Complete / Again / AudioSkipped / FromAudio / Progress，en + zh）
+- [x] BookmarkSentence 数据类（Sentence + audioItemId + audioName）
+- [x] BookmarkReviewProvider（跨音频复习、按音频分组乱序、跟读模式、取消收藏、再来一遍）
+- [x] BookmarkReviewScreen UI（复用 ReviewDifficultPracticeScreen 布局 + 音频来源显示）
+- [x] 路由注册（/bookmark-review，parentNavigatorKey: rootNavigatorKey）
+- [x] Favorites 入口按钮（句子列表上方 FilledButton.tonal "开始复习 (N)"）
+- [x] 单元测试（BookmarkSentence + State 行为 + 分组乱序逻辑，9 个）
+
+  **完成时间**: 2026-03-08
+
+## 优化收藏页
+- [x] 句子收藏页面，需要在每个句子item 上显示收藏icon，用户可以点击取消收藏，不需要展开。
+
+  **完成时间**: 2026-03-08
+- [ ] 句子收藏页面，每个音频item上（展开之前），都需要有一个按钮可以让用户练习这一篇中的收藏句。
+- [x] 单词收藏页面，需要在每个单词item 上显示收藏icon，用户可以点击取消收藏，不需要展开。
+
+  **完成时间**: 2026-03-08
 
 ## 优化UI，使得用户看起来更舒服而不单调
 - 支持自定义背景、背景音
