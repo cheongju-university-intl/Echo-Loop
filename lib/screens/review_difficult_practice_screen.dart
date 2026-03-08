@@ -356,8 +356,9 @@ class _ReviewDifficultPracticeScreenState
                           playerState: playerState,
                           l10n: l10n,
                           theme: theme,
-                          onPeekStart: () => player.setTextRevealed(true),
-                          onPeekEnd: () => player.setTextRevealed(false),
+                          onPeekToggle: () => player.setTextRevealed(
+                            !playerState.isTextRevealed,
+                          ),
                           onCantUnderstand: () => player.enterAnnotationMode(),
                           onRemoveDifficult: _handleRemoveDifficult,
                           onPauseCountdown: () => playerState.isCountdownPaused
@@ -455,8 +456,7 @@ class _NormalModeView extends StatelessWidget {
   final ReviewDifficultPracticeState playerState;
   final AppLocalizations l10n;
   final ThemeData theme;
-  final VoidCallback onPeekStart;
-  final VoidCallback onPeekEnd;
+  final VoidCallback onPeekToggle;
   final VoidCallback onCantUnderstand;
   final VoidCallback onRemoveDifficult;
   final VoidCallback onPauseCountdown;
@@ -467,8 +467,7 @@ class _NormalModeView extends StatelessWidget {
     required this.playerState,
     required this.l10n,
     required this.theme,
-    required this.onPeekStart,
-    required this.onPeekEnd,
+    required this.onPeekToggle,
     required this.onCantUnderstand,
     required this.onRemoveDifficult,
     required this.onPauseCountdown,
@@ -563,12 +562,12 @@ class _NormalModeView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Listener(
-                onPointerDown: (_) => onPeekStart(),
-                onPointerUp: (_) => onPeekEnd(),
-                onPointerCancel: (_) => onPeekEnd(),
+              GestureDetector(
+                onTap: onPeekToggle,
                 child: _ActionChip(
-                  icon: Icons.visibility_outlined,
+                  icon: playerState.isTextRevealed
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
                   label: l10n.intensiveListenPeek,
                 ),
               ),
