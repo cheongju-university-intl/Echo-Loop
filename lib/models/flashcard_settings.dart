@@ -50,6 +50,9 @@ class FlashcardSettings {
   /// 翻转到背面时自动播放来源例句（默认 true）
   final bool autoPlaySentence;
 
+  /// 进入卡片 / 翻转时自动 TTS 朗读单词（默认 true）
+  final bool autoPlayWord;
+
   /// 固定倒计时可选值
   static const List<int> fixedTimerOptions = [3, 5, 8, 10, 15, 20, 30];
 
@@ -58,6 +61,7 @@ class FlashcardSettings {
     this.fixedTimerSeconds = 8,
     this.sortMode = FlashcardSortMode.random,
     this.autoPlaySentence = true,
+    this.autoPlayWord = true,
   });
 
   FlashcardSettings copyWith({
@@ -65,12 +69,14 @@ class FlashcardSettings {
     int? fixedTimerSeconds,
     FlashcardSortMode? sortMode,
     bool? autoPlaySentence,
+    bool? autoPlayWord,
   }) {
     return FlashcardSettings(
       timerMode: timerMode ?? this.timerMode,
       fixedTimerSeconds: fixedTimerSeconds ?? this.fixedTimerSeconds,
       sortMode: sortMode ?? this.sortMode,
       autoPlaySentence: autoPlaySentence ?? this.autoPlaySentence,
+      autoPlayWord: autoPlayWord ?? this.autoPlayWord,
     );
   }
 
@@ -79,6 +85,7 @@ class FlashcardSettings {
     'fixedTimerSeconds': fixedTimerSeconds,
     'sortMode': sortMode.name,
     'autoPlaySentence': autoPlaySentence,
+    'autoPlayWord': autoPlayWord,
   };
 
   /// 防御性解析：非法值回退默认
@@ -89,6 +96,9 @@ class FlashcardSettings {
       sortMode: _parseSortMode(json['sortMode']),
       autoPlaySentence: json['autoPlaySentence'] is bool
           ? json['autoPlaySentence'] as bool
+          : true,
+      autoPlayWord: json['autoPlayWord'] is bool
+          ? json['autoPlayWord'] as bool
           : true,
     );
   }

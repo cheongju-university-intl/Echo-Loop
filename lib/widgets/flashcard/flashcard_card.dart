@@ -35,6 +35,9 @@ class FlashcardCard extends StatefulWidget {
   /// 是否自动播放来源例句
   final bool autoPlaySentence;
 
+  /// 是否自动 TTS 朗读单词
+  final bool autoPlayWord;
+
   const FlashcardCard({
     super.key,
     required this.item,
@@ -42,6 +45,7 @@ class FlashcardCard extends StatefulWidget {
     required this.onFlip,
     required this.onUnsave,
     this.autoPlaySentence = true,
+    this.autoPlayWord = true,
   });
 
   @override
@@ -134,6 +138,7 @@ class _FlashcardCardState extends State<FlashcardCard>
                       item: widget.item,
                       onUnsave: widget.onUnsave,
                       autoPlaySentence: widget.autoPlaySentence,
+                      autoPlayWord: widget.autoPlayWord,
                     ),
                   ),
           );
@@ -237,11 +242,13 @@ class _BackContent extends ConsumerStatefulWidget {
   final FlashcardWordItem item;
   final VoidCallback onUnsave;
   final bool autoPlaySentence;
+  final bool autoPlayWord;
 
   const _BackContent({
     required this.item,
     required this.onUnsave,
     this.autoPlaySentence = true,
+    this.autoPlayWord = true,
   });
 
   @override
@@ -254,21 +261,24 @@ class _BackContentState extends ConsumerState<_BackContent> {
   @override
   void initState() {
     super.initState();
-    // TTS 朗读单词完成后，延迟一小段时间再自动播放来源例句
-    if (widget.autoPlaySentence && widget.item.savedWord.sentenceText != null) {
-      _autoPlayAfterTts();
-    }
+    // 翻转到背面时：先 TTS 朗读单词（如开启），再自动播放来源例句（如开启）
+    _autoPlayOnFlipToBack();
   }
 
-  /// 等 TTS 朗读完毕 + 600ms 间隔后，自动播放例句原声
-  Future<void> _autoPlayAfterTts() async {
-    // 等待当前 TTS 播报完成
-    await TtsService.instance.speak(widget.item.savedWord.word);
-    if (!mounted) return;
-    // 间隔 600ms
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    _playSentence();
+  /// 翻转到背面时的自动播放逻辑
+  Future<void> _autoPlayOnFlipToBack() async {
+    // TTS 朗读单词
+    if (widget.autoPlayWord) {
+      await TtsService.instance.speak(widget.item.savedWord.word);
+      if (!mounted) return;
+    }
+
+    // 自动播放来源例句
+    if (widget.autoPlaySentence && widget.item.savedWord.sentenceText != null) {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      _playSentence();
+    }
   }
 
   @override

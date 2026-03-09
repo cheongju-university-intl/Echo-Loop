@@ -221,6 +221,25 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
 
             const SizedBox(height: AppSpacing.l),
 
+            // 自动播放单词
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  l10n.flashcardAutoPlayWord,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Switch(
+                  value: _settings.autoPlayWord,
+                  onChanged: (value) {
+                    _update(_settings.copyWith(autoPlayWord: value));
+                  },
+                ),
+              ],
+            ),
+
             // 自动播放例句
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

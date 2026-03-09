@@ -1561,4 +1561,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get flashcardAutoPlaySentence => '自动播放例句';
+
+  @override
+  String get flashcardAutoPlayWord => '自动播放单词发音';
 }

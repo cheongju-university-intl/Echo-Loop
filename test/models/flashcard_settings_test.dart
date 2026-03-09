@@ -14,6 +14,7 @@ void main() {
       expect(settings.fixedTimerSeconds, 8);
       expect(settings.sortMode, FlashcardSortMode.random);
       expect(settings.autoPlaySentence, true);
+      expect(settings.autoPlayWord, true);
     });
 
     test('copyWith 替换指定字段', () {
@@ -45,6 +46,7 @@ void main() {
         fixedTimerSeconds: 10,
         sortMode: FlashcardSortMode.timeDesc,
         autoPlaySentence: false,
+        autoPlayWord: false,
       );
       final json = original.toJson();
       final restored = FlashcardSettings.fromJson(json);
@@ -52,6 +54,7 @@ void main() {
       expect(restored.fixedTimerSeconds, original.fixedTimerSeconds);
       expect(restored.sortMode, original.sortMode);
       expect(restored.autoPlaySentence, original.autoPlaySentence);
+      expect(restored.autoPlayWord, original.autoPlayWord);
     });
 
     test('fromJson 空 Map 返回默认值', () {
@@ -60,6 +63,7 @@ void main() {
       expect(settings.fixedTimerSeconds, 8);
       expect(settings.sortMode, FlashcardSortMode.random);
       expect(settings.autoPlaySentence, true);
+      expect(settings.autoPlayWord, true);
     });
 
     test('fromJson 非法值回退默认', () {

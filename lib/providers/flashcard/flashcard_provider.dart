@@ -428,8 +428,9 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     ref.read(audioEngineProvider.notifier).stop();
   }
 
-  /// TTS 朗读当前单词
+  /// TTS 朗读当前单词（受 autoPlayWord 设置控制）
   void _speakCurrentWord() {
+    if (!state.settings.autoPlayWord) return;
     final word = state.currentWord?.savedWord.word;
     if (word != null) {
       TtsService.instance.speak(word);

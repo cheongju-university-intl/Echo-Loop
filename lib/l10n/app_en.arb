@@ -893,5 +893,6 @@
   "flashcardNoDefinition": "No definition",
   "flashcardStartQuiz": "Start Review",
   "flashcardTts": "Pronounce",
-  "flashcardAutoPlaySentence": "Auto-play Sentence"
+  "flashcardAutoPlaySentence": "Auto-play Sentence",
+  "flashcardAutoPlayWord": "Auto-play Word"
 }

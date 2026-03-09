@@ -2869,6 +2869,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-play Sentence'**
   String get flashcardAutoPlaySentence;
+
+  /// No description provided for @flashcardAutoPlayWord.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-play Word'**
+  String get flashcardAutoPlayWord;
 }
 
 class _AppLocalizationsDelegate
