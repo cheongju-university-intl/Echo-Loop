@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:fluency/l10n/app_localizations.dart';
 import 'package:fluency/screens/listen_and_repeat_player_screen.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
@@ -12,9 +13,16 @@ import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/models/intensive_listen_settings.dart';
 import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
+import 'package:fluency/providers/sentence_ai_provider.dart';
+import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
+import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
 
 import '../helpers/mock_providers.dart';
+
+class _MockCacheDao extends Mock implements SentenceAiCacheDao {}
+
+class _MockApiClient extends Mock implements SentenceAiApiClient {}
 
 void main() {
   /// 创建测试用的跟读播放器状态
@@ -88,6 +96,12 @@ void main() {
           () => TestListenAndRepeatPlayer(
             playerState ?? createPlayerState(),
             sentences,
+          ),
+        ),
+        sentenceAiNotifierProvider.overrideWithValue(
+          SentenceAiNotifier(
+            cacheDao: _MockCacheDao(),
+            apiClient: _MockApiClient(),
           ),
         ),
       ],

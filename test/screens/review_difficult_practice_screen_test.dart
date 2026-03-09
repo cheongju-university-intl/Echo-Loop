@@ -13,13 +13,21 @@ import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:fluency/database/daos/bookmark_dao.dart';
+import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/app_database.dart' show Bookmark;
 import 'package:fluency/database/providers.dart';
+import 'package:fluency/providers/sentence_ai_provider.dart';
+import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
 import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
 
 import '../helpers/mock_providers.dart';
+
+class _MockCacheDao extends Mock implements SentenceAiCacheDao {}
+
+class _MockApiClient extends Mock implements SentenceAiApiClient {}
 
 /// 测试用 BookmarkDao
 class _TestBookmarkDao implements BookmarkDao {
@@ -114,6 +122,12 @@ void main() {
           () => TestReviewDifficultPractice(initialPlayerState, sentences),
         ),
         bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+        sentenceAiNotifierProvider.overrideWithValue(
+          SentenceAiNotifier(
+            cacheDao: _MockCacheDao(),
+            apiClient: _MockApiClient(),
+          ),
+        ),
       ],
       child: MaterialApp.router(
         locale: locale,
