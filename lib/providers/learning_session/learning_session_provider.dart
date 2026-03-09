@@ -6,6 +6,7 @@
 library;
 
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/playback_settings.dart';
@@ -126,16 +127,49 @@ class LearningSession extends _$LearningSession {
   /// 学习计时器，进入学习模式时启动，退出时停止
   final Stopwatch _studyStopwatch = Stopwatch();
 
+  /// 学习计时器是否正在运行（仅用于测试验证）
+  @visibleForTesting
+  bool get isStudyTimerRunning => _studyStopwatch.isRunning;
+
+  /// App 生命周期监听器，用于在后台暂停计时
+  late final AppLifecycleListener _lifecycleListener;
+
   /// 学习时长存储服务
   final StudyTimeService _studyTimeService = StudyTimeService();
 
   @override
   LearningSessionState build() {
+    _lifecycleListener = AppLifecycleListener(
+      onStateChange: _onAppLifecycleStateChanged,
+    );
     ref.onDispose(() {
       _playerStateSub?.cancel();
       _saveStudyTime();
+      _lifecycleListener.dispose();
     });
     return const LearningSessionState();
+  }
+
+  /// App 生命周期变化时，根据音频播放状态决定是否暂停计时
+  ///
+  /// - 进入后台/非活跃：如果音频没在播放，暂停 Stopwatch（避免挂起时间被计入）
+  /// - 回到前台：如果当前在学习模式且 Stopwatch 未运行，恢复计时
+  void _onAppLifecycleStateChanged(AppLifecycleState lifecycleState) {
+    if (lifecycleState == AppLifecycleState.paused ||
+        lifecycleState == AppLifecycleState.hidden) {
+      // 进入后台：如果音频没在播放，暂停计时
+      if (_studyStopwatch.isRunning) {
+        final isPlaying = ref.read(audioEngineProvider.notifier).isPlaying;
+        if (!isPlaying) {
+          _studyStopwatch.stop();
+        }
+      }
+    } else if (lifecycleState == AppLifecycleState.resumed) {
+      // 回到前台：如果在学习模式中，恢复计时
+      if (state.isInLearningMode && !_studyStopwatch.isRunning) {
+        _studyStopwatch.start();
+      }
+    }
   }
 
   /// 停止计时并保存已记录的学习时长

@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart' as ja;
 import 'package:fluency/models/audio_item.dart';
 import 'package:fluency/models/collection.dart';
 import 'package:fluency/models/tag.dart';
@@ -24,6 +25,7 @@ import 'package:fluency/providers/learning_session/blind_listen_player_provider.
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
 import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/providers/transcription_task_provider.dart';
 import 'package:fluency/services/transcription_api_client.dart';
 import 'package:fluency/database/enums.dart';
@@ -1093,6 +1095,15 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
   }
 }
 
+/// 测试用 DailyStudyTime — 不依赖 SharedPreferences
+class TestDailyStudyTime extends DailyStudyTime {
+  @override
+  Future<int> build() async => 0;
+
+  @override
+  Future<void> refresh() async {}
+}
+
 /// 测试用 AudioEngine — 不依赖 just_audio
 class TestAudioEngine extends AudioEngine {
   final AudioEngineState _initialState;
@@ -1110,11 +1121,17 @@ class TestAudioEngine extends AudioEngine {
   @override
   bool get isPlaying => _isPlaying;
 
+  /// 测试中直接设置播放状态
+  set isPlaying(bool value) => _isPlaying = value;
+
   @override
   Duration get currentPosition => Duration.zero;
 
   @override
   Stream<Duration> get absolutePositionStream => Stream.value(Duration.zero);
+
+  @override
+  Stream<ja.PlayerState> get playerStateStream => const Stream.empty();
 
   @override
   Future<void> play() async {
@@ -1142,6 +1159,9 @@ class TestAudioEngine extends AudioEngine {
 
   @override
   bool isActiveSession(int id) => true;
+
+  @override
+  Future<void> clearClip() async {}
 }
 
 /// 测试用 TranscriptionTaskManager — 不执行真实转录
