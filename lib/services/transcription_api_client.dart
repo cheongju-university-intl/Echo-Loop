@@ -192,6 +192,7 @@ class TranscriptionApiClient {
   /// 自动检查字幕缓存：[cached]=true 时直接返回 transcript。
   Future<SubmitTranscriptionResponse> submitTranscription({
     required String sha256,
+    String? fileName,
     String? objectName,
     String? publicUrl,
     String? mimeType,
@@ -202,6 +203,7 @@ class TranscriptionApiClient {
       '/api/v1/user-audio/submit-transcription',
       data: {
         'sha256': sha256,
+        if (fileName != null) 'fileName': fileName,
         if (objectName != null) 'objectName': objectName,
         if (publicUrl != null) 'publicUrl': publicUrl,
         if (mimeType != null) 'mimeType': mimeType,

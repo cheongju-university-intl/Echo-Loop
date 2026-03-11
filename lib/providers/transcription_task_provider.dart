@@ -186,6 +186,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
 
       final submitResp = await api.submitTranscription(
         sha256: sha256,
+        fileName: p.basename(fullPath),
         objectName: uploadResp.objectName,
         publicUrl: uploadResp.publicUrl,
         mimeType: mimeType,
