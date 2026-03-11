@@ -47,6 +47,7 @@
   "languageChinese": "简体中文",
   "about": "关于",
   "version": "版本",
+  "save": "保存",
   "appDescription": "专业的英语听力练习应用",
   "enableLoop": "启用循环",
   "loopSettings": "循环设置",
@@ -522,8 +523,12 @@
   },
 
   "developer": "开发者",
-  "unlockAllReviews": "解锁所有复习",
-  "unlockAllReviewsDescription": "跳过复习时间锁，用于测试",
+  "timeMachine": "时光机",
+  "timeMachineUseSystemTime": "使用系统时间",
+  "timeMachineCurrentTime": "当前调试时间",
+  "timeMachineSelectDate": "选择日期",
+  "timeMachineSelectTime": "选择时间",
+  "timeMachineReset": "恢复系统时间",
 
   "manageSubtitles": "管理字幕",
   "localUpload": "本地上传",

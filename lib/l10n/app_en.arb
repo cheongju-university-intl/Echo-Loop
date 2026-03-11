@@ -54,6 +54,7 @@
   "languageChinese": "简体中文",
   "about": "About",
   "version": "Version",
+  "save": "Save",
   "appDescription": "Professional English listening practice app",
   "enableLoop": "Enable Loop",
   "loopSettings": "Loop Settings",
@@ -679,8 +680,12 @@
   },
 
   "developer": "Developer",
-  "unlockAllReviews": "Unlock All Reviews",
-  "unlockAllReviewsDescription": "Skip review time locks for testing",
+  "timeMachine": "Time Machine",
+  "timeMachineUseSystemTime": "Using system time",
+  "timeMachineCurrentTime": "Debug time",
+  "timeMachineSelectDate": "Select date",
+  "timeMachineSelectTime": "Select time",
+  "timeMachineReset": "Use system time",
 
   "manageSubtitles": "Manage Subtitles",
   "localUpload": "Local Upload",

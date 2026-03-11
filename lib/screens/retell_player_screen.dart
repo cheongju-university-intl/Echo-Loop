@@ -325,35 +325,51 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
               if (state.settings.keywordMethod != KeywordMethod.off)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-                  child: SegmentedButton<RetellDisplayMode>(
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(
-                        value: RetellDisplayMode.keywordsOnly,
-                        label: _DisplayModeSegmentLabel(
-                          text: l10n.retellDisplayKeywordsOnly,
-                          selected:
-                              state.displayMode == RetellDisplayMode.keywordsOnly,
-                        ),
-                      ),
-                      ButtonSegment(
-                        value: RetellDisplayMode.showAll,
-                        label: _DisplayModeSegmentLabel(
-                          text: l10n.retellDisplayShowAll,
-                          selected: state.displayMode == RetellDisplayMode.showAll,
-                        ),
-                      ),
-                      ButtonSegment(
-                        value: RetellDisplayMode.hideAll,
-                        label: _DisplayModeSegmentLabel(
-                          text: l10n.retellDisplayHideAll,
-                          selected: state.displayMode == RetellDisplayMode.hideAll,
-                        ),
-                      ),
-                    ],
-                    selected: {state.displayMode},
-                    onSelectionChanged: (selected) =>
-                        player.setDisplayMode(selected.first),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact = constraints.maxWidth < 360;
+                      final keywordsOnlyLabel = _displayModeLabel(
+                        context,
+                        regularText: l10n.retellDisplayKeywordsOnly,
+                        compactEnglishText: 'Visible',
+                        isCompact: isCompact,
+                      );
+                      final showAllLabel = _displayModeLabel(
+                        context,
+                        regularText: l10n.retellDisplayShowAll,
+                        compactEnglishText: 'Show',
+                        isCompact: isCompact,
+                      );
+                      final hideAllLabel = _displayModeLabel(
+                        context,
+                        regularText: l10n.retellDisplayHideAll,
+                        compactEnglishText: 'Hide',
+                        isCompact: isCompact,
+                      );
+                      return SegmentedButton<RetellDisplayMode>(
+                        direction: isCompact ? Axis.vertical : Axis.horizontal,
+                        showSelectedIcon: false,
+                        segments: [
+                          ButtonSegment(
+                            value: RetellDisplayMode.keywordsOnly,
+                            label: _DisplayModeSegmentLabel(
+                              text: keywordsOnlyLabel,
+                            ),
+                          ),
+                          ButtonSegment(
+                            value: RetellDisplayMode.showAll,
+                            label: _DisplayModeSegmentLabel(text: showAllLabel),
+                          ),
+                          ButtonSegment(
+                            value: RetellDisplayMode.hideAll,
+                            label: _DisplayModeSegmentLabel(text: hideAllLabel),
+                          ),
+                        ],
+                        selected: {state.displayMode},
+                        onSelectionChanged: (selected) =>
+                            player.setDisplayMode(selected.first),
+                      );
+                    },
                   ),
                 ),
               const SizedBox(height: AppSpacing.s),
@@ -381,30 +397,33 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
   }
 }
 
+String _displayModeLabel(
+  BuildContext context, {
+  required String regularText,
+  required String compactEnglishText,
+  required bool isCompact,
+}) {
+  if (!isCompact) return regularText;
+  return Localizations.localeOf(context).languageCode == 'en'
+      ? compactEnglishText
+      : regularText;
+}
+
 /// 显示模式标签
 ///
-/// 始终为选中图标预留固定宽度，避免切换选中项时 SegmentedButton 宽度抖动。
+/// 使用单行省略文本，避免窄屏下分段按钮内部发生横向溢出。
 class _DisplayModeSegmentLabel extends StatelessWidget {
   final String text;
-  final bool selected;
 
-  const _DisplayModeSegmentLabel({
-    required this.text,
-    required this.selected,
-  });
+  const _DisplayModeSegmentLabel({required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 18,
-          child: selected ? const Icon(Icons.check, size: 18) : null,
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        Text(text),
-      ],
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      softWrap: false,
     );
   }
 }

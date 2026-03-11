@@ -152,6 +152,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get version => 'Version';
 
   @override
+  String get save => 'Save';
+
+  @override
   String get appDescription => 'Professional English listening practice app';
 
   @override
@@ -1203,11 +1206,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get developer => 'Developer';
 
   @override
-  String get unlockAllReviews => 'Unlock All Reviews';
+  String get timeMachine => 'Time Machine';
 
   @override
-  String get unlockAllReviewsDescription =>
-      'Skip review time locks for testing';
+  String get timeMachineUseSystemTime => 'Using system time';
+
+  @override
+  String get timeMachineCurrentTime => 'Debug time';
+
+  @override
+  String get timeMachineSelectDate => 'Select date';
+
+  @override
+  String get timeMachineSelectTime => 'Select time';
+
+  @override
+  String get timeMachineReset => 'Use system time';
 
   @override
   String get manageSubtitles => 'Manage Subtitles';

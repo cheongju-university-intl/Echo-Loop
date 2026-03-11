@@ -48,9 +48,7 @@ class _TestBookmarkDao implements BookmarkDao {
 void main() {
   /// 创建测试段落
   List<List<Sentence>> createTestParagraphs() {
-    return [
-      createTestSentences(count: 3),
-    ];
+    return [createTestSentences(count: 3)];
   }
 
   Widget createTestWidget({
@@ -61,16 +59,15 @@ void main() {
   }) {
     final testParagraphs = paragraphs ?? createTestParagraphs();
     final testKeywords = keywords ?? {};
-    final initialState = playerState ??
+    final initialState =
+        playerState ??
         RetellPlayerState(
           currentParagraphIndex: 0,
           totalParagraphs: testParagraphs.length,
           phase: RetellPhase.listening,
           isPlaying: true,
           playingSentenceIndex: 0,
-          settings: const RetellSettings(
-            keywordMethod: KeywordMethod.random,
-          ),
+          settings: const RetellSettings(keywordMethod: KeywordMethod.random),
         );
 
     final router = GoRouter(
@@ -103,9 +100,7 @@ void main() {
         learningProgressNotifierProvider.overrideWith(
           () => TestLearningProgressNotifier(),
         ),
-        learningSessionProvider.overrideWith(
-          () => TestLearningSession(),
-        ),
+        learningSessionProvider.overrideWith(() => TestLearningSession()),
         retellPlayerProvider.overrideWith(
           () => TestRetellPlayer(initialState, testParagraphs, testKeywords),
         ),
@@ -147,8 +142,11 @@ void main() {
       final expandedBox = tester.getRect(expandedFinder);
       final segmentedBox = tester.getRect(segmentedButton);
 
-      expect(segmentedBox.top, greaterThanOrEqualTo(expandedBox.bottom - 1),
-          reason: 'SegmentedButton 应位于句子列表（Expanded）下方');
+      expect(
+        segmentedBox.top,
+        greaterThanOrEqualTo(expandedBox.bottom - 1),
+        reason: 'SegmentedButton 应位于句子列表（Expanded）下方',
+      );
     });
 
     testWidgets('切换显示模式功能正常', (tester) async {

@@ -152,6 +152,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get version => '版本';
 
   @override
+  String get save => '保存';
+
+  @override
   String get appDescription => '专业的英语听力练习应用';
 
   @override
@@ -1174,10 +1177,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get developer => '开发者';
 
   @override
-  String get unlockAllReviews => '解锁所有复习';
+  String get timeMachine => '时光机';
 
   @override
-  String get unlockAllReviewsDescription => '跳过复习时间锁，用于测试';
+  String get timeMachineUseSystemTime => '使用系统时间';
+
+  @override
+  String get timeMachineCurrentTime => '当前调试时间';
+
+  @override
+  String get timeMachineSelectDate => '选择日期';
+
+  @override
+  String get timeMachineSelectTime => '选择时间';
+
+  @override
+  String get timeMachineReset => '恢复系统时间';
 
   @override
   String get manageSubtitles => '管理字幕';

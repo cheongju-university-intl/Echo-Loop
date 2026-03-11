@@ -380,6 +380,12 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get version;
 
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
   /// No description provided for @appDescription.
   ///
   /// In en, this message translates to:
@@ -2192,17 +2198,41 @@ abstract class AppLocalizations {
   /// **'Developer'**
   String get developer;
 
-  /// No description provided for @unlockAllReviews.
+  /// No description provided for @timeMachine.
   ///
   /// In en, this message translates to:
-  /// **'Unlock All Reviews'**
-  String get unlockAllReviews;
+  /// **'Time Machine'**
+  String get timeMachine;
 
-  /// No description provided for @unlockAllReviewsDescription.
+  /// No description provided for @timeMachineUseSystemTime.
   ///
   /// In en, this message translates to:
-  /// **'Skip review time locks for testing'**
-  String get unlockAllReviewsDescription;
+  /// **'Using system time'**
+  String get timeMachineUseSystemTime;
+
+  /// No description provided for @timeMachineCurrentTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug time'**
+  String get timeMachineCurrentTime;
+
+  /// No description provided for @timeMachineSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get timeMachineSelectDate;
+
+  /// No description provided for @timeMachineSelectTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select time'**
+  String get timeMachineSelectTime;
+
+  /// No description provided for @timeMachineReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Use system time'**
+  String get timeMachineReset;
 
   /// No description provided for @manageSubtitles.
   ///

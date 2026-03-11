@@ -117,6 +117,14 @@ class TestAppSettings extends AppSettings {
   Future<void> setLocale(Locale locale) async {
     state = state.copyWith(locale: locale);
   }
+
+  @override
+  Future<void> setTimeMachineDateTime(DateTime? value) async {
+    state = state.copyWith(
+      timeMachineDateTime: value,
+      clearTimeMachineDateTime: value == null,
+    );
+  }
 }
 
 /// 测试用 AudioLibrary — 不访问文件系统

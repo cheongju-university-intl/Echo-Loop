@@ -6,15 +6,15 @@ typedef NowGetter = DateTime Function();
 
 /// 统一的当前时间 Provider。
 ///
-/// 正常模式使用系统时间；开启「解锁所有复习」后返回一年后的时间，
-/// 使所有复习立即可用，方便开发测试。
+/// 正常模式使用系统时间；开启时光机后返回开发者选择的调试时间，
+/// 便于验证复习解锁与任务调度逻辑。
 /// 测试中可 override 为固定时间。
 final nowProvider = Provider<NowGetter>((ref) {
-  final unlockAllReviews = ref.watch(
-    appSettingsProvider.select((s) => s.unlockAllReviews),
+  final timeMachineDateTime = ref.watch(
+    appSettingsProvider.select((s) => s.timeMachineDateTime),
   );
-  if (unlockAllReviews) {
-    return () => DateTime.now().add(const Duration(days: 365));
+  if (timeMachineDateTime != null) {
+    return () => timeMachineDateTime;
   }
   return DateTime.now;
 });

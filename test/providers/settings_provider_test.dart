@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fluency/providers/settings_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('AppSettingsState', () {
@@ -35,10 +37,12 @@ void main() {
         final copied = state.copyWith(
           themeMode: ThemeMode.light,
           locale: const Locale('ja'),
+          timeMachineDateTime: DateTime(2026, 3, 11, 21, 30),
         );
 
         expect(copied.themeMode, ThemeMode.light);
         expect(copied.locale, const Locale('ja'));
+        expect(copied.timeMachineDateTime, DateTime(2026, 3, 11, 21, 30));
       });
 
       test('不传参数时保持原值', () {
@@ -51,6 +55,56 @@ void main() {
         expect(copied.themeMode, ThemeMode.dark);
         expect(copied.locale, const Locale('zh'));
       });
+
+      test('可清除时光机时间', () {
+        final state = AppSettingsState(
+          timeMachineDateTime: DateTime(2026, 3, 11, 21, 30),
+        );
+        final copied = state.copyWith(clearTimeMachineDateTime: true);
+
+        expect(copied.timeMachineDateTime, isNull);
+      });
+    });
+  });
+
+  group('AppSettings provider', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('加载已保存的时光机时间', () async {
+      final expected = DateTime(2026, 3, 11, 21, 30);
+      SharedPreferences.setMockInitialValues({
+        'developer_time_machine_at_ms': expected.millisecondsSinceEpoch,
+      });
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(appSettingsProvider);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(appSettingsProvider).timeMachineDateTime, expected);
+    });
+
+    test('兼容旧版 unlock_all_reviews 配置', () async {
+      SharedPreferences.setMockInitialValues({'unlock_all_reviews': true});
+      final before = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(appSettingsProvider);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final migrated = container.read(appSettingsProvider).timeMachineDateTime;
+      expect(migrated, isNotNull);
+      expect(migrated!.isAfter(before.add(const Duration(days: 364))), isTrue);
+      expect(prefs.getInt('developer_time_machine_at_ms'), isNotNull);
+      expect(prefs.getBool('unlock_all_reviews'), isNull);
     });
   });
 }

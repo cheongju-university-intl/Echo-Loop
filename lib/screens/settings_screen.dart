@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/developer_options_provider.dart';
 import '../providers/package_info_provider.dart';
 import '../providers/settings_provider.dart';
 import '../theme/app_theme.dart';
@@ -12,6 +14,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(appSettingsProvider);
+    final showDeveloperOptions = ref.watch(showDeveloperOptionsProvider);
     final settingsController = ref.read(appSettingsProvider.notifier);
 
     return Scaffold(
@@ -29,13 +32,10 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.m),
           _buildAboutSection(context, ref, l10n),
-          const SizedBox(height: AppSpacing.m),
-          _buildDeveloperSection(
-            context,
-            l10n,
-            settings,
-            settingsController,
-          ),
+          if (showDeveloperOptions) ...[
+            const SizedBox(height: AppSpacing.m),
+            _buildDeveloperSection(context, l10n, settings, settingsController),
+          ],
         ],
       ),
     );
@@ -100,19 +100,199 @@ class SettingsScreen extends ConsumerWidget {
     AppSettingsState settings,
     AppSettings controller,
   ) {
+    final formattedTimeMachine = _formatTimeMachineDateTime(
+      context,
+      settings.timeMachineDateTime,
+    );
     return _buildSection(
       context,
       title: l10n.developer,
       children: [
-        SwitchListTile(
-          secondary: _emojiIcon('🔧'),
-          title: Text(l10n.unlockAllReviews),
-          subtitle: Text(l10n.unlockAllReviewsDescription),
-          value: settings.unlockAllReviews,
-          onChanged: (value) => controller.setUnlockAllReviews(value),
+        ListTile(
+          leading: _emojiIcon('🔧'),
+          title: Text(l10n.timeMachine),
+          subtitle: Text(
+            formattedTimeMachine == null
+                ? l10n.timeMachineUseSystemTime
+                : '${l10n.timeMachineCurrentTime}: $formattedTimeMachine',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showTimeMachineDialog(
+            context,
+            l10n,
+            controller,
+            settings.timeMachineDateTime,
+          ),
         ),
       ],
     );
+  }
+
+  /// 显示时光机设置对话框。
+  ///
+  /// 对话框内允许分别选择日期与时间，并支持恢复系统时间。
+  Future<void> _showTimeMachineDialog(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppSettings controller,
+    DateTime? initialDateTime,
+  ) async {
+    DateTime? selectedDateTime = initialDateTime;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final formattedDateTime = _formatTimeMachineDateTime(
+              context,
+              selectedDateTime,
+            );
+            return AlertDialog(
+              title: Text(l10n.timeMachine),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    formattedDateTime == null
+                        ? l10n.timeMachineUseSystemTime
+                        : '${l10n.timeMachineCurrentTime}: $formattedDateTime',
+                  ),
+                  const SizedBox(height: AppSpacing.m),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final nextDateTime = await _pickDate(
+                              dialogContext,
+                              selectedDateTime,
+                            );
+                            if (nextDateTime == null) return;
+                            setState(() {
+                              selectedDateTime = nextDateTime;
+                            });
+                          },
+                          child: Text(l10n.timeMachineSelectDate),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.s),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final nextDateTime = await _pickTime(
+                              dialogContext,
+                              selectedDateTime,
+                            );
+                            if (nextDateTime == null) return;
+                            setState(() {
+                              selectedDateTime = nextDateTime;
+                            });
+                          },
+                          child: Text(l10n.timeMachineSelectTime),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          selectedDateTime = null;
+                        });
+                      },
+                      child: Text(l10n.timeMachineReset),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    await controller.setTimeMachineDateTime(selectedDateTime);
+                    if (!dialogContext.mounted) return;
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: Text(l10n.save),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 选择时光机日期，并保留已有时间部分。
+  Future<DateTime?> _pickDate(
+    BuildContext context,
+    DateTime? currentDateTime,
+  ) async {
+    final baseDateTime = _normalizedPickerBaseDateTime(currentDateTime);
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: baseDateTime,
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (pickedDate == null) return null;
+
+    return DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      baseDateTime.hour,
+      baseDateTime.minute,
+    );
+  }
+
+  /// 选择时光机时间，并保留已有日期部分。
+  Future<DateTime?> _pickTime(
+    BuildContext context,
+    DateTime? currentDateTime,
+  ) async {
+    final baseDateTime = _normalizedPickerBaseDateTime(currentDateTime);
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: baseDateTime.hour,
+        minute: baseDateTime.minute,
+      ),
+    );
+    if (pickedTime == null) return null;
+
+    return DateTime(
+      baseDateTime.year,
+      baseDateTime.month,
+      baseDateTime.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+  }
+
+  /// 为 picker 提供分钟精度的默认时间。
+  DateTime _normalizedPickerBaseDateTime(DateTime? currentDateTime) {
+    final baseDateTime = currentDateTime ?? DateTime.now();
+    return DateTime(
+      baseDateTime.year,
+      baseDateTime.month,
+      baseDateTime.day,
+      baseDateTime.hour,
+      baseDateTime.minute,
+    );
+  }
+
+  String? _formatTimeMachineDateTime(BuildContext context, DateTime? dateTime) {
+    if (dateTime == null) return null;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    return DateFormat('yyyy-MM-dd HH:mm', locale).format(dateTime);
   }
 
   /// 构建 emoji 图标（Learna AI 风格）
@@ -259,15 +439,11 @@ class SettingsScreen extends ConsumerWidget {
   ) {
     final isSelected = settings.themeMode == mode;
     return ListTile(
-      leading: Radio<ThemeMode>(
-        value: mode,
-        groupValue: settings.themeMode,
-        onChanged: (value) {
-          if (value != null) {
-            controller.setThemeMode(value);
-            Navigator.pop(context);
-          }
-        },
+      leading: Icon(
+        isSelected ? Icons.check_circle : Icons.circle_outlined,
+        color: isSelected
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.outline,
       ),
       title: Row(
         children: [
@@ -332,15 +508,11 @@ class SettingsScreen extends ConsumerWidget {
   ) {
     final isSelected = settings.locale == locale;
     return ListTile(
-      leading: Radio<Locale>(
-        value: locale,
-        groupValue: settings.locale,
-        onChanged: (value) {
-          if (value != null) {
-            controller.setLocale(value);
-            Navigator.pop(context);
-          }
-        },
+      leading: Icon(
+        isSelected ? Icons.check_circle : Icons.circle_outlined,
+        color: isSelected
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.outline,
       ),
       title: Row(
         children: [

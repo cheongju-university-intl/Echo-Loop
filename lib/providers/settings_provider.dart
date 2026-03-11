@@ -4,28 +4,38 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'settings_provider.g.dart';
 
+const _themeModeKey = 'theme_mode';
+const _localeKey = 'locale';
+const _timeMachineDateTimeKey = 'developer_time_machine_at_ms';
+const _legacyUnlockAllReviewsKey = 'unlock_all_reviews';
+
 class AppSettingsState {
   final ThemeMode themeMode;
   final Locale locale;
 
-  /// 开发者选项：解锁所有复习（跳过时间锁）。
-  final bool unlockAllReviews;
+  /// 开发者选项：时光机时间。
+  ///
+  /// 为 null 时表示使用系统真实时间。
+  final DateTime? timeMachineDateTime;
 
   const AppSettingsState({
     this.themeMode = ThemeMode.system,
     this.locale = const Locale('en'),
-    this.unlockAllReviews = false,
+    this.timeMachineDateTime,
   });
 
   AppSettingsState copyWith({
     ThemeMode? themeMode,
     Locale? locale,
-    bool? unlockAllReviews,
+    DateTime? timeMachineDateTime,
+    bool clearTimeMachineDateTime = false,
   }) {
     return AppSettingsState(
       themeMode: themeMode ?? this.themeMode,
       locale: locale ?? this.locale,
-      unlockAllReviews: unlockAllReviews ?? this.unlockAllReviews,
+      timeMachineDateTime: clearTimeMachineDateTime
+          ? null
+          : timeMachineDateTime ?? this.timeMachineDateTime,
     );
   }
 }
@@ -41,23 +51,45 @@ class AppSettings extends _$AppSettings {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final themeModeString = prefs.getString('theme_mode') ?? 'system';
+    final themeModeString = prefs.getString(_themeModeKey) ?? 'system';
     final themeMode = switch (themeModeString) {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
 
-    final localeString = prefs.getString('locale') ?? 'en';
+    final localeString = prefs.getString(_localeKey) ?? 'en';
     final locale = Locale(localeString);
 
-    final unlockAllReviews = prefs.getBool('unlock_all_reviews') ?? false;
+    final timeMachineDateTime = await _loadTimeMachineDateTime(prefs);
 
     state = state.copyWith(
       themeMode: themeMode,
       locale: locale,
-      unlockAllReviews: unlockAllReviews,
+      timeMachineDateTime: timeMachineDateTime,
     );
+  }
+
+  /// 加载时光机时间，并兼容旧版“解锁所有复习”开关。
+  Future<DateTime?> _loadTimeMachineDateTime(SharedPreferences prefs) async {
+    final storedMillis = prefs.getInt(_timeMachineDateTimeKey);
+    if (storedMillis != null) {
+      return DateTime.fromMillisecondsSinceEpoch(storedMillis);
+    }
+
+    final legacyUnlockAllReviews =
+        prefs.getBool(_legacyUnlockAllReviewsKey) ?? false;
+    if (!legacyUnlockAllReviews) {
+      return null;
+    }
+
+    final migratedDateTime = DateTime.now().add(const Duration(days: 365));
+    await prefs.setInt(
+      _timeMachineDateTimeKey,
+      migratedDateTime.millisecondsSinceEpoch,
+    );
+    await prefs.remove(_legacyUnlockAllReviewsKey);
+    return migratedDateTime;
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -69,21 +101,31 @@ class AppSettings extends _$AppSettings {
       ThemeMode.dark => 'dark',
       ThemeMode.system => 'system',
     };
-    await prefs.setString('theme_mode', modeString);
+    await prefs.setString(_themeModeKey, modeString);
   }
 
   Future<void> setLocale(Locale locale) async {
     state = state.copyWith(locale: locale);
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('locale', locale.languageCode);
+    await prefs.setString(_localeKey, locale.languageCode);
   }
 
-  /// 设置是否解锁所有复习（开发者选项）。
-  Future<void> setUnlockAllReviews(bool value) async {
-    state = state.copyWith(unlockAllReviews: value);
+  /// 设置开发者时光机时间。
+  ///
+  /// 传入 null 时恢复系统真实时间。
+  Future<void> setTimeMachineDateTime(DateTime? value) async {
+    state = state.copyWith(
+      timeMachineDateTime: value,
+      clearTimeMachineDateTime: value == null,
+    );
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('unlock_all_reviews', value);
+    if (value == null) {
+      await prefs.remove(_timeMachineDateTimeKey);
+    } else {
+      await prefs.setInt(_timeMachineDateTimeKey, value.millisecondsSinceEpoch);
+    }
+    await prefs.remove(_legacyUnlockAllReviewsKey);
   }
 }
