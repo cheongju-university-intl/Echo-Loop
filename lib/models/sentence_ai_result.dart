@@ -44,4 +44,15 @@ class SentenceAnalysis {
       listening: analysis['listening'] as String,
     );
   }
+
+  /// 字段间分隔符（Unit Separator，不会出现在正常文本中）
+  static const fieldSeparator = '\u001F';
+
+  /// 序列化为展示用字符串
+  String toDisplayString() =>
+      '$grammar$fieldSeparator$vocabulary$fieldSeparator$listening';
+
+  /// 从展示用字符串解析出三个字段
+  static List<String> parseDisplayString(String content) =>
+      content.split(fieldSeparator);
 }
