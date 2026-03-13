@@ -241,7 +241,7 @@ class _BottomControls extends StatelessWidget {
                 onTap: onTogglePause,
               )
             else
-              const SizedBox(width: 44),
+              const SizedBox(width: 56),
 
             // 下一张
             IconButton(
@@ -337,16 +337,16 @@ class _CountdownChipState extends State<_CountdownChip>
           // 使用 SizedBox + Stack 让秒数文字溢出到环下方，
           // 不影响 Row 的 crossAxisAlignment.center 对齐
           return SizedBox(
-            width: 44,
-            height: 44,
+            width: 56,
+            height: 56,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
                 // 环形进度
                 SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: 48,
+                  height: 48,
                   child: CircularProgressIndicator(
                     value: progress.clamp(0.0, 1.0),
                     strokeWidth: 3,
@@ -359,23 +359,34 @@ class _CountdownChipState extends State<_CountdownChip>
                     ),
                   ),
                 ),
-                // 暂停/恢复图标
-                Icon(
-                  widget.isPaused
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
-                  size: 20,
-                  color: theme.colorScheme.primary,
+                // 倒计时数字
+                Text(
+                  '${widget.remaining}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                // 秒数文字（溢出到环下方，不影响对齐）
+                // 暂停/恢复小徽章（右下角）
                 Positioned(
-                  bottom: -16,
-                  child: Text(
-                    '${widget.remaining}s',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.5,
+                  right: 2,
+                  bottom: 2,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.colorScheme.primaryContainer,
+                      border: Border.all(
+                        color: theme.colorScheme.surface,
                       ),
+                    ),
+                    child: Icon(
+                      widget.isPaused
+                          ? Icons.play_arrow_rounded
+                          : Icons.pause_rounded,
+                      size: 12,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                 ),

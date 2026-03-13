@@ -26,6 +26,7 @@ import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/difficult_practice/difficult_practice_settings_sheet.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
+import '../widgets/common/countdown_chip.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 复习难句补练页面
@@ -403,6 +404,40 @@ class _ReviewDifficultPracticeScreenState
                   }
                 },
               ),
+
+              // 遍数
+              if (playerState.isAnnotationMode)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: Text(
+                    l10n.listenAndRepeatPlayCount(
+                      playerState.currentPlayCount,
+                      playerState.targetRepeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                )
+              else if (playerState.settings.blindListenRepeatCount > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: Text(
+                    l10n.listenAndRepeatPlayCount(
+                      playerState.currentPlayCount,
+                      playerState.settings.blindListenRepeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(height: AppSpacing.m),
             ],
           ),
         ),
@@ -539,17 +574,14 @@ class _NormalModeView extends StatelessWidget {
           SizedBox(
             height: 72,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (playerState.isPauseBetweenPlays)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: _CountdownChip(
-                      remaining: playerState.pauseRemaining,
-                      total: playerState.pauseDuration,
-                      isPaused: playerState.isCountdownPaused,
-                      onTap: onPauseCountdown,
-                    ),
+                  CountdownChip(
+                    remaining: playerState.pauseRemaining,
+                    total: playerState.pauseDuration,
+                    isPaused: playerState.isCountdownPaused,
+                    onTap: onPauseCountdown,
                   ),
                 if (playerState.isPlaying)
                   Row(
@@ -562,12 +594,7 @@ class _NormalModeView extends StatelessWidget {
                       ),
                       const SizedBox(width: AppSpacing.s),
                       Text(
-                        playerState.settings.blindListenRepeatCount > 1
-                            ? l10n.listenAndRepeatPlayCount(
-                                playerState.currentPlayCount,
-                                playerState.settings.blindListenRepeatCount,
-                              )
-                            : l10n.reviewDifficultPracticeBlindListen,
+                        l10n.reviewDifficultPracticeBlindListen,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w500,
@@ -639,72 +666,6 @@ class _HiddenTextPlaceholder extends StatelessWidget {
   }
 }
 
-/// 倒计时控制按钮
-///
-/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
-class _CountdownChip extends StatelessWidget {
-  final Duration remaining;
-  final Duration total;
-  final bool isPaused;
-  final VoidCallback onTap;
-
-  const _CountdownChip({
-    required this.remaining,
-    required this.total,
-    required this.isPaused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final totalMs = total.inMilliseconds;
-    final remainingMs = remaining.inMilliseconds;
-    final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
-    final seconds = (remainingMs / 1000).ceil();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${seconds}s',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  strokeWidth: 2.5,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.12,
-                  ),
-                  valueColor: AlwaysStoppedAnimation(
-                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                  ),
-                ),
-                Icon(
-                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// 跟读模式视图（听不懂 → 显示字幕 + 播放 N 遍跟读循环）
 class _ShadowReadingView extends StatelessWidget {
@@ -771,7 +732,7 @@ class _ShadowReadingView extends StatelessWidget {
             ),
           ),
 
-          // 底部固定区域：跟读提示 / 倒计时 + 遍数/播放状态
+          // 底部固定区域：跟读提示 / 倒计时 + 播放状态
           SizedBox(
             height: 116,
             child: Column(
@@ -787,7 +748,7 @@ class _ShadowReadingView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  _CountdownChip(
+                  CountdownChip(
                     remaining: playerState.pauseRemaining,
                     total: playerState.pauseDuration,
                     isPaused: playerState.isCountdownPaused,
@@ -810,17 +771,6 @@ class _ShadowReadingView extends StatelessWidget {
                         Icons.headphones,
                         size: 20,
                         color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: AppSpacing.s),
-                      Text(
-                        l10n.listenAndRepeatPlayCount(
-                          playerState.currentPlayCount,
-                          playerState.targetRepeatCount,
-                        ),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
                       ),
                     ],
                   ),
@@ -899,7 +849,7 @@ class _PlaybackControls extends StatelessWidget {
         AppSpacing.l,
         AppSpacing.xs,
         AppSpacing.l,
-        AppSpacing.l,
+        AppSpacing.xs,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

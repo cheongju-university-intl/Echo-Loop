@@ -26,6 +26,7 @@ import '../providers/sentence_ai_provider.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
+import '../widgets/common/countdown_chip.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 精听播放器页面
@@ -611,6 +612,21 @@ class _IntensiveListenPlayerScreenState
                   }
                 },
               ),
+              // 播放遍数
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                child: Text(
+                  l10n.intensiveListenPlayCount(
+                    playerState.currentPlayCount,
+                    playerState.settings.repeatCount,
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.5,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -751,35 +767,19 @@ class _NormalModeView extends StatelessWidget {
             ),
           ),
 
-          // 倒计时控制（上） + 播放遍数（下），固定高度避免跳动
+          // 倒计时控制，固定高度避免跳动
           SizedBox(
             height: 72,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (playerState.isPauseBetweenPlays)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: _CountdownChip(
+            child: playerState.isPauseBetweenPlays
+                ? Center(
+                    child: CountdownChip(
                       remaining: playerState.pauseRemaining,
                       total: playerState.pauseDuration,
                       isPaused: playerState.isCountdownPaused,
                       onTap: onPauseCountdown,
                     ),
-                  ),
-                Text(
-                  l10n.intensiveListenPlayCount(
-                    playerState.currentPlayCount,
-                    playerState.settings.repeatCount,
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                  )
+                : const SizedBox.shrink(),
           ),
 
           const SizedBox(height: AppSpacing.m),
@@ -839,76 +839,6 @@ class _HiddenTextPlaceholder extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-/// 倒计时控制按钮
-///
-/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
-/// 点击可暂停/恢复倒计时。
-class _CountdownChip extends StatelessWidget {
-  final Duration remaining;
-  final Duration total;
-  final bool isPaused;
-  final VoidCallback onTap;
-
-  const _CountdownChip({
-    required this.remaining,
-    required this.total,
-    required this.isPaused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final totalMs = total.inMilliseconds;
-    final remainingMs = remaining.inMilliseconds;
-    final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
-    final seconds = (remainingMs / 1000).ceil();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 秒数文字
-          Text(
-            '${seconds}s',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // 带进度环的圆形按钮（居中）
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  strokeWidth: 2.5,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.12,
-                  ),
-                  valueColor: AlwaysStoppedAnimation(
-                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                  ),
-                ),
-                Icon(
-                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1034,7 +964,7 @@ class _AnnotationModeView extends StatelessWidget {
               ),
             ),
           if (isPauseBetweenSentences)
-            _CountdownChip(
+            CountdownChip(
               remaining: pauseRemaining,
               total: pauseDuration,
               isPaused: isCountdownPaused,
@@ -1110,7 +1040,7 @@ class _PlaybackControls extends StatelessWidget {
         AppSpacing.l,
         AppSpacing.xs,
         AppSpacing.l,
-        AppSpacing.l,
+        AppSpacing.xs,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

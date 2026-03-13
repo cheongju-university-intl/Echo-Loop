@@ -31,6 +31,7 @@ import '../providers/sentence_ai_provider.dart';
 import '../providers/speech_practice_session_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
+import '../widgets/common/countdown_chip.dart';
 import '../widgets/listen_and_repeat/speech_record_button.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
@@ -737,91 +738,6 @@ class _ProgressSection extends StatelessWidget {
   }
 }
 
-/// 倒计时控制按钮
-///
-/// 圆形按钮，外围带进度环，内部显示倒计时秒数，点击可暂停/恢复。
-class _CountdownChip extends StatelessWidget {
-  final Duration remaining;
-  final Duration total;
-  final bool isPaused;
-  final VoidCallback onTap;
-
-  const _CountdownChip({
-    required this.remaining,
-    required this.total,
-    required this.isPaused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final totalMs = total.inMilliseconds;
-    final remainingMs = remaining.inMilliseconds;
-    final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
-    final seconds = (remainingMs / 1000).ceil();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 56,
-        height: 56,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: CircularProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                strokeWidth: 3,
-                strokeCap: StrokeCap.round,
-                backgroundColor: theme.colorScheme.primary.withValues(
-                  alpha: 0.12,
-                ),
-                valueColor: AlwaysStoppedAnimation(
-                  theme.colorScheme.primary.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
-            // 倒计时数字始终居中显示
-            Text(
-              '$seconds',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            // 右下角状态徽章：暂停时 play，倒计时中 pause
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.colorScheme.primaryContainer,
-                  border: Border.all(
-                    color: theme.colorScheme.surface,
-                  ),
-                ),
-                child: Icon(
-                  isPaused
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
-                  size: 12,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// 跟读回合状态面板。
 class _SpeechPracticeTurnPanel extends StatelessWidget {
   final AppLocalizations l10n;
@@ -856,7 +772,7 @@ class _SpeechPracticeTurnPanel extends StatelessWidget {
               // 左侧占位，与右侧快进按钮等宽，保持倒计时居中
               const SizedBox(width: 32),
               const SizedBox(width: 48),
-              _CountdownChip(
+              CountdownChip(
                 remaining: turnState.reviewCountdownRemaining,
                 total: const Duration(seconds: 5),
                 isPaused: turnState.isReviewCountdownPaused,

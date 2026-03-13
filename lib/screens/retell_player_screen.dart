@@ -20,6 +20,7 @@ import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
 import '../widgets/retell/retell_settings_sheet.dart';
+import '../widgets/common/countdown_chip.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 复述播放器页面
@@ -404,7 +405,23 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
               // 底部控制
               _BottomControls(state: state, player: player, l10n: l10n),
 
-              const SizedBox(height: AppSpacing.l),
+              if (state.phase == RetellPhase.listening && state.settings.repeatCount > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: Text(
+                    l10n.retellRepeatInfo(
+                      state.currentRepeatCount,
+                      state.settings.repeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(height: AppSpacing.m),
             ],
           ),
         ),
@@ -485,20 +502,6 @@ class _PhaseIndicator extends StatelessWidget {
                 ),
               ],
             ),
-            if (state.settings.repeatCount > 1) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                l10n.retellRepeatInfo(
-                  state.currentRepeatCount,
-                  state.settings.repeatCount,
-                ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.5,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       );
@@ -506,14 +509,14 @@ class _PhaseIndicator extends StatelessWidget {
 
     // retelling 阶段：倒计时控制（上） + 提示文字（下）
     return SizedBox(
-      height: 72,
+      height: state.isRetellCountdown ? 80 : 72,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           if (state.isRetellCountdown)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-              child: _CountdownChip(
+              child: CountdownChip(
                 remaining: state.pauseRemaining,
                 total: state.pauseDuration,
                 isPaused: state.isCountdownPaused,
@@ -526,73 +529,6 @@ class _PhaseIndicator extends StatelessWidget {
             ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 倒计时控制按钮
-///
-/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
-class _CountdownChip extends StatelessWidget {
-  final Duration remaining;
-  final Duration total;
-  final bool isPaused;
-  final VoidCallback onTap;
-
-  const _CountdownChip({
-    required this.remaining,
-    required this.total,
-    required this.isPaused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final totalMs = total.inMilliseconds;
-    final remainingMs = remaining.inMilliseconds;
-    final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
-    final seconds = (remainingMs / 1000).ceil();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${seconds}s',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  strokeWidth: 2.5,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.12,
-                  ),
-                  valueColor: AlwaysStoppedAnimation(
-                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                  ),
-                ),
-                Icon(
-                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-              ],
             ),
           ),
         ],

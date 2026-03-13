@@ -18,6 +18,7 @@ import 'package:go_router/go_router.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/wakelock_mixin.dart';
+import '../widgets/common/countdown_chip.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
@@ -247,6 +248,40 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                   }
                 },
               ),
+
+              // 遍数
+              if (playerState.isAnnotationMode)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: Text(
+                    l10n.listenAndRepeatPlayCount(
+                      playerState.currentPlayCount,
+                      playerState.targetRepeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                )
+              else if (playerState.settings.blindListenRepeatCount > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: Text(
+                    l10n.listenAndRepeatPlayCount(
+                      playerState.currentPlayCount,
+                      playerState.settings.blindListenRepeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(height: AppSpacing.m),
             ],
           ),
         ),
@@ -413,17 +448,14 @@ class _NormalModeView extends StatelessWidget {
           SizedBox(
             height: 72,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (playerState.isPauseBetweenPlays)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: _CountdownChip(
-                      remaining: playerState.pauseRemaining,
-                      total: playerState.pauseDuration,
-                      isPaused: playerState.isCountdownPaused,
-                      onTap: onPauseCountdown,
-                    ),
+                  CountdownChip(
+                    remaining: playerState.pauseRemaining,
+                    total: playerState.pauseDuration,
+                    isPaused: playerState.isCountdownPaused,
+                    onTap: onPauseCountdown,
                   ),
                 if (playerState.isPlaying)
                   Row(
@@ -436,12 +468,7 @@ class _NormalModeView extends StatelessWidget {
                       ),
                       const SizedBox(width: AppSpacing.s),
                       Text(
-                        playerState.settings.blindListenRepeatCount > 1
-                            ? l10n.listenAndRepeatPlayCount(
-                                playerState.currentPlayCount,
-                                playerState.settings.blindListenRepeatCount,
-                              )
-                            : l10n.reviewDifficultPracticeBlindListen,
+                        l10n.reviewDifficultPracticeBlindListen,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w500,
@@ -509,71 +536,6 @@ class _HiddenTextPlaceholder extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-/// 倒计时控制按钮
-class _CountdownChip extends StatelessWidget {
-  final Duration remaining;
-  final Duration total;
-  final bool isPaused;
-  final VoidCallback onTap;
-
-  const _CountdownChip({
-    required this.remaining,
-    required this.total,
-    required this.isPaused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final totalMs = total.inMilliseconds;
-    final remainingMs = remaining.inMilliseconds;
-    final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
-    final seconds = (remainingMs / 1000).ceil();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${seconds}s',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  strokeWidth: 2.5,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.12,
-                  ),
-                  valueColor: AlwaysStoppedAnimation(
-                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                  ),
-                ),
-                Icon(
-                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -658,7 +620,7 @@ class _ShadowReadingView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  _CountdownChip(
+                  CountdownChip(
                     remaining: playerState.pauseRemaining,
                     total: playerState.pauseDuration,
                     isPaused: playerState.isCountdownPaused,
@@ -673,26 +635,10 @@ class _ShadowReadingView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.headphones,
-                        size: 20,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: AppSpacing.s),
-                      Text(
-                        l10n.listenAndRepeatPlayCount(
-                          playerState.currentPlayCount,
-                          playerState.targetRepeatCount,
-                        ),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  Icon(
+                    Icons.headphones,
+                    size: 20,
+                    color: theme.colorScheme.primary,
                   ),
                 ],
               ],
@@ -767,7 +713,7 @@ class _PlaybackControls extends StatelessWidget {
         AppSpacing.l,
         AppSpacing.xs,
         AppSpacing.l,
-        AppSpacing.l,
+        AppSpacing.xs,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
