@@ -1648,4 +1648,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get freePlay => 'Free Play';
+
+  @override
+  String get wordAiAnalysis => 'AI Analysis';
+
+  @override
+  String get wordAiContextMeaning => 'Contextual Meaning';
+
+  @override
+  String get wordAiCollocations => 'Collocations';
+
+  @override
+  String get wordAiUsage => 'Usage Notes';
+
+  @override
+  String get wordAiWordFamily => 'Word Family';
 }

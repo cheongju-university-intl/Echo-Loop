@@ -918,5 +918,10 @@
   "flashcardTts": "Pronounce",
   "flashcardAutoPlaySentence": "Auto-play Sentence",
   "flashcardAutoPlayWord": "Auto-play Word",
-  "freePlay": "Free Play"
+  "freePlay": "Free Play",
+  "wordAiAnalysis": "AI Analysis",
+  "wordAiContextMeaning": "Contextual Meaning",
+  "wordAiCollocations": "Collocations",
+  "wordAiUsage": "Usage Notes",
+  "wordAiWordFamily": "Word Family"
 }

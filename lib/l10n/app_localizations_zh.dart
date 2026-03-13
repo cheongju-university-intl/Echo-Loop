@@ -1610,4 +1610,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get freePlay => '自由练习';
+
+  @override
+  String get wordAiAnalysis => 'AI 解析';
+
+  @override
+  String get wordAiContextMeaning => '语境释义';
+
+  @override
+  String get wordAiCollocations => '常见搭配';
+
+  @override
+  String get wordAiUsage => '用法要点';
+
+  @override
+  String get wordAiWordFamily => '词族扩展';
 }

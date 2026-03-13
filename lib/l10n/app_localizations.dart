@@ -2959,6 +2959,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Free Play'**
   String get freePlay;
+
+  /// No description provided for @wordAiAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Analysis'**
+  String get wordAiAnalysis;
+
+  /// No description provided for @wordAiContextMeaning.
+  ///
+  /// In en, this message translates to:
+  /// **'Contextual Meaning'**
+  String get wordAiContextMeaning;
+
+  /// No description provided for @wordAiCollocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Collocations'**
+  String get wordAiCollocations;
+
+  /// No description provided for @wordAiUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Notes'**
+  String get wordAiUsage;
+
+  /// No description provided for @wordAiWordFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Word Family'**
+  String get wordAiWordFamily;
 }
 
 class _AppLocalizationsDelegate

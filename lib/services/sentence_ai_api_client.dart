@@ -10,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/api_config.dart';
 import '../models/sentence_ai_result.dart';
+import '../models/word_analysis.dart';
 
 part 'sentence_ai_api_client.g.dart';
 
@@ -65,6 +66,23 @@ class SentenceAiApiClient {
       cancelToken: cancelToken,
     );
     return SentenceAnalysis.fromJson(response.data!);
+  }
+
+  /// 解析单词
+  ///
+  /// 调用后端 AI 单词解析接口，返回语境释义、搭配、用法和词族分析。
+  /// [sentence] 为可选上下文句子，帮助 AI 确定语境含义。
+  Future<WordAnalysis> analyzeWord(
+    String word, {
+    String? sentence,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/ai/word-analyze',
+      data: {'word': word, if (sentence != null) 'sentence': sentence},
+      cancelToken: cancelToken,
+    );
+    return WordAnalysis.fromJson(response.data!);
   }
 
   /// 释放资源

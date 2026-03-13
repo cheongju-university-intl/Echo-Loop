@@ -667,5 +667,10 @@
   "flashcardTts": "发音",
   "flashcardAutoPlaySentence": "自动播放例句",
   "flashcardAutoPlayWord": "自动播放单词发音",
-  "freePlay": "自由练习"
+  "freePlay": "自由练习",
+  "wordAiAnalysis": "AI 解析",
+  "wordAiContextMeaning": "语境释义",
+  "wordAiCollocations": "常见搭配",
+  "wordAiUsage": "用法要点",
+  "wordAiWordFamily": "词族扩展"
 }
