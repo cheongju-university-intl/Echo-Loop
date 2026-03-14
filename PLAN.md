@@ -61,6 +61,7 @@
 - 已完成跟读结果回合自动推进：结果页默认 5 秒倒计时，播放自己的录音时会重置倒计时并在播放结束后重新开始计时
 - 已完成跟读录音 UI 优化：大圆形录音按钮（脉冲+波纹动画）、manualFallback 重录 bug 修复、继续按钮升级为 FilledButton.tonal + 箭头图标、倒计时圆环放大至 40px 内嵌秒数
 - 已完成录音启动延迟优化：AVAudioEngine 页面级常驻，warmup/shutdown 生命周期管理，startSession 从 524ms 降至 ~1ms
+- 已完成难句补练页面接入自动录音：提取共享 UI 组件（SpeechPracticeTurnPanel / SpeechPracticeResultCard），回调注入解耦 TurnController，难句补练跟读模式自动录音流程与跟读页完全一致（遍间+句间停顿均触发录音）
 - 段级复述页面尚未接入 UI，仅保留复用接口
 
 ---

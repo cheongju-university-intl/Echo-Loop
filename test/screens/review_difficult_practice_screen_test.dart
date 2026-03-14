@@ -20,9 +20,13 @@ import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/app_database.dart' show Bookmark;
 import 'package:fluency/database/providers.dart';
 import 'package:fluency/providers/sentence_ai_provider.dart';
+import 'package:fluency/providers/speech_practice_session_provider.dart';
+import 'package:fluency/providers/listen_and_repeat_turn_controller_provider.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
 import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
+import 'package:fluency/widgets/listen_and_repeat/speech_practice_turn_panel.dart';
+import 'package:fluency/widgets/listen_and_repeat/speech_record_button.dart';
 
 import '../helpers/mock_providers.dart';
 
@@ -96,7 +100,8 @@ void main() {
     TestReviewDifficultPractice Function(
       ReviewDifficultPracticeState initialState,
       List<Sentence> sentences,
-    )? playerFactory,
+    )?
+    playerFactory,
   }) {
     final sentences = createTestSentences(count: 5);
     final initialPlayerState = playerState ?? createPlayerState();
@@ -134,10 +139,17 @@ void main() {
               TestLearningSession(sessionState ?? const LearningSessionState()),
         ),
         reviewDifficultPracticeProvider.overrideWith(
-          () => playerFactory?.call(initialPlayerState, sentences) ??
+          () =>
+              playerFactory?.call(initialPlayerState, sentences) ??
               TestReviewDifficultPractice(initialPlayerState, sentences),
         ),
         bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+        speechPracticeSessionProvider.overrideWith(
+          () => TestSpeechPracticeSession(),
+        ),
+        listenAndRepeatTurnControllerProvider.overrideWith(
+          () => TestListenAndRepeatTurnController(),
+        ),
         sentenceAiNotifierProvider.overrideWithValue(
           SentenceAiNotifier(
             cacheDao: _MockCacheDao(),
@@ -349,7 +361,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('3s'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
@@ -449,7 +461,7 @@ void main() {
       expect(find.text("Can't understand"), findsNothing);
     });
 
-    testWidgets('跟读留白期显示倒计时和跟读提示', (tester) async {
+    testWidgets('跟读留白期显示录音面板', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
@@ -464,10 +476,9 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('5s'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      // 跟读提示
-      expect(find.text('Your turn — repeat out loud!'), findsOneWidget);
+      // 跟读留白期显示录音面板（含录音按钮）
+      expect(find.byType(SpeechPracticeTurnPanel), findsOneWidget);
+      expect(find.byType(SpeechRecordButton), findsOneWidget);
     });
 
     testWidgets('跟读模式导航按钮可用', (tester) async {

@@ -96,6 +96,7 @@
   **自动录音升级完成时间**: 2026-03-13（跟读回合自动开始录音、speechStarted/silenceProgress 事件、静音自动结束、manual fallback、5 秒 review 倒计时与回放重置）
   **录音 UI 优化**: 2026-03-13（大圆形录音按钮+脉冲/波纹动画、manualFallback 重录 bug 修复、继续按钮 FilledButton.tonal 升级、倒计时圆环放大）
   **录音延迟优化**: 2026-03-13（AVAudioEngine 常驻 + warmup/shutdown 生命周期 + 双路径 startSession）
+  **难句补练接入录音**: 2026-03-14（提取共享 UI 组件、回调注入解耦 TurnController、难句补练跟读模式接入自动录音，流程与跟读页完全一致）
 
 ## 已完成：本地词典功能
 

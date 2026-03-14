@@ -28,6 +28,9 @@ import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
+import 'package:fluency/providers/speech_practice_session_provider.dart';
+import 'package:fluency/providers/listen_and_repeat_turn_controller_provider.dart';
+import 'package:fluency/models/speech_practice_models.dart';
 import 'package:fluency/providers/transcription_task_provider.dart';
 import 'package:fluency/services/transcription_api_client.dart';
 import 'package:fluency/database/enums.dart';
@@ -1200,6 +1203,21 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
   }
 
   @override
+  Future<void> completePausedTurn() async {
+    // 测试用：不执行实际逻辑
+  }
+
+  @override
+  void pauseCountdown() {
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  @override
+  void resumeCountdown() {
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  @override
   void disposePlayer() {
     _testSentences = [];
     state = const ReviewDifficultPracticeState();
@@ -1480,6 +1498,99 @@ class TestRetellPlayer extends RetellPlayer {
     _testKeywords = {};
     state = const RetellPlayerState();
   }
+}
+
+/// 测试用 SpeechPracticeSession — 不依赖平台通道
+class TestSpeechPracticeSession extends SpeechPracticeSession {
+  @override
+  SpeechPracticeSessionState build() => const SpeechPracticeSessionState();
+
+  @override
+  Future<void> startRecording({required String promptId}) async {}
+
+  @override
+  Future<SpeechPracticeAttempt?> stopRecordingAndEvaluate({
+    required String promptId,
+    required String referenceText,
+  }) async => null;
+
+  @override
+  Future<void> cancelActiveRecording() async {}
+
+  @override
+  Future<void> stopAttemptPlayback() async {}
+
+  @override
+  Future<void> playAttempt(String promptId) async {}
+
+  @override
+  Future<void> disposeSession() async {}
+
+  @override
+  bool isRecordingPrompt(String promptId) => false;
+
+  @override
+  SpeechPracticeAttempt? attemptFor(String promptId) => null;
+}
+
+/// 测试用 ListenAndRepeatTurnController — 不依赖平台通道
+class TestListenAndRepeatTurnController extends ListenAndRepeatTurnController {
+  @override
+  ListenAndRepeatTurnState build() => const ListenAndRepeatTurnState();
+
+  @override
+  void setOnContinue(Future<void> Function()? callback) {}
+
+  @override
+  Future<void> ensureTurn({
+    required String promptId,
+    required String referenceText,
+    bool allowAutoFallback = true,
+    Duration sentenceDuration = Duration.zero,
+  }) async {}
+
+  @override
+  Future<void> ensureAutoTurn({
+    required String promptId,
+    required String referenceText,
+    Duration sentenceDuration = Duration.zero,
+  }) async {}
+
+  @override
+  Future<void> startManualRecording({
+    required String promptId,
+    required String referenceText,
+    Duration sentenceDuration = Duration.zero,
+  }) async {}
+
+  @override
+  void clearTurn() {
+    state = const ListenAndRepeatTurnState();
+  }
+
+  @override
+  Future<void> handleManualStop() async {}
+
+  @override
+  Future<void> handleContinue() async {}
+
+  @override
+  void pauseReviewCountdown() {}
+
+  @override
+  void resumeReviewCountdown() {}
+
+  @override
+  void fastForwardReviewCountdown() {}
+
+  @override
+  void resetReviewCountdownOnPlayback() {}
+
+  @override
+  void activateReviewCountdown({required String promptId}) {}
+
+  @override
+  void enterProcessing(String promptId) {}
 }
 
 /// 测试用 TranscriptionApiClient Provider 值
