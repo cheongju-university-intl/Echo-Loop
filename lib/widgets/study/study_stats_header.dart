@@ -111,6 +111,7 @@ class _TodayCard extends StatelessWidget {
               return Row(
               children: [
                 Expanded(
+                  flex: 3,
                   child: _ListenSpeakItem(
                     icon: Icons.headphones_outlined,
                     iconColor: Colors.teal,
@@ -125,6 +126,7 @@ class _TodayCard extends StatelessWidget {
                   color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
                 Expanded(
+                  flex: 3,
                   child: _ListenSpeakItem(
                     icon: Icons.mic_outlined,
                     iconColor: Colors.deepPurple,
@@ -139,6 +141,7 @@ class _TodayCard extends StatelessWidget {
                   color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
                 Expanded(
+                  flex: 2,
                   child: _VocabItem(
                     todayNew: stats.todayNewWordForms,
                     onTap: () => showLearnedWordFormsSheet(context: context),
