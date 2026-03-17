@@ -162,6 +162,7 @@ class BookmarkReview extends _$BookmarkReview {
   /// 更新后中断当前播放，以新设置重新开始当前句子。
   void updateSettings(DifficultPracticeSettings newSettings) {
     _engine.invalidateSession();
+    _outputStopwatch.stop();
     state = state.copyWith(settings: newSettings, isPlaying: false);
   }
 
@@ -192,6 +193,7 @@ class BookmarkReview extends _$BookmarkReview {
   /// 暂停播放
   void pause() {
     _engine.invalidateSession();
+    _outputStopwatch.stop();
     _studyStopwatch.stop();
     state = state.copyWith(
       isPlaying: false,
@@ -230,6 +232,7 @@ class BookmarkReview extends _$BookmarkReview {
     if (_sentences.isEmpty) return null;
 
     _engine.invalidateSession();
+    _outputStopwatch.stop();
 
     final removedIndex = state.currentSentenceIndex;
     final removed = _sentences[removedIndex];
@@ -327,6 +330,7 @@ class BookmarkReview extends _$BookmarkReview {
   /// 强制完成（用户在最后一句主动点击完成按钮）
   void forceComplete() {
     _engine.invalidateSession();
+    _outputStopwatch.stop();
     state = state.copyWith(
       isCompleted: true,
       isPlaying: false,
@@ -465,6 +469,7 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// 开始播放当前句子（盲听 N 遍）
   Future<void> _startSentence() async {
+    _outputStopwatch.stop();
     final bookmarkSentence = currentBookmarkSentence;
     if (bookmarkSentence == null) return;
 
@@ -548,6 +553,7 @@ class BookmarkReview extends _$BookmarkReview {
   ///
   /// [startPlayCount] 从第几遍开始（默认第 1 遍）。
   void _startShadowReading({int startPlayCount = 1}) {
+    _outputStopwatch.stop();
     final sentence = currentSentence;
     if (sentence == null || sentence.duration <= Duration.zero) return;
 

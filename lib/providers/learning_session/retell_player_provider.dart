@@ -268,6 +268,7 @@ class RetellPlayer extends _$RetellPlayer {
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateRetellCountdown();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     await engine.stopPlayback();
     state = state.copyWith(
       isPlaying: false,
@@ -414,6 +415,7 @@ class RetellPlayer extends _$RetellPlayer {
   /// 使用局部变量 `sid` 捕获 sessionId，防止 pause/其他操作
   /// 覆写实例变量 `_sessionId` 后导致 guard 失效。
   Future<void> _playCurrentParagraph() async {
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     final sentences = currentParagraphSentences;
     if (sentences.isEmpty) return;
 

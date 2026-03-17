@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -88,14 +90,31 @@ class _TodayCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            // 第二行：听 / 说 / 词汇 三列
-            Row(
+            // 第二行：听 / 说 / 词汇 三列（clamp 防御脏数据）
+            Builder(builder: (context) {
+              final clampedInput = math.min(
+                stats.todayInputSeconds,
+                stats.todaySeconds,
+              );
+              final clampedOutput = math.min(
+                stats.todayOutputSeconds,
+                math.max(0, stats.todaySeconds - clampedInput),
+              );
+              if (clampedInput != stats.todayInputSeconds ||
+                  clampedOutput != stats.todayOutputSeconds) {
+                debugPrint(
+                  '⚠️ 今日卡片 clamp: input ${stats.todayInputSeconds}→$clampedInput, '
+                  'output ${stats.todayOutputSeconds}→$clampedOutput, '
+                  'total ${stats.todaySeconds}',
+                );
+              }
+              return Row(
               children: [
                 Expanded(
                   child: _ListenSpeakItem(
                     icon: Icons.headphones_outlined,
                     iconColor: Colors.teal,
-                    timeText: _formatTimeShort(stats.todayInputSeconds),
+                    timeText: _formatTimeShort(clampedInput),
                     wordText:
                         '${_formatWordCount(stats.todayInputWords)}${l10n.localeName == 'zh' ? '词' : 'w'}',
                   ),
@@ -109,7 +128,7 @@ class _TodayCard extends StatelessWidget {
                   child: _ListenSpeakItem(
                     icon: Icons.mic_outlined,
                     iconColor: Colors.deepPurple,
-                    timeText: _formatTimeShort(stats.todayOutputSeconds),
+                    timeText: _formatTimeShort(clampedOutput),
                     wordText:
                         '${_formatWordCount(stats.todayOutputWords)}${l10n.localeName == 'zh' ? '词' : 'w'}',
                   ),
@@ -126,7 +145,8 @@ class _TodayCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
+            );
+            }),
           ],
         ),
       ),
@@ -243,13 +263,8 @@ class _WeeklyBarChart extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    // 向前兼容：旧数据无 input/output 时，用 totalSeconds 当作输入
-    final dailyBarSeconds = List.generate(7, (i) {
-      final io = dailyInputSeconds[i] + dailyOutputSeconds[i];
-      return io > 0 ? io : dailyTotalSeconds[i];
-    });
-
-    final maxSeconds = dailyBarSeconds.reduce((a, b) => a > b ? a : b);
+    // 柱高基于 totalSeconds（而非 input+output），避免重叠计时导致柱高虚高
+    final maxSeconds = dailyTotalSeconds.reduce((a, b) => a > b ? a : b);
     const maxBarHeight = 56.0;
 
     // 计算最近 7 天的星期标签
@@ -294,17 +309,25 @@ class _WeeklyBarChart extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
                 final isToday = i == 6;
-                final totalSec = dailyBarSeconds[i];
+                final totalSec = dailyTotalSeconds[i];
                 final ratio = maxSeconds > 0 ? totalSec / maxSeconds : 0.0;
                 final barHeight =
                     (ratio * maxBarHeight).clamp(3.0, maxBarHeight);
 
-                // 双色比例（旧数据无 input/output 时全部算输入）
+                // Clamp input/output 防御历史脏数据
                 final hasBreakdown =
                     dailyInputSeconds[i] > 0 || dailyOutputSeconds[i] > 0;
-                final inputSec =
+                final rawInput =
                     hasBreakdown ? dailyInputSeconds[i] : dailyTotalSeconds[i];
-                final outputSec = hasBreakdown ? dailyOutputSeconds[i] : 0;
+                final rawOutput = hasBreakdown ? dailyOutputSeconds[i] : 0;
+                final inputSec = math.min(rawInput, totalSec);
+                final outputSec = math.min(rawOutput, math.max(0, totalSec - inputSec));
+                if (rawInput != inputSec || rawOutput != outputSec) {
+                  debugPrint(
+                    '⚠️ 柱状图 clamp day$i: input $rawInput→$inputSec, '
+                    'output $rawOutput→$outputSec, total $totalSec',
+                  );
+                }
                 final inputRatio =
                     totalSec > 0 ? inputSec / totalSec : 1.0;
 

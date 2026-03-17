@@ -199,6 +199,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   /// 暂停播放
   Future<void> pause() async {
     _engine.invalidateSession();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
@@ -407,6 +408,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   /// 强制完成（用户在最后一句主动点击完成按钮）
   void forceComplete() {
     _engine.invalidateSession();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     state = state.copyWith(
       isCompleted: true,
       isPlaying: false,
@@ -426,6 +428,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
 
   /// 开始播放当前句子的循环
   Future<void> _startSentence({int startPlayCount = 1}) async {
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     final sentence = currentSentence;
     if (sentence == null) return;
 

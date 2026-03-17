@@ -171,6 +171,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 更新后中断当前播放，以新设置重新开始当前句子。
   void updateSettings(DifficultPracticeSettings newSettings) {
     _engine.invalidateSession();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     state = state.copyWith(settings: newSettings, isPlaying: false);
   }
 
@@ -216,6 +217,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 跟读模式下保留 isAnnotationMode 标记，resume 时恢复跟读循环。
   void pause() {
     _engine.invalidateSession();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
@@ -273,6 +275,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (_sentences.isEmpty) return null;
 
     _engine.invalidateSession();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
+
 
     final removedIndex = state.currentSentenceIndex;
     final removed = _sentences[removedIndex];
@@ -388,6 +392,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 强制完成（用户在最后一句主动点击完成按钮）
   void forceComplete() {
     _engine.invalidateSession();
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     state = state.copyWith(
       isCompleted: true,
       isPlaying: false,
@@ -474,6 +479,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// fire-and-forget，与 listen_and_repeat 的 _startSentence 模式一致。
   /// [startPlayCount] 从第几遍开始（默认第 1 遍）。
   void _startShadowReading({int startPlayCount = 1}) {
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     final sentence = currentSentence;
     if (sentence == null || sentence.duration <= Duration.zero) return;
 
@@ -533,6 +539,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
   /// 开始播放当前句子（盲听 N 遍）
   Future<void> _startSentence() async {
+    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
     final sentence = currentSentence;
     if (sentence == null) return;
 

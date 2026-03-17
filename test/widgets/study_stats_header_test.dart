@@ -223,6 +223,87 @@ void main() {
     });
   });
 
+  group('StudyStatsHeader — 今日卡片 clamp', () {
+    testWidgets('input+output > total 时 clamp 显示正确', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(
+            todaySeconds: 1500, // 25 min
+            todayInputSeconds: 1440, // 24 min（超过 total）
+            todayOutputSeconds: 1260, // 21 min
+            dailySeconds: [0, 0, 0, 0, 0, 0, 1500],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 总时长正常显示 25 min
+      expect(find.text('25 min'), findsOneWidget);
+
+      // input: min(1440, 1500) = 1440 → 24分
+      // output: min(1260, max(0, 1500-1440)) = min(1260, 60) = 60 → 1分
+      expect(find.text('24分'), findsOneWidget);
+      expect(find.text('1分'), findsOneWidget);
+    });
+
+    testWidgets('input+output <= total 时不 clamp', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(
+            todaySeconds: 1800, // 30 min
+            todayInputSeconds: 900, // 15 min
+            todayOutputSeconds: 600, // 10 min
+            dailySeconds: [0, 0, 0, 0, 0, 0, 1800],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('30 min'), findsOneWidget);
+      expect(find.text('15分'), findsOneWidget);
+      expect(find.text('10分'), findsOneWidget);
+    });
+  });
+
+  group('StudyStatsHeader — 柱状图基于 totalSeconds', () {
+    testWidgets('柱顶标签显示 total 而非 input+output', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(
+            todaySeconds: 1500, // 25 min
+            weekTotalSeconds: 1500,
+            dailySeconds: [0, 0, 0, 0, 0, 0, 1500],
+            dailyInputSeconds: [0, 0, 0, 0, 0, 0, 1440],
+            dailyOutputSeconds: [0, 0, 0, 0, 0, 0, 1260],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 柱顶应显示 25m（基于 totalSeconds 1500/60=25）
+      expect(find.text('25m'), findsOneWidget);
+      // 不应显示 45m（input+output 的错误值）
+      expect(find.text('45m'), findsNothing);
+    });
+
+    testWidgets('input+output > total 时柱状图 clamp 不溢出', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(
+            weekTotalSeconds: 1800,
+            dailySeconds: [0, 0, 0, 0, 0, 0, 1800],
+            dailyInputSeconds: [0, 0, 0, 0, 0, 0, 1200],
+            dailyOutputSeconds: [0, 0, 0, 0, 0, 0, 900],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 柱顶显示 30m（totalSeconds 1800/60=30）
+      expect(find.text('30m'), findsOneWidget);
+    });
+  });
+
   group('StudyStatsHeader — 中文本地化', () {
     testWidgets('中文标签', (tester) async {
       await tester.pumpWidget(
