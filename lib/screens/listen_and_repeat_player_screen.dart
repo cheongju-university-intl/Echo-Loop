@@ -685,8 +685,6 @@ class _ListenAndRepeatPlayerScreenState
                         if (isLast) {
                           // 最后一句：直接完成
                           player.forceComplete();
-                        } else if (playerState.isPauseBetweenPlays) {
-                          unawaited(player.completePausedTurn());
                         } else {
                           unawaited(player.goToNext());
                         }
