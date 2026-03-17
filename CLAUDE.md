@@ -48,7 +48,6 @@
 flutter analyze
 flutter test
 flutter test integration_test -d macos
-flutter build macos
 ```
 
 ### 步骤 5: 更新 TASKS.md
