@@ -677,6 +677,24 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     }
   }
 
+  /// 强制完成（用户在最后一句主动点击完成按钮）
+  void forceComplete() {
+    _invalidateSession();
+    try {
+      ref.read(learningSessionProvider.notifier).stopOutputTimer();
+    } catch (_) {}
+    state = state.copyWith(
+      isCompleted: true,
+      isPlaying: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isAnnotationMode: false,
+      isAnnotationReplay: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
+  }
+
   /// 重置到第一句并重新开始播放（供"再来一遍"使用）
   Future<void> resetToStart() async {
     _invalidateSession();

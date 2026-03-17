@@ -30,8 +30,8 @@ class SentenceAnnotationCard extends StatefulWidget {
   /// 其它场景（包括已存在的难句）保持 false。
   final bool showAutoMarkedLabel;
 
-  /// 切换难句标记回调
-  final VoidCallback onToggle;
+  /// 切换难句标记回调（为 null 时不显示标记行）
+  final VoidCallback? onToggle;
 
   /// 请求翻译回调（返回翻译文本）
   final Future<String> Function()? onRequestTranslation;
@@ -68,7 +68,7 @@ class SentenceAnnotationCard extends StatefulWidget {
     required this.text,
     required this.isDifficult,
     this.showAutoMarkedLabel = false,
-    required this.onToggle,
+    this.onToggle,
     this.onRequestTranslation,
     this.onRequestAnalysis,
     this.cachedTranslation,
@@ -197,35 +197,37 @@ class _SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 难句标记（可点击切换）
-        GestureDetector(
-          onTap: widget.onToggle,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Flexible(
-                child: Text(
-                  widget.isDifficult
-                      ? (widget.showAutoMarkedLabel
-                            ? l10n.intensiveListenAutoMarkedDifficult
-                            : l10n.intensiveListenMarkedDifficult)
-                      : l10n.intensiveListenNotDifficult,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.6),
+        // 难句标记（可点击切换；onToggle 为 null 时不显示）
+        if (widget.onToggle != null) ...[
+          GestureDetector(
+            onTap: widget.onToggle,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    widget.isDifficult
+                        ? (widget.showAutoMarkedLabel
+                              ? l10n.intensiveListenAutoMarkedDifficult
+                              : l10n.intensiveListenMarkedDifficult)
+                        : l10n.intensiveListenNotDifficult,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.6),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Icon(
-                widget.isDifficult ? Icons.bookmark : Icons.bookmark_border,
-                color: widget.isDifficult ? Colors.amber : Colors.grey,
-                size: 18,
-              ),
-            ],
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  widget.isDifficult ? Icons.bookmark : Icons.bookmark_border,
+                  color: widget.isDifficult ? Colors.amber : Colors.grey,
+                  size: 18,
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.m),
+          const SizedBox(height: AppSpacing.m),
+        ],
 
         // 句子文本（单词可点击查词典）
         RichText(

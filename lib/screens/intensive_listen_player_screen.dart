@@ -321,10 +321,7 @@ class _IntensiveListenPlayerScreenState
             .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
         if (mounted) {
           context.pushReplacement(
-            AppRoutes.retellPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
+            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
           );
         }
       },
@@ -598,22 +595,6 @@ class _IntensiveListenPlayerScreenState
                             playerState.currentSentenceIndex,
                           ),
                           isAutoMarked: playerState.isCurrentSentenceAutoMarked,
-                          isReplayActive: playerState.isAnnotationReplay,
-                          isPauseBetweenSentences:
-                              playerState.isPauseBetweenSentences,
-                          pauseRemaining: playerState.pauseRemaining,
-                          pauseDuration: playerState.pauseDuration,
-                          isCountdownPaused: playerState.isCountdownPaused,
-                          l10n: l10n,
-                          onContinue:
-                              playerState.isAnnotationReplay ||
-                                  playerState.isPauseBetweenSentences
-                              ? null
-                              : () => player.exitAnnotationMode(),
-                          onToggleDifficult: _toggleAndSaveDifficult,
-                          onPauseCountdown: () => playerState.isCountdownPaused
-                              ? player.resumeCountdown()
-                              : player.pauseCountdown(),
                           aiNotifier: ref.read(sentenceAiNotifierProvider),
                           audioItemId: widget.audioItemId,
                           sentenceIndex: playerState.currentSentenceIndex,
@@ -630,8 +611,8 @@ class _IntensiveListenPlayerScreenState
                           onPeekToggle: () => player.setTextRevealed(
                             !playerState.isTextRevealed,
                           ),
-                          onCantUnderstand: () => player.enterAnnotationMode(),
                           onToggleDifficult: _toggleAndSaveDifficult,
+                          onCantUnderstand: () => player.enterAnnotationMode(),
                           onPauseCountdown: () => playerState.isCountdownPaused
                               ? player.resumeCountdown()
                               : player.pauseCountdown(),
@@ -640,38 +621,97 @@ class _IntensiveListenPlayerScreenState
                 ),
               ),
 
-              // 底部播放控制
-              _PlaybackControls(
-                playerState: playerState,
-                onPrevious: () => player.goToPrevious(),
-                onNext: () => player.goToNext(),
-                onPlayPause: () {
-                  if (playerState.isPlaying) {
-                    player.pause();
-                  } else if (playerState.isAnnotationReplay) {
-                    player.resume();
-                  } else if (playerState.isPauseBetweenPlays) {
-                    player.replayDuringCountdown();
-                  } else if (playerState.isAnnotationMode) {
-                    player.replayInAnnotationMode();
-                  } else {
-                    player.resume();
-                  }
-                },
-              ),
-              // 播放遍数
+              // 底部统一 Padding（对齐跟读页布局）
               Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                child: Text(
-                  l10n.intensiveListenPlayCount(
-                    playerState.currentPlayCount,
-                    playerState.settings.repeatCount,
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.5,
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.l,
+                  right: AppSpacing.l,
+                  bottom: AppSpacing.m,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // === 标注模式专属 ===
+                    if (playerState.isAnnotationMode &&
+                        !playerState.isAnnotationReplay &&
+                        !playerState.isPauseBetweenSentences)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () => player.exitAnnotationMode(),
+                            child: Text(l10n.intensiveListenContinue),
+                          ),
+                        ),
+                      ),
+                    if (playerState.isAnnotationReplay)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                        child: Text(
+                          l10n.intensiveListenReplayingWithSubtitle,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    if ((playerState.isAnnotationMode ||
+                            playerState.isAnnotationReplay) &&
+                        playerState.isPauseBetweenSentences)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                        child: CountdownChip(
+                          remaining: playerState.pauseRemaining,
+                          total: playerState.pauseDuration,
+                          isPaused: playerState.isCountdownPaused,
+                          onTap: () => playerState.isCountdownPaused
+                              ? player.resumeCountdown()
+                              : player.pauseCountdown(),
+                        ),
+                      ),
+
+                    // === 通用：播放控制 ===
+                    _PlaybackControls(
+                      playerState: playerState,
+                      onPrevious: () => player.goToPrevious(),
+                      onNext: () {
+                        final isLast =
+                            playerState.currentSentenceIndex >=
+                            playerState.totalSentences - 1;
+                        if (isLast) {
+                          player.forceComplete();
+                        } else {
+                          player.goToNext();
+                        }
+                      },
+                      onPlayPause: () {
+                        if (playerState.isPlaying) {
+                          player.pause();
+                        } else if (playerState.isAnnotationReplay) {
+                          player.resume();
+                        } else if (playerState.isPauseBetweenPlays) {
+                          player.replayDuringCountdown();
+                        } else if (playerState.isAnnotationMode) {
+                          player.replayInAnnotationMode();
+                        } else {
+                          player.resume();
+                        }
+                      },
                     ),
-                  ),
+                    // 播放遍数
+                    Text(
+                      l10n.intensiveListenPlayCount(
+                        playerState.currentPlayCount,
+                        playerState.settings.repeatCount,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -734,18 +774,23 @@ class _ProgressSection extends StatelessWidget {
   }
 }
 
-/// 普通模式视图（文字遮盖 / 偷看）
+/// 普通模式视图（难句标记行 + 字幕区 + 偷看 + 倒计时 + 按钮行）
+///
+/// 倒计时使用固定 56px 高度占位，避免字幕区跳动。
+/// 布局参考难句补练 PracticeNormalModeView。
 class _NormalModeView extends StatelessWidget {
   final IntensiveListenState playerState;
   final AppLocalizations l10n;
   final ThemeData theme;
   final VoidCallback onPeekToggle;
-  final VoidCallback onCantUnderstand;
 
-  /// 取消难句标记回调
+  /// 切换难句标记回调（用于难句标记行）
   final VoidCallback onToggleDifficult;
 
-  /// 倒计时暂停/恢复回调
+  /// 听不懂（进入标注模式）
+  final VoidCallback onCantUnderstand;
+
+  /// 暂停/恢复倒计时
   final VoidCallback onPauseCountdown;
 
   final String? sentenceText;
@@ -756,8 +801,8 @@ class _NormalModeView extends StatelessWidget {
     required this.l10n,
     required this.theme,
     required this.onPeekToggle,
-    required this.onCantUnderstand,
     required this.onToggleDifficult,
+    required this.onCantUnderstand,
     required this.onPauseCountdown,
     this.sentenceText,
   });
@@ -801,57 +846,105 @@ class _NormalModeView extends StatelessWidget {
             ),
           ),
 
-          // 遮盖/偷看区域
+          // 字幕区（整个区域可点击切换字幕）
           Expanded(
-            child: Center(
-              child: playerState.isTextRevealed && sentenceText != null
-                  ? Text(
-                      sentenceText!,
-                      style: theme.textTheme.titleMedium?.copyWith(height: 1.6),
-                      textAlign: TextAlign.center,
-                    )
-                  : _HiddenTextPlaceholder(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onPeekToggle,
+              child: Stack(
+                children: [
+                  // 字幕内容偏上（-0.4 ≈ 上方 30% 位置）
+                  Align(
+                    alignment: const Alignment(0, -0.4),
+                    child: playerState.isTextRevealed && sentenceText != null
+                        ? GestureDetector(
+                            onTap: () {}, // 拦截点击，不冒泡到外层
+                            child: Text(
+                              sentenceText!,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                height: 1.6,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : _HiddenTextPlaceholder(),
+                  ),
+                  // 偷看字幕标签（固定在字幕区中间偏下）
+                  Align(
+                    alignment: const Alignment(0, 0.55),
+                    child: _PeekLabel(
+                      isRevealed: playerState.isTextRevealed,
+                      l10n: l10n,
+                      theme: theme,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
-          // 倒计时控制，固定高度避免跳动
-          SizedBox(
-            height: 72,
-            child: playerState.isPauseBetweenPlays
-                ? Center(
-                    child: CountdownChip(
-                      remaining: playerState.pauseRemaining,
-                      total: playerState.pauseDuration,
-                      isPaused: playerState.isCountdownPaused,
-                      onTap: onPauseCountdown,
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          const SizedBox(height: AppSpacing.m),
-
-          // 偷看/听不懂按钮
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          // 底部固定区：倒计时 + 按钮行
+          Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              GestureDetector(
-                onTap: onPeekToggle,
-                child: _ActionChip(
-                  icon: playerState.isTextRevealed
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  label: l10n.intensiveListenPeek,
-                ),
+              // 倒计时（固定 56 高度占位，避免字幕区跳动）
+              SizedBox(
+                height: 56,
+                child: playerState.isPauseBetweenPlays
+                    ? CountdownChip(
+                        remaining: playerState.pauseRemaining,
+                        total: playerState.pauseDuration,
+                        isPaused: playerState.isCountdownPaused,
+                        onTap: onPauseCountdown,
+                      )
+                    : null,
               ),
-              const SizedBox(width: AppSpacing.s),
-              FilledButton.tonal(
-                onPressed: onCantUnderstand,
-                child: Text(l10n.intensiveListenCantUnderstand),
+              const SizedBox(height: AppSpacing.m),
+              // 取消标记 + 听不懂按钮
+              SizedBox(
+                height: 48,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isDifficult) ...[
+                      TextButton(
+                        onPressed: onToggleDifficult,
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.colorScheme.onSurfaceVariant,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: Text(
+                          l10n.practiceRemoveMark,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.m),
+                    ],
+                    FilledButton.tonal(
+                      onPressed: onCantUnderstand,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 12,
+                        ),
+                      ),
+                      child: Text(
+                        l10n.intensiveListenCantUnderstand,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s),
+
+          const SizedBox(height: AppSpacing.l),
         ],
       ),
     );
@@ -890,33 +983,13 @@ class _HiddenTextPlaceholder extends StatelessWidget {
   }
 }
 
-/// 标注模式视图
+/// 标注模式视图（仅卡片，底部控件已移至 build 底部统一 Padding）
 class _AnnotationModeView extends StatelessWidget {
   final String text;
   final bool isDifficult;
 
-  /// 是否展示“自动标记为难句”文案
+  /// 是否展示”自动标记为难句”文案
   final bool isAutoMarked;
-
-  /// 是否处于当前页内的详情重播状态
-  final bool isReplayActive;
-
-  /// 是否处于句间倒计时中
-  final bool isPauseBetweenSentences;
-
-  /// 句间停顿剩余时间
-  final Duration pauseRemaining;
-
-  /// 句间停顿总时长
-  final Duration pauseDuration;
-
-  /// 倒计时是否暂停
-  final bool isCountdownPaused;
-
-  final AppLocalizations l10n;
-  final VoidCallback? onContinue;
-  final VoidCallback onToggleDifficult;
-  final VoidCallback onPauseCountdown;
 
   /// AI 翻译/解析服务
   final SentenceAiNotifier? aiNotifier;
@@ -938,15 +1011,6 @@ class _AnnotationModeView extends StatelessWidget {
     required this.text,
     required this.isDifficult,
     required this.isAutoMarked,
-    required this.isReplayActive,
-    required this.isPauseBetweenSentences,
-    required this.pauseRemaining,
-    required this.pauseDuration,
-    required this.isCountdownPaused,
-    required this.l10n,
-    required this.onContinue,
-    required this.onToggleDifficult,
-    required this.onPauseCountdown,
     this.aiNotifier,
     this.audioItemId,
     this.sentenceIndex,
@@ -960,101 +1024,75 @@ class _AnnotationModeView extends StatelessWidget {
     final cachedTranslation = ai?.getCachedTranslation(text)?.translation;
     final cachedAnalysis = ai?.getCachedAnalysis(text);
     final cachedAnalysisText = cachedAnalysis?.toDisplayString();
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.l),
-      child: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: SentenceAnnotationCard(
-                key: ValueKey(text),
-                text: text,
-                isDifficult: isDifficult,
-                showAutoMarkedLabel: isAutoMarked,
-                onToggle: onToggleDifficult,
-                onRequestTranslation: ai != null
-                    ? () async {
-                        final result = await ai.getTranslation(text);
-                        return result.translation;
-                      }
-                    : null,
-                onRequestAnalysis: ai != null
-                    ? () async {
-                        final result = await ai.getAnalysis(text);
-                        return result.toDisplayString();
-                      }
-                    : null,
-                cachedTranslation: cachedTranslation,
-                cachedAnalysis: cachedAnalysisText,
-                audioItemId: audioItemId,
-                sentenceIndex: sentenceIndex,
-                sentenceStartMs: sentenceStartMs,
-                sentenceEndMs: sentenceEndMs,
-              ),
-            ),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: AppSpacing.l),
+          child: SentenceAnnotationCard(
+            key: ValueKey(text),
+            text: text,
+            isDifficult: isDifficult,
+            showAutoMarkedLabel: isAutoMarked,
+            // 不传 onToggle → 不显示取消标记按钮
+            onRequestTranslation: ai != null
+                ? () async {
+                    final result = await ai.getTranslation(text);
+                    return result.translation;
+                  }
+                : null,
+            onRequestAnalysis: ai != null
+                ? () async {
+                    final result = await ai.getAnalysis(text);
+                    return result.toDisplayString();
+                  }
+                : null,
+            cachedTranslation: cachedTranslation,
+            cachedAnalysis: cachedAnalysisText,
+            audioItemId: audioItemId,
+            sentenceIndex: sentenceIndex,
+            sentenceStartMs: sentenceStartMs,
+            sentenceEndMs: sentenceEndMs,
           ),
-          const SizedBox(height: AppSpacing.m),
-          if (!isReplayActive && !isPauseBetweenSentences)
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onContinue,
-                child: Text(l10n.intensiveListenContinue),
-              ),
-            ),
-          if (isReplayActive)
-            Text(
-              l10n.intensiveListenReplayingWithSubtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          if (isPauseBetweenSentences)
-            CountdownChip(
-              remaining: pauseRemaining,
-              total: pauseDuration,
-              isPaused: isCountdownPaused,
-              onTap: onPauseCountdown,
-            ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// 操作按钮（偷看字幕 / 听不懂）
-///
-/// 统一的轻量胶囊样式，浅色背景 + 小图标 + 文字。
-class _ActionChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
+/// 偷看字幕标签（字幕区下方，提示用户可点击）
+class _PeekLabel extends StatelessWidget {
+  final bool isRevealed;
+  final AppLocalizations l10n;
+  final ThemeData theme;
 
-  const _ActionChip({required this.icon, required this.label});
+  const _PeekLabel({
+    required this.isRevealed,
+    required this.l10n,
+    required this.theme,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isRevealed
+              ? Icons.visibility_off_outlined
+              : Icons.visibility_outlined,
+          size: 14,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          l10n.intensiveListenPeek,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1079,16 +1117,11 @@ class _PlaybackControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canGoPrev = playerState.currentSentenceIndex > 0;
-    final canGoNext =
-        playerState.currentSentenceIndex < playerState.totalSentences - 1;
+    final isLastSentence =
+        playerState.currentSentenceIndex >= playerState.totalSentences - 1;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.l,
-        AppSpacing.xs,
-        AppSpacing.l,
-        AppSpacing.xs,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -1128,9 +1161,11 @@ class _PlaybackControls extends StatelessWidget {
           const SizedBox(width: 48),
 
           _NavButton(
-            icon: Icons.skip_next_rounded,
-            enabled: canGoNext,
-            onTap: canGoNext ? onNext : null,
+            icon: isLastSentence
+                ? Icons.check_circle_rounded
+                : Icons.skip_next_rounded,
+            enabled: true,
+            onTap: onNext,
           ),
         ],
       ),
@@ -1185,4 +1220,3 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.reviewRetellParagraph => 'Paragraph retelling',
       SubStageType.reviewRetellSummary => 'Summary retelling',
     };
-

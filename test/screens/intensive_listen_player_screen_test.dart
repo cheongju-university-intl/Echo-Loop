@@ -265,7 +265,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Peek'), findsOneWidget);
-      expect(find.text("Can't understand"), findsOneWidget);
+      expect(find.text('Unclear'), findsOneWidget);
     });
 
     testWidgets('普通模式显示播放遍数（默认 1 次）', (tester) async {
@@ -319,7 +319,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text("Can't understand"));
+      await tester.tap(find.text('Unclear'));
       await tester.pumpAndSettle();
 
       expect(find.byType(SentenceAnnotationCard), findsOneWidget);
@@ -396,7 +396,7 @@ void main() {
       expect(opacity.opacity, 0.15);
     });
 
-    testWidgets('最后一句时下一句按钮透明度降低（禁用态）', (tester) async {
+    testWidgets('最后一句时下一句按钮变为完成图标且可点击', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
@@ -407,14 +407,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final nextIcon = find.byIcon(Icons.skip_next_rounded);
-      expect(nextIcon, findsOneWidget);
+      // 最后一句显示 check_circle 图标
+      final checkIcon = find.byIcon(Icons.check_circle_rounded);
+      expect(checkIcon, findsOneWidget);
+      // 始终可点击（opacity 0.6）
       final opacity = tester.widget<AnimatedOpacity>(
         find
-            .ancestor(of: nextIcon, matching: find.byType(AnimatedOpacity))
+            .ancestor(of: checkIcon, matching: find.byType(AnimatedOpacity))
             .first,
       );
-      expect(opacity.opacity, 0.15);
+      expect(opacity.opacity, 0.6);
     });
 
     testWidgets('遍间停顿显示倒计时控件', (tester) async {
@@ -471,7 +473,7 @@ void main() {
 
       expect(find.text('逐句精听'), findsOneWidget);
       expect(find.text('偷看字幕'), findsOneWidget);
-      expect(find.text('听不懂'), findsOneWidget);
+      expect(find.text('听不太懂'), findsOneWidget);
     });
 
     testWidgets('完成统计使用数据库难句总数而非本次会话数量', (tester) async {
@@ -511,7 +513,7 @@ void main() {
       expect(find.text('Settings'), findsWidgets);
     });
 
-    testWidgets('标注模式显示实心星标和难句文案', (tester) async {
+    testWidgets('标注模式不显示难句标记行（onToggle 为 null）', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
@@ -524,87 +526,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 实心星标（标注卡片内）
-      expect(find.byIcon(Icons.bookmark), findsOneWidget);
-      expect(find.byIcon(Icons.bookmark_border), findsNothing);
-      // 难句文案
-      expect(find.text('Auto-marked difficult, tap to undo'), findsOneWidget);
-    });
-
-    testWidgets('标注模式取消标记后显示空心星标', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          playerState: createPlayerState(
-            isAnnotationMode: true,
-            isPlaying: false,
-            difficultSentences: {},
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // 空心星标
-      expect(find.byIcon(Icons.bookmark_border), findsOneWidget);
+      // 标注模式不传 onToggle → 不显示难句标记行
       expect(find.byIcon(Icons.bookmark), findsNothing);
-      // 未标记文案
-      expect(find.text('Tap to mark as difficult'), findsOneWidget);
+      expect(find.byIcon(Icons.bookmark_border), findsNothing);
+      expect(find.text('Auto-marked difficult, tap to undo'), findsNothing);
     });
 
-    testWidgets('标注模式中文文案正确显示', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          locale: const Locale('zh'),
-          playerState: createPlayerState(
-            isAnnotationMode: true,
-            isPlaying: false,
-            difficultSentences: {0},
-            isCurrentSentenceAutoMarked: true,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('已自动标记为难句，点此取消'), findsOneWidget);
-    });
-
-    testWidgets('标注模式手动已标记显示普通难句文案', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          playerState: createPlayerState(
-            isAnnotationMode: true,
-            isPlaying: false,
-            difficultSentences: {0},
-            isCurrentSentenceAutoMarked: false,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
-    });
-
-    testWidgets('标注模式点击星标可切换难句状态', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          playerState: createPlayerState(
-            isAnnotationMode: true,
-            isPlaying: false,
-            difficultSentences: {0},
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // 点击标注卡片内的星标
-      await tester.tap(find.byIcon(Icons.bookmark));
-      await tester.pumpAndSettle();
-
-      // 验证状态变更：难句集合不再包含当前句子
-      // （TestIntensiveListenPlayer 会处理 toggleDifficultSentence）
-      expect(find.byIcon(Icons.bookmark_border), findsOneWidget);
-    });
-
-    testWidgets('正常模式下难句显示标记行', (tester) async {
+    testWidgets('正常模式下难句显示标记行和取消标记按钮', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
@@ -618,8 +546,9 @@ void main() {
       // 难句标记行：★ + 文案
       expect(find.byIcon(Icons.bookmark), findsOneWidget);
       expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
-      // "听不懂"按钮仍然存在
-      expect(find.text("Can't understand"), findsOneWidget);
+      // 底部显示"取消标记"和"听不懂"按钮
+      expect(find.text('Unmark'), findsOneWidget);
+      expect(find.text('Unclear'), findsOneWidget);
     });
 
     testWidgets('正常模式下非难句显示空心星标', (tester) async {
