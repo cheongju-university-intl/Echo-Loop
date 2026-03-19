@@ -3,6 +3,9 @@
 /// 难句跟读界面，逐句显示难句文本（带★标记），
 /// 用户听完后在停顿时间内跟读。
 ///
+/// 录音通过 [ShadowingRecordingController] 驱动（跟读专用控制器）。
+/// 录音回放通过 [AudioPlaybackService] 播放本地 .m4a 文件。
+///
 /// 完成处理：所有句子播完 → 完成对话框 → completeCurrentSubStage → 退出
 /// 退出处理：PopScope → 保存断点 → exitLearningMode → pop
 library;
@@ -23,14 +26,15 @@ import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../services/app_logger.dart';
+import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
 import '../models/retell_settings.dart';
 import '../models/speech_practice_models.dart';
 import '../utils/keyword_extraction.dart';
 import '../utils/paragraph_grouping.dart';
 import '../providers/sentence_ai_provider.dart';
-import '../providers/speech_practice_session_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
+import '../widgets/common/countdown_chip.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
 import '../widgets/listen_and_repeat/speech_practice_turn_panel.dart';
 import '../widgets/common/speech_rating_badge.dart';
@@ -63,29 +67,155 @@ class _ListenAndRepeatPlayerScreenState
     with WakelockMixin {
   bool _isShowingDialog = false;
 
+  /// 用户在当前句手动停止过录音 → 本句不再自动录音/倒计时
+  bool _manualStoppedThisSentence = false;
+
+  /// 录音回放服务
+  final AudioPlaybackService _playbackService = AudioPlaybackService();
+
+  /// 当前正在播放的 promptId（null = 未播放）
+  String? _playingPromptId;
+
+  /// 播放状态监听
+  StreamSubscription<bool>? _playbackSub;
+
   @override
   void initState() {
     super.initState();
-    // 进入后自动开始播放，注册 TurnController 回调
+    _playbackSub = _playbackService.isPlayingStream.listen((isPlaying) {
+      if (!isPlaying && mounted) {
+        setState(() => _playingPromptId = null);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final turnController =
-          ref.read(listenAndRepeatTurnControllerProvider.notifier);
-      turnController.setOnContinue(
-        () => ref
-            .read(listenAndRepeatPlayerProvider.notifier)
-            .completePausedTurn(),
-      );
-      // 同步初始控制模式
-      turnController.setManualMode(
-        ref.read(listenAndRepeatPlayerProvider).settings.isManualMode,
-      );
+      // 同步初始控制模式到录音控制器
+      final settings = ref.read(listenAndRepeatPlayerProvider).settings;
+      ref
+          .read(shadowingRecordingControllerProvider.notifier)
+          .setManualMode(settings.isManualMode);
       ref.read(listenAndRepeatPlayerProvider.notifier).startPlaying();
     });
   }
 
+  @override
+  void dispose() {
+    _playbackSub?.cancel();
+    _playbackService.dispose();
+    super.dispose();
+  }
+
+  /// 构造当前句子的 promptId
+  String _currentPromptId() {
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final sentence = player.currentSentence;
+    final sentenceIndex = sentence?.index ?? player.currentIndex;
+    return 'shadowing:${widget.audioItemId}:$sentenceIndex';
+  }
+
+  /// 更新录音相关阈值
+  void _updateRecordingThresholds() {
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final currentSentence = player.currentSentence;
+    if (currentSentence == null) return;
+
+    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
+    final sentenceDuration = currentSentence.duration;
+
+    // 跟读场景最大录音时长：max(2.5 × sentenceDuration + 5s, 10s)
+    final computed = sentenceDuration * 2.5 + const Duration(seconds: 5);
+    final maxRecording = computed < const Duration(seconds: 10)
+        ? const Duration(seconds: 10)
+        : computed;
+
+    AppLogger.log(
+      'ShadowScreen',
+      '更新阈值: '
+          '最大录音=${maxRecording.inMilliseconds}ms',
+    );
+    controller.setMaxRecordingDuration(maxRecording);
+  }
+
+  /// 处理录音按钮点击
+  Future<void> _handleRecordTap() async {
+    final playerState = ref.read(listenAndRepeatPlayerProvider);
+    if (!playerState.isPauseBetweenPlays) return;
+
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
+    final recState = ref.read(shadowingRecordingControllerProvider);
+    final currentSentence = player.currentSentence;
+    if (currentSentence == null) return;
+
+    final promptId = _currentPromptId();
+    if (recState.isRecordingPrompt(promptId)) {
+      AppLogger.log('ShadowScreen', '手动停止录音 → 本句退出自动模式');
+      _manualStoppedThisSentence = true;
+      await controller.stopAndEvaluate(referenceText: currentSentence.text);
+      return;
+    }
+
+    // 停止录音回放
+    await _stopPlayback();
+
+    // 暂停倒计时
+    if (!playerState.isCountdownPaused) {
+      player.pauseCountdown();
+    }
+
+    AppLogger.log('ShadowScreen', '手动开始录音: 句子${player.currentIndex + 1}');
+    _updateRecordingThresholds();
+    await controller.startRecording(
+      promptId: promptId,
+      referenceText: currentSentence.text,
+    );
+  }
+
+  /// 处理录音回放按钮点击
+  Future<void> _handleAttemptPlaybackTap(String promptId) async {
+    if (_playingPromptId == promptId) {
+      await _stopPlayback();
+      return;
+    }
+
+    final playerState = ref.read(listenAndRepeatPlayerProvider);
+    if (playerState.isPlaying) {
+      await ref.read(listenAndRepeatPlayerProvider.notifier).pause();
+    }
+
+    // 取消评估后倒计时（不推进到下一句）
+    ref.read(listenAndRepeatPlayerProvider.notifier).cancelPostEvalCountdown();
+
+    // 标记本句手动操作过 → 不再自动录音/倒计时
+    AppLogger.log('ShadowScreen', '播放录音 → 等待用户操作');
+    _manualStoppedThisSentence = true;
+
+    final recState = ref.read(shadowingRecordingControllerProvider);
+    final attempt = recState.currentAttempt;
+    final filePath = attempt?.filePath;
+    if (filePath == null || filePath.isEmpty) return;
+
+    setState(() => _playingPromptId = promptId);
+    await _playbackService.play(filePath);
+  }
+
+  /// 停止录音回放
+  Future<void> _stopPlayback() async {
+    await _playbackService.stop();
+    if (mounted) {
+      setState(() => _playingPromptId = null);
+    }
+  }
+
+  /// 取消录音和回放
+  Future<void> _cancelRecordingAndPlayback() async {
+    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
+    await controller.cancelActiveRecording();
+    await _stopPlayback();
+  }
+
   /// 处理退出（close 按钮 / 系统返回）
   Future<void> _handleExit() async {
-    await _prepareForExternalPlaybackAction();
+    await _cancelRecordingAndPlayback();
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     await player.pause();
     if (!mounted) return;
@@ -93,8 +223,7 @@ class _ListenAndRepeatPlayerScreenState
     final session = ref.read(learningSessionProvider);
     if (session.isFreePlay) {
       await _saveSentenceProgress();
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) context.pop();
+      await _exit();
       return;
     }
 
@@ -127,72 +256,14 @@ class _ListenAndRepeatPlayerScreenState
 
     // 保存断点
     await _saveSentenceProgress();
+    await _exit();
+  }
 
+  /// 执行退出
+  Future<void> _exit() async {
+    await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (mounted) context.pop();
-  }
-
-  String _currentPromptId() {
-    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
-    final sentence = player.currentSentence;
-    final sentenceIndex = sentence?.index ?? player.currentIndex;
-    return _promptIdForSentenceIndex(sentenceIndex);
-  }
-
-  String _promptIdForSentenceIndex(int sentenceIndex) {
-    return 'shadowing:${widget.audioItemId}:$sentenceIndex';
-  }
-
-  Future<void> _prepareForExternalPlaybackAction() async {
-    final speech = ref.read(speechPracticeSessionProvider.notifier);
-    await speech.cancelActiveRecording();
-    await speech.stopAttemptPlayback();
-  }
-
-  Future<void> _handleRecordTap() async {
-    final playerState = ref.read(listenAndRepeatPlayerProvider);
-    if (!playerState.isPauseBetweenPlays) {
-      return;
-    }
-
-    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
-    final turn = ref.read(listenAndRepeatTurnControllerProvider.notifier);
-    final currentSentence = player.currentSentence;
-    if (currentSentence == null) {
-      return;
-    }
-
-    final promptId = _currentPromptId();
-    final speech = ref.read(speechPracticeSessionProvider.notifier);
-    if (speech.isRecordingPrompt(promptId)) {
-      await turn.handleManualStop();
-      return;
-    }
-
-    if (!playerState.isCountdownPaused) {
-      player.pauseCountdown();
-    }
-    await turn.startManualRecording(
-      promptId: promptId,
-      referenceText: currentSentence.text,
-      sentenceDuration: currentSentence.duration,
-    );
-  }
-
-  Future<void> _handleAttemptPlaybackTap(String promptId) async {
-    final speech = ref.read(speechPracticeSessionProvider.notifier);
-    final speechState = ref.read(speechPracticeSessionProvider);
-    if (speechState.playingPromptId == promptId) {
-      await speech.stopAttemptPlayback();
-      return;
-    }
-
-    // 暂停原句播放，确保同时只有一个音频在播放
-    final playerState = ref.read(listenAndRepeatPlayerProvider);
-    if (playerState.isPlaying) {
-      await ref.read(listenAndRepeatPlayerProvider.notifier).pause();
-    }
-    await speech.playAttempt(promptId);
   }
 
   /// 保存跟读断点进度
@@ -239,6 +310,9 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 取消当前句子的难句收藏
   Future<void> _handleRemoveDifficult() async {
+    await _cancelRecordingAndPlayback();
+    ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
+
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     final removed = player.removeDifficultMark();
 
@@ -251,6 +325,7 @@ class _ListenAndRepeatPlayerScreenState
     // 如果还有句子且未完成，自动开始播放下一句
     final state = ref.read(listenAndRepeatPlayerProvider);
     if (!state.isCompleted && state.totalSentences > 0) {
+      _manualStoppedThisSentence = false;
       await player.startPlaying();
     }
   }
@@ -348,11 +423,13 @@ class _ListenAndRepeatPlayerScreenState
             .read(learningProgressNotifierProvider.notifier)
             .saveShadowingSentenceIndex(widget.audioItemId, null);
         // 完成退出
-        await ref.read(learningSessionProvider.notifier).exitLearningMode();
-        if (mounted) context.pop();
+        await _exit();
       } else {
         // 再来一遍：重置到第一句重新开始
-        await ref.read(speechPracticeSessionProvider.notifier).disposeSession();
+        await ref
+            .read(shadowingRecordingControllerProvider.notifier)
+            .fullReset();
+        _manualStoppedThisSentence = false;
         ref.read(listenAndRepeatPlayerProvider.notifier).resetToStart();
       }
       return;
@@ -402,8 +479,7 @@ class _ListenAndRepeatPlayerScreenState
         await _navigateToRetell();
       } else {
         // 返回计划页
-        await ref.read(learningSessionProvider.notifier).exitLearningMode();
-        if (mounted) context.pop();
+        await _exit();
       }
     }
   }
@@ -412,6 +488,7 @@ class _ListenAndRepeatPlayerScreenState
   ///
   /// 退出跟读模式 → 显示复述简报弹窗 → 分段 + 提取关键词 → 进入复述模式 → pushReplacement
   Future<void> _navigateToRetell() async {
+    await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;
 
@@ -454,10 +531,11 @@ class _ListenAndRepeatPlayerScreenState
 
     final playerState = ref.watch(listenAndRepeatPlayerProvider);
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
-    final speechState = ref.watch(speechPracticeSessionProvider);
-    final turnState = ref.watch(listenAndRepeatTurnControllerProvider);
 
-    // 监听完成状态 + 控制模式变化
+    // watch 录音相关状态
+    final turnState = ref.watch(shadowingRecordingControllerProvider);
+
+    // 监听完成状态 + 句子切换时清除录音结果
     ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
       prev,
       next,
@@ -465,75 +543,106 @@ class _ListenAndRepeatPlayerScreenState
       if (next.isCompleted && !(prev?.isCompleted ?? false)) {
         _handleCompleted();
       }
-      // 控制模式切换时同步到 TurnController，并取消正在进行的自动录音
+      // 句子切换时清除上一句的录音结果，为下一句自动录音做准备
+      if (prev != null &&
+          prev.currentSentenceIndex != next.currentSentenceIndex) {
+        _manualStoppedThisSentence = false;
+        ref
+            .read(shadowingRecordingControllerProvider.notifier)
+            .clearRecording();
+      }
+    });
+
+    // 评估完成 → 启动 review countdown
+    ref.listen<ListenAndRepeatTurnState>(shadowingRecordingControllerProvider, (
+      prev,
+      next,
+    ) {
+      if (prev?.phase == ListenAndRepeatTurnPhase.processing &&
+          next.phase == ListenAndRepeatTurnPhase.idle &&
+          next.currentAttempt != null) {
+        final latestState = ref.read(listenAndRepeatPlayerProvider);
+        if (latestState.isPauseBetweenPlays &&
+            !latestState.isCompleted &&
+            !latestState.settings.isManualMode &&
+            !_manualStoppedThisSentence) {
+          AppLogger.log('ShadowScreen', '评估完成 → 启动 review countdown');
+          ref
+              .read(listenAndRepeatPlayerProvider.notifier)
+              .startPostEvaluationPause();
+        }
+      }
+    });
+
+    // controlMode 切换 → 同步到录音控制器
+    ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
+      prev,
+      next,
+    ) {
       if (prev?.settings.controlMode != next.settings.controlMode) {
-        final turnController =
-            ref.read(listenAndRepeatTurnControllerProvider.notifier);
-        turnController.setManualMode(next.settings.isManualMode);
+        final controller = ref.read(
+          shadowingRecordingControllerProvider.notifier,
+        );
+        controller.setManualMode(next.settings.isManualMode);
+        // 切入手动模式时取消正在进行的自动录音
         if (next.settings.isManualMode) {
-          final turnState = ref.read(listenAndRepeatTurnControllerProvider);
-          if (turnState.isActive) {
-            unawaited(
-              ref
-                  .read(speechPracticeSessionProvider.notifier)
-                  .cancelActiveRecording(),
-            );
-            turnController.clearTurn();
+          final recState = ref.read(shadowingRecordingControllerProvider);
+          if (recState.phase == ListenAndRepeatTurnPhase.awaitingSpeech ||
+              recState.phase == ListenAndRepeatTurnPhase.speaking) {
+            controller.cancelActiveRecording();
           }
         }
       }
     });
 
+    // 自动模式录音触发（对应复述页面的 !state.isRetellCountdown）：
+    // 停顿中 + 未完成 + 非手动模式 + recording idle + 非倒计时中 + 本句未手动停止过
+    if (playerState.isPauseBetweenPlays &&
+        !playerState.isCompleted &&
+        !playerState.settings.isManualMode &&
+        turnState.phase == ListenAndRepeatTurnPhase.idle &&
+        !playerState.isPostEvalCountdown &&
+        !_manualStoppedThisSentence) {
+      final currentSentence = player.currentSentence;
+      if (currentSentence != null) {
+        final promptId = _currentPromptId();
+        final referenceText = currentSentence.text;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final latestRecState = ref.read(shadowingRecordingControllerProvider);
+          if (latestRecState.phase != ListenAndRepeatTurnPhase.idle) return;
+          final latestState = ref.read(listenAndRepeatPlayerProvider);
+          if (!latestState.isPauseBetweenPlays) return;
+          if (_manualStoppedThisSentence) return;
+
+          // 暂停 player 层倒计时（录音由 ShadowingRecordingController 接管）
+          if (!latestState.isCountdownPaused) {
+            ref.read(listenAndRepeatPlayerProvider.notifier).pauseCountdown();
+          }
+
+          AppLogger.log(
+            'ShadowScreen',
+            '自动开始录音: '
+                '句子${latestState.currentSentenceIndex + 1}',
+          );
+          _updateRecordingThresholds();
+          unawaited(
+            ref
+                .read(shadowingRecordingControllerProvider.notifier)
+                .startRecording(
+                  promptId: promptId,
+                  referenceText: referenceText,
+                ),
+          );
+        });
+      }
+    }
+
     final currentSentence = player.currentSentence;
     final currentPromptId = _currentPromptId();
-    final currentAttempt = speechState.attempts[currentPromptId];
-    final isRecordingCurrent = speechState.recordingPromptId == currentPromptId;
-
-    if (playerState.isPauseBetweenPlays &&
-        currentSentence != null &&
-        turnState.phase == ListenAndRepeatTurnPhase.idle) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-        final latestTurn = ref.read(listenAndRepeatTurnControllerProvider);
-        if (latestTurn.phase != ListenAndRepeatTurnPhase.idle) {
-          return;
-        }
-        final latestPlayer = ref.read(listenAndRepeatPlayerProvider);
-        // 防护：player 可能已推进，不再处于停顿中
-        if (!latestPlayer.isPauseBetweenPlays) {
-          AppLogger.log('Screen', 'postFrameCallback 跳过：isPauseBetweenPlays=false');
-          return;
-        }
-        if (!latestPlayer.isCountdownPaused) {
-          ref.read(listenAndRepeatPlayerProvider.notifier).pauseCountdown();
-        }
-        // 手动模式下不自动开始录音，等用户点击录音按钮
-        if (latestPlayer.settings.isManualMode) {
-          return;
-        }
-        unawaited(
-          ref
-              .read(listenAndRepeatTurnControllerProvider.notifier)
-              .ensureAutoTurn(
-                promptId: currentPromptId,
-                referenceText: currentSentence.text,
-                sentenceDuration: currentSentence.duration,
-              ),
-        );
-      });
-    }
-
-    if (!playerState.isPauseBetweenPlays &&
-        turnState.phase != ListenAndRepeatTurnPhase.idle) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-        ref.read(listenAndRepeatTurnControllerProvider.notifier).clearTurn();
-      });
-    }
+    final currentAttempt = turnState.currentAttempt;
+    final isRecordingCurrent = turnState.isRecordingPrompt(currentPromptId);
 
     // 句子时长（如 "2.8秒"）
     final hasDuration =
@@ -548,8 +657,12 @@ class _ListenAndRepeatPlayerScreenState
 
     return LearningHotkeyScope(
       onPlayPause: () {
-        unawaited(_prepareForExternalPlaybackAction());
+        unawaited(_cancelRecordingAndPlayback());
         if (playerState.isPauseBetweenPlays) {
+          _manualStoppedThisSentence = false;
+          ref
+              .read(shadowingRecordingControllerProvider.notifier)
+              .clearRecording();
           player.replayDuringCountdown();
         } else if (playerState.isPlaying) {
           player.pause();
@@ -558,11 +671,19 @@ class _ListenAndRepeatPlayerScreenState
         }
       },
       onPrevious: () {
-        unawaited(_prepareForExternalPlaybackAction());
+        _manualStoppedThisSentence = false;
+        unawaited(_cancelRecordingAndPlayback());
+        ref
+            .read(shadowingRecordingControllerProvider.notifier)
+            .clearRecording();
         unawaited(player.goToPrevious());
       },
       onNext: () {
-        unawaited(_prepareForExternalPlaybackAction());
+        _manualStoppedThisSentence = false;
+        unawaited(_cancelRecordingAndPlayback());
+        ref
+            .read(shadowingRecordingControllerProvider.notifier)
+            .clearRecording();
         unawaited(player.goToNext());
       },
       child: PopScope(
@@ -607,22 +728,6 @@ class _ListenAndRepeatPlayerScreenState
                             player.currentIndex,
                             highlightedSegments:
                                 currentAttempt?.referenceSegments,
-                            inlineFeedback: switch (currentAttempt) {
-                              final attempt? when attempt.hasFinalFeedback =>
-                                SpeechRatingBadge(
-                                  l10n: l10n,
-                                  attempt: attempt,
-                                  isPlaying:
-                                      speechState.playingPromptId ==
-                                      currentPromptId,
-                                  onTap: attempt.hasRecording
-                                      ? () => _handleAttemptPlaybackTap(
-                                          currentPromptId,
-                                        )
-                                      : null,
-                                ),
-                              _ => null,
-                            },
                           )
                         : const SizedBox.shrink(),
                   ),
@@ -639,12 +744,39 @@ class _ListenAndRepeatPlayerScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 录音面板 / 播放提示
-                    // 自动模式 idle 阶段不显示，避免蓝→红闪烁；手动模式需要显示蓝色按钮
-                    if (playerState.isPauseBetweenPlays &&
-                        (playerState.settings.isManualMode ||
-                            turnState.phase !=
-                                ListenAndRepeatTurnPhase.idle))
+                    // 评级 badge（点击播放录音），和复述页面同位置
+                    if (currentAttempt != null && currentAttempt.score != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                        child: Center(
+                          child: SpeechRatingBadge(
+                            l10n: l10n,
+                            attempt: currentAttempt,
+                            isPlaying: _playingPromptId == currentPromptId,
+                            onTap: currentAttempt.hasRecording
+                                ? () =>
+                                      _handleAttemptPlaybackTap(currentPromptId)
+                                : null,
+                          ),
+                        ),
+                      ),
+                    // 评估后倒计时 / 录音面板（和复述页面同构）
+                    if (_isPostEvalCountdown(playerState))
+                      _PostEvalCountdown(
+                        playerState: playerState,
+                        onFastForward: () => ref
+                            .read(listenAndRepeatPlayerProvider.notifier)
+                            .completePausedTurn(),
+                        onCountdownTap: () {
+                          final p = ref.read(
+                            listenAndRepeatPlayerProvider.notifier,
+                          );
+                          playerState.isCountdownPaused
+                              ? p.resumePostEvalCountdown()
+                              : p.pausePostEvalCountdown();
+                        },
+                      )
+                    else if (playerState.isPauseBetweenPlays)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.m),
                         child: SpeechPracticeTurnPanel(
@@ -652,39 +784,28 @@ class _ListenAndRepeatPlayerScreenState
                           turnState: turnState,
                           isRecordingCurrent: isRecordingCurrent,
                           onRecordTap: _handleRecordTap,
-                          onFastForward: () {
-                            ref
-                                .read(
-                                  listenAndRepeatTurnControllerProvider
-                                      .notifier,
-                                )
-                                .fastForwardReviewCountdown();
-                          },
-                          onCountdownTap: turnState.isReviewCountdownPaused
-                              ? () => ref
-                                    .read(
-                                      listenAndRepeatTurnControllerProvider
-                                          .notifier,
-                                    )
-                                    .resumeReviewCountdown()
-                              : () => ref
-                                    .read(
-                                      listenAndRepeatTurnControllerProvider
-                                          .notifier,
-                                    )
-                                    .pauseReviewCountdown(),
+                          currentAttempt: currentAttempt,
                         ),
                       ),
                     // 播放控制
                     _PlaybackControls(
                       playerState: playerState,
                       onPrevious: () {
-                        unawaited(_prepareForExternalPlaybackAction());
+                        _manualStoppedThisSentence = false;
+                        unawaited(_cancelRecordingAndPlayback());
+                        ref
+                            .read(shadowingRecordingControllerProvider.notifier)
+                            .clearRecording();
                         unawaited(player.goToPrevious());
                       },
                       onNext: () {
-                        unawaited(_prepareForExternalPlaybackAction());
-                        final isLast = playerState.currentSentenceIndex >=
+                        _manualStoppedThisSentence = false;
+                        unawaited(_cancelRecordingAndPlayback());
+                        ref
+                            .read(shadowingRecordingControllerProvider.notifier)
+                            .clearRecording();
+                        final isLast =
+                            playerState.currentSentenceIndex >=
                             playerState.totalSentences - 1;
                         if (isLast) {
                           // 最后一句：直接完成
@@ -694,8 +815,14 @@ class _ListenAndRepeatPlayerScreenState
                         }
                       },
                       onPlayPause: () {
-                        unawaited(_prepareForExternalPlaybackAction());
+                        unawaited(_cancelRecordingAndPlayback());
                         if (playerState.isPauseBetweenPlays) {
+                          _manualStoppedThisSentence = false;
+                          ref
+                              .read(
+                                shadowingRecordingControllerProvider.notifier,
+                              )
+                              .clearRecording();
                           player.replayDuringCountdown();
                         } else if (playerState.isPlaying) {
                           player.pause();
@@ -725,6 +852,60 @@ class _ListenAndRepeatPlayerScreenState
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 是否处于评估后倒计时状态（对应复述页面的 isRetellCountdown）
+bool _isPostEvalCountdown(ListenAndRepeatPlayerState playerState) {
+  return playerState.isPostEvalCountdown;
+}
+
+/// 评估后倒计时组件：CountdownChip + 快进按钮
+class _PostEvalCountdown extends StatelessWidget {
+  final ListenAndRepeatPlayerState playerState;
+  final VoidCallback onFastForward;
+  final VoidCallback onCountdownTap;
+
+  const _PostEvalCountdown({
+    required this.playerState,
+    required this.onFastForward,
+    required this.onCountdownTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.m),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 24 + AppSpacing.xs),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(width: 32),
+              const SizedBox(width: 48),
+              CountdownChip(
+                remaining: playerState.pauseRemaining,
+                total: playerState.pauseDuration,
+                isPaused: playerState.isCountdownPaused,
+                onTap: onCountdownTap,
+              ),
+              const SizedBox(width: 48),
+              GestureDetector(
+                onTap: onFastForward,
+                child: Icon(
+                  Icons.fast_forward_rounded,
+                  size: 32,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

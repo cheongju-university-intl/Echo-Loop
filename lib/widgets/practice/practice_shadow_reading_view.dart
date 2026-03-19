@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/speech_practice_models.dart';
 import '../../providers/learning_session/review_difficult_practice_provider.dart';
-import '../../providers/listen_and_repeat_turn_controller_provider.dart';
+import '../../providers/listen_and_repeat_turn_controller_provider.dart'
+    show ListenAndRepeatTurnPhase, ListenAndRepeatTurnState;
 import '../../providers/sentence_ai_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/countdown_chip.dart';
@@ -19,11 +20,8 @@ import '../../widgets/listen_and_repeat/speech_practice_turn_panel.dart';
 
 /// 录音配置（包装所有录音相关参数）
 class RecordingConfig {
-  /// TurnController 状态
+  /// 录音控制器状态
   final ListenAndRepeatTurnState turnState;
-
-  /// 录音会话状态
-  final SpeechPracticeSessionState speechState;
 
   /// 当前句子的 promptId
   final String currentPromptId;
@@ -34,29 +32,48 @@ class RecordingConfig {
   /// 是否正在录制当前句子
   final bool isRecordingCurrent;
 
+  /// 是否正在播放当前句子的录音回放
+  final bool isPlayingAttempt;
+
   /// 录音按钮点击
   final VoidCallback onRecordTap;
 
   /// 录音回放点击
   final void Function(String) onAttemptPlaybackTap;
 
-  /// 快进回顾倒计时
+  /// 评估后倒计时剩余时长（由 player provider 驱动）
+  final Duration pauseRemaining;
+
+  /// 评估后倒计时总时长
+  final Duration pauseDuration;
+
+  /// 倒计时是否暂停
+  final bool isCountdownPaused;
+
+  /// 快进倒计时
   final VoidCallback onFastForward;
 
-  /// 暂停/恢复回顾倒计时
+  /// 暂停/恢复倒计时
   final VoidCallback onCountdownTap;
 
   const RecordingConfig({
     required this.turnState,
-    required this.speechState,
     required this.currentPromptId,
     required this.currentAttempt,
     required this.isRecordingCurrent,
+    required this.isPlayingAttempt,
     required this.onRecordTap,
     required this.onAttemptPlaybackTap,
+    this.pauseRemaining = Duration.zero,
+    this.pauseDuration = Duration.zero,
+    this.isCountdownPaused = false,
+    this.isPostEvalCountdown = false,
     required this.onFastForward,
     required this.onCountdownTap,
   });
+
+  /// 是否处于评估后倒计时状态（由外部 playerState.isPostEvalCountdown 传入）
+  final bool isPostEvalCountdown;
 }
 
 /// 跟读模式视图（听不懂 → 显示字幕 + 可选自动录音 + 评分反馈）
@@ -106,12 +123,13 @@ class PracticeShadowReadingView extends StatelessWidget {
     final cachedAnalysisText = cachedAnalysis?.toDisplayString();
 
     final rec = recording;
-    // 自动模式 idle 阶段不显示录音面板，避免蓝→红闪烁（等 ensureAutoTurn 启动后再显示）
-    // 手动模式下 idle 是正常待录音状态，需要显示蓝色按钮
-    final shouldShowTurnPanel = rec != null &&
-        playerState.isPauseBetweenPlays &&
-        (playerState.settings.isManualMode ||
-            rec.turnState.phase != ListenAndRepeatTurnPhase.idle);
+
+    // 倒计时中：直接显示 CountdownChip（和复述页面一致）
+    final isCountdown = rec != null && rec.isPostEvalCountdown;
+
+    // 录音面板：非倒计时 + 停顿中（和复述页面同构：不在倒计时就显示录音按钮）
+    final shouldShowTurnPanel =
+        !isCountdown && rec != null && playerState.isPauseBetweenPlays;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
@@ -130,20 +148,6 @@ class PracticeShadowReadingView extends StatelessWidget {
                 audioItemId: audioItemId,
                 sentenceIndex: sentenceIndex,
                 highlightedSegments: rec?.currentAttempt?.referenceSegments,
-                inlineFeedback: switch (rec?.currentAttempt) {
-                  final attempt? when attempt.hasFinalFeedback =>
-                    SpeechRatingBadge(
-                      l10n: l10n,
-                      attempt: attempt,
-                      isPlaying:
-                          rec!.speechState.playingPromptId ==
-                          rec.currentPromptId,
-                      onTap: attempt.hasRecording
-                          ? () => rec.onAttemptPlaybackTap(rec.currentPromptId)
-                          : null,
-                    ),
-                  _ => null,
-                },
                 onRequestTranslation: ai != null
                     ? () async {
                         final result = await ai.getTranslation(text);
@@ -162,9 +166,62 @@ class PracticeShadowReadingView extends StatelessWidget {
             ),
           ),
 
+          // 评级 badge（点击播放录音），和复述页面同位置
+          if (rec != null &&
+              rec.currentAttempt != null &&
+              rec.currentAttempt!.score != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: Center(
+                child: SpeechRatingBadge(
+                  l10n: l10n,
+                  attempt: rec.currentAttempt!,
+                  isPlaying: rec.isPlayingAttempt,
+                  onTap: rec.currentAttempt!.hasRecording
+                      ? () => rec.onAttemptPlaybackTap(rec.currentPromptId)
+                      : null,
+                ),
+              ),
+            ),
+
           // 底部固定区域
-          if (shouldShowTurnPanel)
-            // 有录音配置：显示录音面板
+          if (isCountdown)
+            // 评估后倒计时：CountdownChip + 快进按钮（和复述页面一致）
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.m),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 24 + AppSpacing.xs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(width: 32),
+                      const SizedBox(width: 48),
+                      CountdownChip(
+                        remaining: rec.pauseRemaining,
+                        total: rec.pauseDuration,
+                        isPaused: rec.isCountdownPaused,
+                        onTap: rec.onCountdownTap,
+                      ),
+                      const SizedBox(width: 48),
+                      GestureDetector(
+                        onTap: rec.onFastForward,
+                        child: Icon(
+                          Icons.fast_forward_rounded,
+                          size: 32,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          else if (shouldShowTurnPanel)
+            // 录音面板
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.m),
               child: SpeechPracticeTurnPanel(
@@ -172,8 +229,7 @@ class PracticeShadowReadingView extends StatelessWidget {
                 turnState: rec.turnState,
                 isRecordingCurrent: rec.isRecordingCurrent,
                 onRecordTap: rec.onRecordTap,
-                onFastForward: rec.onFastForward,
-                onCountdownTap: rec.onCountdownTap,
+                currentAttempt: rec.currentAttempt,
               ),
             )
           else if (rec == null && playerState.isPauseBetweenPlays)

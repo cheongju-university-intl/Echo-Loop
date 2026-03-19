@@ -1,7 +1,25 @@
 # Fluency 任务清单
 
-> 最后更新：2026-03-13
+> 最后更新：2026-03-19
 > 当前焦点：录音+识别功能
+
+## 已完成：跟读录音控制器独立实现 + UI 优化
+- [x] 新增 `ShadowingRecordingController` 替代跟读场景对 `retellRecordingControllerProvider` 的复用
+- [x] 扩展 `ListenAndRepeatTurnState` 新增录音相关字段（currentAttempt / liveTranscript / permissions 等）
+- [x] 三个页面（跟读/难句补练/收藏复习）统一切换到 `shadowingRecordingControllerProvider`
+- [x] `exitLearningMode` 按模式调用对应录音控制器 fullReset
+- [x] 删除旧 `ListenAndRepeatTurnController` 及 `_mapToTurnState` 映射
+- [x] 评估后倒计时：`isPostEvalCountdown` 标志（对应复述的 `isRetellCountdown`）
+- [x] 倒计时 UI 直接用 player state 驱动（不再合成 turnState）
+- [x] 倒计时暂停/恢复/取消（`pausePostEvalCountdown` / `cancelPostEvalCountdown`）
+- [x] 评级 badge 移到录音按钮上方（和复述页面同位置）
+- [x] 错误提示（未检测到英语等）显示在录音按钮上方状态文字区
+- [x] 手动模式录音兜底：开始即启动 300s 上限，检测到语音后 max(300s, 5×自动时长)
+- [x] 更新测试（provider 测试 + screen 测试 + mock 测试辅助类）
+
+  **完成时间**: 2026-03-19
+
+---
 
 ## 历史归档
 - [Milestone 2 - 学习流程引擎](./docs/tasks-archive/milestone-2-learning-engine.md)
@@ -97,6 +115,7 @@
   **录音 UI 优化**: 2026-03-13（大圆形录音按钮+脉冲/波纹动画、manualFallback 重录 bug 修复、继续按钮 FilledButton.tonal 升级、倒计时圆环放大）
   **录音延迟优化**: 2026-03-13（AVAudioEngine 常驻 + warmup/shutdown 生命周期 + 双路径 startSession）
   **难句补练接入录音**: 2026-03-14（提取共享 UI 组件、回调注入解耦 TurnController、难句补练跟读模式接入自动录音，流程与跟读页完全一致）
+  **录音架构统一**: 2026-03-19（跟读/难句补练/收藏复习三个页面从 SpeechPracticeSession + ListenAndRepeatTurnController 迁移到 RetellRecordingController + AudioPlaybackService，与复述页面共享录音架构）
 
 ## 已完成：本地词典功能
 
