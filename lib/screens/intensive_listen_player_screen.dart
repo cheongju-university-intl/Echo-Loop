@@ -651,9 +651,9 @@ class _IntensiveListenPlayerScreenState
                         padding: const EdgeInsets.only(bottom: AppSpacing.m),
                         child: Text(
                           l10n.intensiveListenReplayingWithSubtitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                       ),
