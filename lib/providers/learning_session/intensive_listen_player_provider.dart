@@ -489,15 +489,29 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       clampedPlayCount = newSettings.repeatCount;
     }
 
-    final needRestart = newSettings.repeatCount != state.settings.repeatCount ||
-        newSettings.controlMode != state.settings.controlMode;
+    final switchedToManual = newSettings.isManualMode &&
+        !state.settings.isManualMode;
 
     state = state.copyWith(
       settings: newSettings,
       currentPlayCount: clampedPlayCount,
     );
 
+    // 切换到手动模式时，停在当前句子，取消一切异步操作
+    if (switchedToManual) {
+      _invalidateSession();
+      state = state.copyWith(
+        isPlaying: false,
+        isPauseBetweenPlays: false,
+        isPauseBetweenSentences: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+      );
+      return;
+    }
+
     // repeatCount 变化时中断当前循环，以新设置重新开始
+    final needRestart = newSettings.repeatCount != state.settings.repeatCount;
     if (needRestart && state.isPlaying) {
       _invalidateSession();
       _startSentence();

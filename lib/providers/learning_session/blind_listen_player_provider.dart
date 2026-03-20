@@ -264,15 +264,24 @@ class BlindListenPlayer extends _$BlindListenPlayer {
 
   /// 更新设置
   ///
-  /// 切换到手动模式时，取消正在进行的倒计时。
+  /// 切换到手动模式时，停在当前段落，取消一切异步操作。
   void updateSettings(BlindListenSettings newSettings) {
     final switchedToManual = newSettings.isManualMode &&
         !state.settings.isManualMode;
 
     state = state.copyWith(settings: newSettings);
 
-    if (switchedToManual && state.isPauseCountdown) {
-      cancelCountdown();
+    if (switchedToManual) {
+      final engine = ref.read(audioEngineProvider.notifier);
+      _sessionId = engine.newSession();
+      _positionSub?.cancel();
+      _invalidateCountdown();
+      engine.stopPlayback();
+      state = state.copyWith(
+        isPlaying: false,
+        isPauseCountdown: false,
+        isCountdownPaused: false,
+      );
     }
   }
 
