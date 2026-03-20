@@ -828,7 +828,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intensiveListenPauseLabel => 'Pause between sentences';
 
   @override
-  String get intensiveListenPauseSmart => 'Smart';
+  String get intensiveListenPauseSmart => 'Auto';
 
   @override
   String get intensiveListenPauseFixed => 'Fixed';

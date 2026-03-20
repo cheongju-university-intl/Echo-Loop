@@ -207,6 +207,7 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
             onSelectionChanged: (selected) {
               onUpdate(ref, settings.copyWith(controlMode: selected.first));
             },
+            showSelectedIcon: false,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -290,6 +291,7 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
         onSelectionChanged: (selected) {
           onUpdate(ref, settings.copyWith(pauseMode: selected.first));
         },
+        showSelectedIcon: false,
       ),
     );
   }
@@ -323,19 +325,39 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
         );
 
       case PauseMode.fixed:
-        return Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: IntensiveListenSettings.fixedPauseOptions.map((seconds) {
-            final isSelected = settings.fixedPauseSeconds == seconds;
-            return ChoiceChip(
-              label: Text(l10n.intensiveListenPauseFixedUnit(seconds)),
-              selected: isSelected,
-              onSelected: (_) {
-                onUpdate(ref, settings.copyWith(fixedPauseSeconds: seconds));
-              },
-            );
-          }).toList(),
+        final options = IntensiveListenSettings.fixedPauseOptions;
+        final seconds = settings.fixedPauseSeconds;
+        // 将当前值映射到选项索引，保证 divisions 数量少、刻度点清晰可见
+        var idx = options.indexOf(seconds);
+        if (idx < 0) idx = 2; // 回退到 5 秒
+        return Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: idx.toDouble(),
+                min: 0,
+                max: (options.length - 1).toDouble(),
+                divisions: options.length - 1,
+                label: '${options[idx]}s',
+                onChanged: (v) => onUpdate(
+                  ref,
+                  settings.copyWith(
+                    fixedPauseSeconds: options[v.round()],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 36,
+              child: Text(
+                '${seconds}s',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         );
 
       case PauseMode.multiplier:

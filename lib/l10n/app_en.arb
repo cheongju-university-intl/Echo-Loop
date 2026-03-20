@@ -414,7 +414,7 @@
     }
   },
   "intensiveListenPauseLabel": "Pause between sentences",
-  "intensiveListenPauseSmart": "Smart",
+  "intensiveListenPauseSmart": "Auto",
   "intensiveListenPauseFixed": "Fixed",
   "intensiveListenPauseMultiplierMode": "Multiplier",
   "intensiveListenSettingsTemporaryHint": "Settings apply to this session only",

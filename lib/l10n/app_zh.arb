@@ -264,7 +264,7 @@
     }
   },
   "intensiveListenPauseLabel": "句间停顿",
-  "intensiveListenPauseSmart": "智能间隔",
+  "intensiveListenPauseSmart": "自动",
   "intensiveListenPauseFixed": "固定间隔",
   "intensiveListenPauseMultiplierMode": "句长倍数",
   "intensiveListenSettingsTemporaryHint": "设置仅对本次精听有效",

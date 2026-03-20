@@ -814,7 +814,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get intensiveListenPauseLabel => '句间停顿';
 
   @override
-  String get intensiveListenPauseSmart => '智能间隔';
+  String get intensiveListenPauseSmart => '自动';
 
   @override
   String get intensiveListenPauseFixed => '固定间隔';

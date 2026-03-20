@@ -151,6 +151,7 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
                     settings.copyWith(controlMode: selected.first),
                   );
             },
+            showSelectedIcon: false,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -239,6 +240,7 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
               .read(intensiveListenPlayerProvider.notifier)
               .updateSettings(settings.copyWith(pauseMode: selected.first));
         },
+        showSelectedIcon: false,
       ),
     );
   }
@@ -272,23 +274,40 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
         );
 
       case PauseMode.fixed:
-        return Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: IntensiveListenSettings.fixedPauseOptions.map((seconds) {
-            final isSelected = settings.fixedPauseSeconds == seconds;
-            return ChoiceChip(
-              label: Text(l10n.intensiveListenPauseFixedUnit(seconds)),
-              selected: isSelected,
-              onSelected: (_) {
-                ref
-                    .read(intensiveListenPlayerProvider.notifier)
-                    .updateSettings(
-                      settings.copyWith(fixedPauseSeconds: seconds),
-                    );
-              },
-            );
-          }).toList(),
+        final options = IntensiveListenSettings.fixedPauseOptions;
+        var idx = options.indexOf(settings.fixedPauseSeconds);
+        if (idx < 0) idx = 2; // 回退到 5 秒
+        return Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: idx.toDouble(),
+                min: 0,
+                max: (options.length - 1).toDouble(),
+                divisions: options.length - 1,
+                label: '${options[idx]}s',
+                onChanged: (v) {
+                  ref
+                      .read(intensiveListenPlayerProvider.notifier)
+                      .updateSettings(
+                        settings.copyWith(
+                          fixedPauseSeconds: options[v.round()],
+                        ),
+                      );
+                },
+              ),
+            ),
+            SizedBox(
+              width: 36,
+              child: Text(
+                '${settings.fixedPauseSeconds}s',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         );
 
       case PauseMode.multiplier:

@@ -1595,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @intensiveListenPauseSmart.
   ///
   /// In en, this message translates to:
-  /// **'Smart'**
+  /// **'Auto'**
   String get intensiveListenPauseSmart;
 
   /// No description provided for @intensiveListenPauseFixed.

@@ -205,6 +205,7 @@ class _RetellSettingsSheet extends ConsumerWidget {
                     settings.copyWith(controlMode: selected.first),
                   );
             },
+            showSelectedIcon: false,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -330,14 +331,7 @@ class _RetellSettingsSheet extends ConsumerWidget {
             ),
           ],
         ),
-      PauseMode.fixed => _buildChipGrid(
-          items: RetellSettings.fixedPauseOptions,
-          labelBuilder: (v) => '${v}s',
-          selected: (v) => settings.fixedPauseSeconds == v,
-          onSelected: (v) => ref
-              .read(retellPlayerProvider.notifier)
-              .updateSettings(settings.copyWith(fixedPauseSeconds: v)),
-        ),
+      PauseMode.fixed => _buildFixedPauseSlider(theme, settings, ref),
       PauseMode.multiplier => _buildChipGrid(
           items: RetellSettings.multiplierOptions,
           labelBuilder: (v) =>
@@ -348,6 +342,47 @@ class _RetellSettingsSheet extends ConsumerWidget {
               .updateSettings(settings.copyWith(pauseMultiplier: v)),
         ),
     };
+  }
+
+  /// 固定间隔滑块（索引映射，刻度清晰可见）
+  Widget _buildFixedPauseSlider(
+    ThemeData theme,
+    RetellSettings settings,
+    WidgetRef ref,
+  ) {
+    final options = RetellSettings.fixedPauseOptions;
+    var idx = options.indexOf(settings.fixedPauseSeconds);
+    if (idx < 0) idx = 2; // 回退到 30s
+    return Row(
+      children: [
+        Expanded(
+          child: Slider(
+            value: idx.toDouble(),
+            min: 0,
+            max: (options.length - 1).toDouble(),
+            divisions: options.length - 1,
+            label: '${options[idx]}s',
+            onChanged: (v) {
+              ref.read(retellPlayerProvider.notifier).updateSettings(
+                    settings.copyWith(
+                      fixedPauseSeconds: options[v.round()],
+                    ),
+                  );
+            },
+          ),
+        ),
+        SizedBox(
+          width: 42,
+          child: Text(
+            '${settings.fixedPauseSeconds}s',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// 等宽网格排列 ChoiceChip，每行 4 个
