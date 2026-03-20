@@ -788,6 +788,26 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
   bool _isPlaying = false;
   bool _isExpanded = false;
 
+  /// 源音频名称（异步加载）
+  String? _audioName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAudioName();
+  }
+
+  /// 加载源音频名称
+  Future<void> _loadAudioName() async {
+    final audioId = widget.savedWord.audioItemId;
+    if (audioId == null) return;
+    final dao = ref.read(audioItemDaoProvider);
+    final row = await dao.getById(audioId);
+    if (mounted && row != null) {
+      setState(() => _audioName = row.name);
+    }
+  }
+
   /// 播放来源句子的原声片段
   ///
   /// 优先使用冗余存储的 sentenceStartMs/sentenceEndMs（不依赖字幕文件），
@@ -1005,6 +1025,44 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+
+                    // 源音频引用
+                    if (_audioName != null &&
+                        word.audioItemId != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () => context.push(
+                            AppRoutes.audioLearningPlan(word.audioItemId!),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.headphones,
+                                size: 12,
+                                color: theme.colorScheme.outline
+                                    .withValues(alpha: 0.6),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  l10n.bookmarkReviewFromAudio(_audioName!),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.outline
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],

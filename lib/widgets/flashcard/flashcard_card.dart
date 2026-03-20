@@ -9,12 +9,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/audio_item.dart' as model;
 import '../../models/dict_entry.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
 import '../../providers/flashcard/flashcard_provider.dart';
+import '../../router/app_router.dart';
 import '../../services/tts_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -258,11 +261,27 @@ class _BackContent extends ConsumerStatefulWidget {
 class _BackContentState extends ConsumerState<_BackContent> {
   bool _isPlaying = false;
 
+  /// 源音频名称（异步加载）
+  String? _audioName;
+
   @override
   void initState() {
     super.initState();
     // 翻转到背面时：先 TTS 朗读单词（如开启），再自动播放来源例句（如开启）
     _autoPlayOnFlipToBack();
+    // 异步加载源音频名称
+    _loadAudioName();
+  }
+
+  /// 加载源音频名称
+  Future<void> _loadAudioName() async {
+    final audioId = widget.item.savedWord.audioItemId;
+    if (audioId == null) return;
+    final dao = ref.read(audioItemDaoProvider);
+    final row = await dao.getById(audioId);
+    if (mounted && row != null) {
+      setState(() => _audioName = row.name);
+    }
   }
 
   /// 翻转到背面时的自动播放逻辑
@@ -382,6 +401,16 @@ class _BackContentState extends ConsumerState<_BackContent> {
                         const Divider(height: 1),
                         const SizedBox(height: AppSpacing.m),
                         _buildSentenceRow(theme, word),
+                      ],
+
+                      // 源音频引用
+                      if (_audioName != null &&
+                          word.audioItemId != null) ...[
+                        const SizedBox(height: AppSpacing.s),
+                        _AudioSourceLink(
+                          audioName: _audioName!,
+                          audioItemId: word.audioItemId!,
+                        ),
                       ],
                     ],
                   ),
@@ -654,6 +683,52 @@ class _UnsaveButton extends StatelessWidget {
           tooltip: l10n.flashcardUnsaveHint,
         ),
       ],
+    );
+  }
+}
+
+/// 源音频引用链接（小字弱化，右对齐，点击跳转学习计划）
+class _AudioSourceLink extends StatelessWidget {
+  final String audioName;
+  final String audioItemId;
+
+  const _AudioSourceLink({
+    required this.audioName,
+    required this.audioItemId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GestureDetector(
+        onTap: () => context.push(AppRoutes.audioLearningPlan(audioItemId)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.headphones,
+              size: 12,
+              color: theme.colorScheme.outline.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                l10n.bookmarkReviewFromAudio(audioName),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  color: theme.colorScheme.outline.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
