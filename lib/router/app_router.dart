@@ -40,8 +40,15 @@ abstract class AppRoutes {
       '/collections/$collectionId';
 
   /// 学习计划页路径
-  static String learningPlan(String collectionId, String audioId) =>
-      '/collections/$collectionId/$audioId/plan';
+  /// [autoStart] 为 true 时进入后自动弹出学习任务
+  static String learningPlan(
+    String collectionId,
+    String audioId, {
+    bool autoStart = false,
+  }) =>
+      autoStart
+          ? '/collections/$collectionId/$audioId/plan?autoStart=true'
+          : '/collections/$collectionId/$audioId/plan';
 
   /// 播放器页路径
   static String player(String collectionId, String audioId) =>
@@ -248,9 +255,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final collectionId = state.pathParameters['collectionId']!;
           final audioId = state.pathParameters['audioId']!;
+          final autoStart =
+              state.uri.queryParameters['autoStart'] == 'true';
           return LearningPlanScreen(
             collectionId: collectionId,
             audioItemId: audioId,
+            autoStart: autoStart,
           );
         },
       ),

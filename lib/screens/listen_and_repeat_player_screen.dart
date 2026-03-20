@@ -23,15 +23,11 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/listen_and_repeat_player_provider.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
-import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
-import '../models/retell_settings.dart';
 import '../models/speech_practice_models.dart';
-import '../utils/keyword_extraction.dart';
-import '../utils/paragraph_grouping.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/common/countdown_chip.dart';
@@ -40,7 +36,6 @@ import '../widgets/listen_and_repeat/speech_practice_turn_panel.dart';
 import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
-import '../widgets/retell/retell_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 跟读播放器页面
@@ -477,53 +472,30 @@ class _ListenAndRepeatPlayerScreenState
       debugPrint('跟读完成处理出错: $e');
     }
 
-    if (result.action == StepCompleteAction.continueNext) {
-      // 继续下一步：段落复述
-      await _navigateToRetell();
-    } else {
-      // 返回计划 → 退出
-      await _exit();
-    }
-  }
-
-  /// 导航到段落复述播放器
-  ///
-  /// 退出跟读模式 → 显示复述简报弹窗 → 分段 + 提取关键词 → 进入复述模式 → pushReplacement
-  Future<void> _navigateToRetell() async {
     await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;
 
-    final lpState = ref.read(listeningPracticeProvider);
-    if (lpState.sentences.isEmpty) {
-      if (mounted) context.pop();
-      return;
+    if (result.action == StepCompleteAction.continueNext) {
+      _navigateBackToPlanAndAutoStart();
+    } else {
+      context.pop();
     }
+  }
 
-    showRetellBriefingSheet(
-      context: context,
-      sentences: lpState.sentences,
-      defaultSeconds: retellDefaultSeconds(LearningStage.firstLearn),
-      onStartPractice: (targetDuration, _) async {
-        final paragraphs = groupSentencesIntoParagraphs(
-          lpState.sentences,
-          targetDuration,
-        );
-        final keywordsMap = extractKeywords(
-          lpState.sentences,
-          ratio: KeywordRatio.oneThird,
-        );
-
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
-        if (mounted) {
-          context.pushReplacement(
-            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
+  /// 返回学习计划页并自动启动下一个任务
+  void _navigateBackToPlanAndAutoStart() {
+    if (!mounted) return;
+    final route = widget.collectionId != null
+        ? AppRoutes.learningPlan(
+            widget.collectionId!, widget.audioItemId,
+            autoStart: true,
+          )
+        : AppRoutes.audioLearningPlan(
+            widget.audioItemId,
+            autoStart: true,
           );
-        }
-      },
-    );
+    context.pushReplacement(route);
   }
 
   @override

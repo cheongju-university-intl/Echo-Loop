@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../database/providers.dart';
+import '../router/app_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
@@ -412,15 +413,29 @@ class _ReviewDifficultPracticeScreenState
       debugPrint('难句补练完成处理出错: $e');
     }
 
+    await ref.read(learningSessionProvider.notifier).exitLearningMode();
+    if (!mounted) return;
+
     if (result.action == StepCompleteAction.continueNext && stepCtx.nextStepName != null) {
-      // 继续下一步 → 退出当前模式，返回计划页让路由分发
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) context.pop();
+      _navigateBackToPlanAndAutoStart();
     } else {
-      // 返回计划 → 退出
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) context.pop();
+      context.pop();
     }
+  }
+
+  /// 返回学习计划页并自动启动下一个任务
+  void _navigateBackToPlanAndAutoStart() {
+    if (!mounted) return;
+    final route = widget.collectionId != null
+        ? AppRoutes.learningPlan(
+            widget.collectionId!, widget.audioItemId,
+            autoStart: true,
+          )
+        : AppRoutes.audioLearningPlan(
+            widget.audioItemId,
+            autoStart: true,
+          );
+    context.pushReplacement(route);
   }
 
   @override

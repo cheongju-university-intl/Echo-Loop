@@ -17,21 +17,15 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/intensive_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
-import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/intensive_listen/intensive_listen_settings_sheet.dart';
-import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/player_hotkey_scope.dart';
-import '../widgets/retell/retell_briefing_sheet.dart';
-import '../models/retell_settings.dart';
-import '../utils/keyword_extraction.dart';
-import '../utils/paragraph_grouping.dart';
 
 /// 精听播放器页面
 class IntensiveListenPlayerScreen extends ConsumerStatefulWidget {
@@ -245,86 +239,19 @@ class _IntensiveListenPlayerScreenState
   ///
   /// 精听完成后调用，读取难句书签并进入跟读。
   /// 0 个难句时显示 SnackBar 提示并 pop 回计划页。
-  Future<void> _startListenAndRepeat() async {
-    final l10n = AppLocalizations.of(context)!;
-    final lpState = ref.read(listeningPracticeProvider);
-
-    if (lpState.sentences.isEmpty) {
-      context.pop();
-      return;
-    }
-
-    final difficultCount = await _loadTotalDifficultCount();
+  /// 返回学习计划页并自动启动下一个任务
+  void _navigateBackToPlanAndAutoStart() {
     if (!mounted) return;
-
-    if (difficultCount == 0) {
-      // 无难句 → 自动完成跟读，推进到复述
-      await ref
-          .read(learningProgressNotifierProvider.notifier)
-          .completeCurrentSubStage(widget.audioItemId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
-      );
-      // 退出精听模式后导航到段落复述
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (!mounted) return;
-      _navigateToRetell();
-      return;
-    }
-
-    showListenAndRepeatBriefingSheet(
-      context: context,
-      difficultCount: difficultCount,
-      playCount: 3, // 默认遍数（实际由难度决定，此处为预览估值）
-      onStartPractice: () async {
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
-        if (mounted) {
-          context.pushReplacement(
-            AppRoutes.listenAndRepeatPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
+    final route = widget.collectionId != null
+        ? AppRoutes.learningPlan(
+            widget.collectionId!, widget.audioItemId,
+            autoStart: true,
+          )
+        : AppRoutes.audioLearningPlan(
+            widget.audioItemId,
+            autoStart: true,
           );
-        }
-      },
-    );
-  }
-
-  /// 导航到段落复述（跳过跟读后使用）
-  void _navigateToRetell() {
-    final lpState = ref.read(listeningPracticeProvider);
-    if (lpState.sentences.isEmpty) {
-      context.pop();
-      return;
-    }
-
-    showRetellBriefingSheet(
-      context: context,
-      sentences: lpState.sentences,
-      defaultSeconds: retellDefaultSeconds(LearningStage.firstLearn),
-      onStartPractice: (targetDuration, _) async {
-        final paragraphs = groupSentencesIntoParagraphs(
-          lpState.sentences,
-          targetDuration,
-        );
-        final keywordsMap = extractKeywords(
-          lpState.sentences,
-          ratio: KeywordRatio.oneThird,
-        );
-
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
-        if (mounted) {
-          context.pushReplacement(
-            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
-          );
-        }
-      },
-    );
+    context.pushReplacement(route);
   }
 
   /// 获取当前步骤的上下文信息
@@ -486,16 +413,13 @@ class _IntensiveListenPlayerScreenState
       debugPrint('精听完成处理出错: $e');
     }
 
+    await ref.read(learningSessionProvider.notifier).exitLearningMode();
+    if (!mounted) return;
+
     if (result.action == StepCompleteAction.continueNext) {
-      // 继续下一步 → 进入难句跟读
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) {
-        _startListenAndRepeat();
-      }
+      _navigateBackToPlanAndAutoStart();
     } else {
-      // 返回计划 → 退出
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) context.pop();
+      context.pop();
     }
   }
 

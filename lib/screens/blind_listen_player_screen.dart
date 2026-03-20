@@ -19,7 +19,6 @@ import '../models/retell_settings.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/blind_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
-import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
@@ -30,13 +29,8 @@ import '../widgets/common/paragraph_progress_header.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
-import '../widgets/retell/retell_briefing_sheet.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
-import '../database/providers.dart';
 import '../providers/learning_session/retell_player_provider.dart';
-import '../utils/keyword_extraction.dart';
-import '../utils/paragraph_grouping.dart';
-import '../providers/listening_practice/bookmark_manager.dart';
 
 /// 盲听播放器页面
 class BlindListenPlayerScreen extends ConsumerStatefulWidget {
@@ -158,12 +152,13 @@ class _BlindListenPlayerScreenState
       debugPrint('盲听完成处理出错: $e');
     }
 
+    await ref.read(learningSessionProvider.notifier).exitLearningMode();
+    if (!mounted) return;
+
     if (result.action == StepCompleteAction.continueNext) {
-      await _navigateToNextStep();
+      _navigateBackToPlanAndAutoStart();
     } else {
-      // back：返回计划页
-      if (mounted) context.pop();
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
+      context.pop();
     }
   }
 
@@ -215,164 +210,19 @@ class _BlindListenPlayerScreenState
     );
   }
 
-  /// 导航到下一个子步骤
-  Future<void> _navigateToNextStep() async {
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[widget.audioItemId];
-    if (progress == null || !mounted) {
-      if (mounted) context.pop();
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      return;
-    }
-
-    final nextSubStage = progress.currentSubStage;
-
-    if (nextSubStage == SubStageType.intensiveListen) {
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (!mounted) return;
-
-      final lpState = ref.read(listeningPracticeProvider);
-      if (lpState.sentences.isEmpty) {
-        if (mounted) context.pop();
-        return;
-      }
-
-      await ref
-          .read(learningSessionProvider.notifier)
-          .enterIntensiveListenMode(widget.audioItemId, lpState.sentences);
-      if (mounted) {
-        context.pushReplacement(
-          AppRoutes.intensiveListenPlayer(
-            widget.collectionId,
-            widget.audioItemId,
-          ),
-        );
-      }
-    } else if (nextSubStage == SubStageType.reviewDifficultPractice) {
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (!mounted) return;
-
-      final lpState = ref.read(listeningPracticeProvider);
-      if (lpState.sentences.isEmpty) {
-        if (mounted) context.pop();
-        return;
-      }
-
-      final bookmarkDao = ref.read(bookmarkDaoProvider);
-      final bookmarks = await BookmarkManager.loadBookmarks(
-        widget.audioItemId,
-        dao: bookmarkDao,
-      );
-      if (!mounted) return;
-
-      if (bookmarks.isEmpty) {
-        final l10n = AppLocalizations.of(context)!;
-        await ref
-            .read(learningProgressNotifierProvider.notifier)
-            .completeCurrentSubStage(widget.audioItemId);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.reviewDifficultPracticeNone)),
-        );
-        _navigateToReviewRetell();
-        return;
-      }
-
-      await ref
-          .read(learningSessionProvider.notifier)
-          .enterReviewDifficultPracticeMode(
-            widget.audioItemId,
-            lpState.sentences,
-          );
-      if (mounted) {
-        context.pushReplacement(
-          AppRoutes.reviewDifficultPractice(
-            widget.collectionId,
-            widget.audioItemId,
-          ),
-        );
-      }
-    } else {
-      if (mounted) context.pop();
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-    }
-  }
-
-  /// 导航到复习复述
-  void _navigateToReviewRetell() {
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[widget.audioItemId];
-    if (progress == null || !mounted) {
-      if (mounted) context.pop();
-      return;
-    }
-
-    final lpState = ref.read(listeningPracticeProvider);
-    if (lpState.sentences.isEmpty) {
-      context.pop();
-      return;
-    }
-
-    final nextSubStage = progress.currentSubStage;
-    if (nextSubStage == SubStageType.reviewRetellSummary) {
-      final keywordsMap = extractKeywords(
-        lpState.sentences,
-        ratio: KeywordRatio.oneThird,
-      );
-      ref
-          .read(learningSessionProvider.notifier)
-          .enterRetellMode(
-            widget.audioItemId,
-            [lpState.sentences],
-            keywordsMap,
+  /// 返回学习计划页并自动启动下一个任务
+  void _navigateBackToPlanAndAutoStart() {
+    if (!mounted) return;
+    final route = widget.collectionId != null
+        ? AppRoutes.learningPlan(
+            widget.collectionId!, widget.audioItemId,
+            autoStart: true,
           )
-          .then((_) {
-        if (mounted) {
-          context.pushReplacement(
-            AppRoutes.retellPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
+        : AppRoutes.audioLearningPlan(
+            widget.audioItemId,
+            autoStart: true,
           );
-        }
-      });
-    } else if (nextSubStage == SubStageType.reviewRetellParagraph) {
-      final currentStage = progress.currentStage;
-      showRetellBriefingSheet(
-        context: context,
-        sentences: lpState.sentences,
-        defaultSeconds: retellDefaultSeconds(currentStage),
-        onStartPractice: (targetDuration, _) async {
-          final paragraphs = groupSentencesIntoParagraphs(
-            lpState.sentences,
-            targetDuration,
-          );
-          final keywordsMap = extractKeywords(
-            lpState.sentences,
-            ratio: KeywordRatio.oneThird,
-          );
-          await ref
-              .read(learningSessionProvider.notifier)
-              .enterRetellMode(
-                widget.audioItemId,
-                paragraphs,
-                keywordsMap,
-              );
-          if (mounted) {
-            context.pushReplacement(
-              AppRoutes.retellPlayer(
-                widget.collectionId,
-                widget.audioItemId,
-              ),
-            );
-          }
-        },
-      );
-    } else {
-      context.pop();
-    }
+    context.pushReplacement(route);
   }
 
   // ========== 退出处理 ==========
