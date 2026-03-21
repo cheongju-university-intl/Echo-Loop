@@ -15,6 +15,7 @@ import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/review_reminder_provider.dart';
+import '../providers/study_stats_provider.dart';
 import '../providers/study_task_provider.dart';
 import '../providers/tag_provider.dart';
 import '../providers/time_provider.dart';
@@ -90,6 +91,25 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
+  /// 切换 tab 时调用，切到学习 tab 时刷新数据
+  void _onTabSelected(int index) {
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
+    // 切换到学习 tab 时刷新数据
+    if (index == 1) {
+      _refreshStudyData();
+    }
+  }
+
+  /// 刷新学习页数据，确保时间相关计算和统计使用最新值
+  void _refreshStudyData() {
+    ref.invalidate(studyTaskProvider);
+    ref.invalidate(completedAudioProvider);
+    ref.read(studyStatsNotifierProvider.notifier).refresh();
+  }
+
   Future<void> _syncDailyReminder(int pendingTaskCount) async {
     final service = ref.read(reviewReminderServiceProvider);
     await service.syncDailyReminder(pendingTaskCount: pendingTaskCount);
@@ -149,13 +169,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 NavigationRail(
                   extended: constraints.maxWidth >= 800,
                   selectedIndex: widget.navigationShell.currentIndex,
-                  onDestinationSelected: (index) {
-                    widget.navigationShell.goBranch(
-                      index,
-                      initialLocation:
-                          index == widget.navigationShell.currentIndex,
-                    );
-                  },
+                  onDestinationSelected: _onTabSelected,
                   destinations: [
                     NavigationRailDestination(
                       icon: const Icon(Icons.library_music_outlined),
@@ -198,13 +212,7 @@ class _MainShellState extends ConsumerState<MainShell> {
               ? null
               : NavigationBar(
                   selectedIndex: widget.navigationShell.currentIndex,
-                  onDestinationSelected: (index) {
-                    widget.navigationShell.goBranch(
-                      index,
-                      initialLocation:
-                          index == widget.navigationShell.currentIndex,
-                    );
-                  },
+                  onDestinationSelected: _onTabSelected,
                   labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                   destinations: [
                     NavigationDestination(
