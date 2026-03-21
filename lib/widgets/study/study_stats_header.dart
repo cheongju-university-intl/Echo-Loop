@@ -626,14 +626,14 @@ class CefrRecommendationTable extends StatelessWidget {
     final theme = Theme.of(context);
     final isListening = highlightColumn == HighlightColumn.listening;
 
-    // 基于 CEFR 各级别参考数据（取中间值）：
-    //   初级: 日总 ~53min, 输入 30–45min → 38min, 输出 10–15min → 13min
-    //   中级: 日总 ~68min, 输入 35–45min → 40min, 输出 25–30min → 28min
-    //   高级: 日总 ~75min, 输入 30–45min → 38min, 输出 30–45min → 38min
+    // 基于 CEFR 各级别每日推荐练习时长：
+    //   初级: 听力 12min, 口语 8min, 日总 20min
+    //   中级: 听力 15min, 口语 10min, 日总 25min
+    //   高级: 听力 18min, 口语 12min, 日总 30min
     final levels = [
-      CefrLevel('A1–A2', isZh ? '初级' : 'Beginner', '38', '13', '5,000', '1,700'),
-      CefrLevel('B1–B2', isZh ? '中级' : 'Intermediate', '40', '28', '5,500', '3,500'),
-      CefrLevel('C1–C2', isZh ? '高级' : 'Advanced', '38', '38', '6,000', '5,000'),
+      CefrLevel('A1–A2', isZh ? '初级' : 'Beginner', '12', '8', '5,000', '1,700'),
+      CefrLevel('B1–B2', isZh ? '中级' : 'Intermediate', '15', '10', '5,500', '3,500'),
+      CefrLevel('C1–C2', isZh ? '高级' : 'Advanced', '18', '12', '6,000', '5,000'),
     ];
 
     final listenHeader = isZh ? '听力（输入）' : 'Listening (input)';
@@ -641,8 +641,8 @@ class CefrRecommendationTable extends StatelessWidget {
     final minLabel = isZh ? '分钟' : 'min';
     final wordSuffix = isZh ? '词' : 'w';
     final footnote = isZh
-        ? '输入输出比随水平提升从 ~3:1 趋近 ~1:1'
-        : 'Input/output ratio trends from ~3:1 to ~1:1 as level rises';
+        ? '输入输出比随水平提升从 ~3:2 趋近 ~1:1'
+        : 'Input/output ratio trends from ~3:2 to ~1:1 as level rises';
     final sectionTitle = isZh ? '每日推荐练习量' : 'Daily recommendation';
 
     final tealBg = Colors.teal.withValues(alpha: isListening ? 0.08 : 0.03);

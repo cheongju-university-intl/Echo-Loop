@@ -329,19 +329,20 @@ void main() {
       expect(find.text('Beginner'), findsOneWidget);
       expect(find.text('Intermediate'), findsOneWidget);
       expect(find.text('Advanced'), findsOneWidget);
-      // 听力时长（初级38/高级38 出现2次, 中级40）
-      expect(find.text('38min'), findsAtLeast(2));
-      expect(find.text('40min'), findsOneWidget);
+      // 听力时长
+      expect(find.text('12min'), findsAtLeast(1));
+      expect(find.text('15min'), findsAtLeast(1));
+      expect(find.text('18min'), findsAtLeast(1));
       // 说的时长
-      expect(find.text('13min'), findsOneWidget);
-      expect(find.text('28min'), findsOneWidget);
+      expect(find.text('8min'), findsOneWidget);
+      expect(find.text('10min'), findsAtLeast(1));
       // 输入 + 输出词数（~5,000w 出现 2 次：初级输入 + 高级输出）
       expect(find.text('~5,000w'), findsNWidgets(2));
       expect(find.text('~1,700w'), findsOneWidget);
       // 脚注
       expect(
         find.text(
-          'Input/output ratio trends from ~3:1 to ~1:1 as level rises',
+          'Input/output ratio trends from ~3:2 to ~1:1 as level rises',
         ),
         findsOneWidget,
       );
@@ -366,9 +367,11 @@ void main() {
       expect(find.text('Listening (input)'), findsOneWidget);
       expect(find.text('Speaking (output)'), findsOneWidget);
       // 听 + 说时长都出现
-      expect(find.text('38min'), findsAtLeast(2));
-      expect(find.text('13min'), findsOneWidget);
-      expect(find.text('28min'), findsOneWidget);
+      expect(find.text('12min'), findsAtLeast(1));
+      expect(find.text('15min'), findsAtLeast(1));
+      expect(find.text('18min'), findsAtLeast(1));
+      expect(find.text('8min'), findsOneWidget);
+      expect(find.text('10min'), findsAtLeast(1));
       // 输出词数（~5,000w 出现 2 次：初级输入 + 高级输出）
       expect(find.text('~1,700w'), findsOneWidget);
       expect(find.text('~3,500w'), findsOneWidget);
@@ -402,14 +405,15 @@ void main() {
       expect(find.text('中级'), findsOneWidget);
       expect(find.text('高级'), findsOneWidget);
       // 听力时长
-      expect(find.text('38分钟'), findsAtLeast(2));
-      expect(find.text('40分钟'), findsOneWidget);
+      expect(find.text('12分钟'), findsAtLeast(1));
+      expect(find.text('15分钟'), findsAtLeast(1));
+      expect(find.text('18分钟'), findsAtLeast(1));
       // 说的时长
-      expect(find.text('13分钟'), findsOneWidget);
-      expect(find.text('28分钟'), findsOneWidget);
+      expect(find.text('8分钟'), findsOneWidget);
+      expect(find.text('10分钟'), findsAtLeast(1));
       // 中文脚注
       expect(
-        find.text('输入输出比随水平提升从 ~3:1 趋近 ~1:1'),
+        find.text('输入输出比随水平提升从 ~3:2 趋近 ~1:1'),
         findsOneWidget,
       );
     });
