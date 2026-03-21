@@ -1,5 +1,6 @@
 import AVFoundation
 import Cocoa
+import CoreAudio
 import FlutterMacOS
 import NaturalLanguage
 import Speech
@@ -23,6 +24,10 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   // 引擎级资源（页面常驻，warmup 创建，shutdown 释放）
   private var audioEngine: AVAudioEngine?
   private var cachedRecognizer: SFSpeechRecognizer?
+  private var configChangeObserver: NSObjectProtocol?
+  private var configChangeRestartWorkItem: DispatchWorkItem?
+  private var warmupPendingResult: FlutterResult?
+  private var warmupTimeoutWorkItem: DispatchWorkItem?
   private var isEngineRunning = false
   private var isRecording = false
 
@@ -141,6 +146,10 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   }
 
   /// 预热引擎：创建 AVAudioEngine + installTap + start，页面进入时调用。
+  ///
+  /// 检测到蓝牙输出设备时，会等待 BT 完成 A2DP→HFP 模式切换并重启引擎后
+  /// 才返回成功，确保后续 startSession 在引擎稳定状态下执行。
+  /// 非蓝牙设备立即返回。
   private func warmup(_ arguments: [String: Any]?, result: @escaping FlutterResult) {
     guard microphonePermissionStatus() == "granted", speechPermissionStatus() == "granted" else {
       result(FlutterError(
@@ -151,10 +160,27 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       return
     }
 
-    // 已在运行则直接返回。
-    if isEngineRunning {
+    // 上一次 warmup 还在等 BT 稳定时又被调用，先 resolve 旧 result 避免 Dart 挂起。
+    if let oldResult = warmupPendingResult {
+      warmupPendingResult = nil
+      warmupTimeoutWorkItem?.cancel()
+      warmupTimeoutWorkItem = nil
+      oldResult(FlutterError(
+        code: SpeechPracticeMacError.recordingFailed.rawValue,
+        message: "Warmup superseded by a new warmup call",
+        details: nil
+      ))
+    }
+
+    // 已在运行且引擎实际可用则直接返回。
+    if isEngineRunning, let engine = audioEngine, engine.isRunning {
       result([:])
       return
+    }
+
+    // 标记不一致时修正。
+    if isEngineRunning {
+      cleanupEngine()
     }
 
     let localeIdentifier = (arguments?["locale"] as? String) ?? "en-US"
@@ -162,29 +188,35 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
     do {
       let engine = AVAudioEngine()
-      let inputNode = engine.inputNode
-      let inputFormat = inputNode.outputFormat(forBus: 0)
-
-      inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-        guard let self, self.isRecording else { return }
-        self.handleVoiceActivity(buffer: buffer)
-        self.recognitionRequest?.append(buffer)
-        do {
-          let playbackBuffer = self.makeAmplifiedBuffer(from: buffer, gain: 2.2)
-          try self.audioFile?.write(from: playbackBuffer)
-        } catch {
-          self.emitError(
-            code: SpeechPracticeMacError.recordingFailed.rawValue,
-            message: "Failed to write recording buffer"
-          )
-        }
-      }
+      installInputTap(on: engine)
 
       engine.prepare()
       try engine.start()
       audioEngine = engine
       isEngineRunning = true
-      result([:])
+
+      // 监听 IO 配置变更（蓝牙设备模式切换等），自动重启引擎。
+      configChangeObserver = NotificationCenter.default.addObserver(
+        forName: .AVAudioEngineConfigurationChange,
+        object: engine,
+        queue: .main
+      ) { [weak self] _ in
+        self?.handleEngineConfigurationChange()
+      }
+
+      // 蓝牙输出设备会触发 A2DP→HFP 模式切换，导致引擎被系统 stop。
+      // 此时延迟返回，等引擎重启稳定后再通知 Dart 端。
+      if isBluetoothAudioActive() {
+        warmupPendingResult = result
+        // 安全超时：3 秒内 BT 未稳定则返回错误。
+        let timeout = DispatchWorkItem { [weak self] in
+          self?.resolveWarmup()
+        }
+        warmupTimeoutWorkItem = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: timeout)
+      } else {
+        result([:])
+      }
     } catch {
       cleanupEngine()
       result(FlutterError(
@@ -192,6 +224,111 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
         message: "Failed to warmup audio engine",
         details: error.localizedDescription
       ))
+    }
+  }
+
+  /// 解决待返回的 warmup result。
+  private func resolveWarmup() {
+    warmupTimeoutWorkItem?.cancel()
+    warmupTimeoutWorkItem = nil
+    guard let result = warmupPendingResult else { return }
+    warmupPendingResult = nil
+
+    if isEngineRunning, let engine = audioEngine, engine.isRunning {
+      result([:])
+    } else {
+      cleanupEngine()
+      result(FlutterError(
+        code: SpeechPracticeMacError.recordingFailed.rawValue,
+        message: "Audio engine failed to stabilize (Bluetooth mode switch timeout)",
+        details: nil
+      ))
+    }
+  }
+
+  /// 检测默认输入或输出设备是否为蓝牙设备。
+  ///
+  /// 蓝牙设备无论作为输入还是输出，开启麦克风时都可能触发 A2DP→HFP 模式切换。
+  private func isBluetoothAudioActive() -> Bool {
+    return isBluetoothDevice(selector: kAudioHardwarePropertyDefaultOutputDevice)
+      || isBluetoothDevice(selector: kAudioHardwarePropertyDefaultInputDevice)
+  }
+
+  private func isBluetoothDevice(selector: AudioObjectPropertySelector) -> Bool {
+    var deviceID = AudioDeviceID(0)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    var address = AudioObjectPropertyAddress(
+      mSelector: selector,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    guard AudioObjectGetPropertyData(
+      AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
+    ) == noErr else { return false }
+
+    var transportType: UInt32 = 0
+    size = UInt32(MemoryLayout<UInt32>.size)
+    address.mSelector = kAudioDevicePropertyTransportType
+    guard AudioObjectGetPropertyData(
+      deviceID, &address, 0, nil, &size, &transportType
+    ) == noErr else { return false }
+
+    return transportType == kAudioDeviceTransportTypeBluetooth
+      || transportType == kAudioDeviceTransportTypeBluetoothLE
+  }
+
+  /// 处理 AVAudioEngine IO 配置变更。
+  ///
+  /// 蓝牙设备在开启麦克风输入时会从 A2DP 切换到 HFP 模式，
+  /// 触发 IO 配置变更导致引擎被系统自动 stop。
+  /// 使用 debounce（500ms）等 BT 设备稳定后再重启引擎，
+  /// 避免在模式切换过程中反复重启。
+  private func handleEngineConfigurationChange() {
+    guard isEngineRunning, let engine = audioEngine else { return }
+
+    // 引擎仍在运行说明无需处理（某些无害的配置变更不会 stop 引擎）。
+    guard !engine.isRunning else { return }
+
+    // 取消之前的重启计划（debounce）。
+    configChangeRestartWorkItem?.cancel()
+
+    let workItem = DispatchWorkItem { [weak self] in
+      self?.performEngineRestart()
+    }
+    configChangeRestartWorkItem = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+  }
+
+  /// 重启被系统 stop 的引擎。
+  ///
+  /// 重新安装 tap（配置变更后 inputNode 格式可能改变）并 start 引擎。
+  /// 重启成功后如果有待返回的 warmup result，一并解决。
+  private func performEngineRestart() {
+    configChangeRestartWorkItem = nil
+    guard isEngineRunning, let engine = audioEngine, !engine.isRunning else {
+      resolveWarmup()
+      return
+    }
+
+    engine.inputNode.removeTap(onBus: 0)
+    installInputTap(on: engine)
+
+    engine.prepare()
+    do {
+      try engine.start()
+      resolveWarmup()
+    } catch {
+      // 重启失败，标记引擎已停止，后续 startSession 会走完整初始化路径。
+      isEngineRunning = false
+      resolveWarmup()
+      if isRecording {
+        isRecording = false
+        emitError(
+          code: SpeechPracticeMacError.recordingFailed.rawValue,
+          message: "Failed to restart engine after configuration change: \(error.localizedDescription)"
+        )
+        cleanupSentenceState(cancelRecognition: true)
+      }
     }
   }
 
@@ -210,8 +347,10 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
     let localeIdentifier = (arguments?["locale"] as? String) ?? "en-US"
 
-    // 引擎已常驻：轻量启动，只创建句子级资源。
-    if isEngineRunning, let engine = audioEngine {
+    // 引擎已常驻且实际运行中：轻量启动，只创建句子级资源。
+    // 额外检查 engine.isRunning 防止 IO 配置变更导致引擎已被系统 stop
+    // 但 isEngineRunning 标记尚未同步的情况。
+    if isEngineRunning, let engine = audioEngine, engine.isRunning {
       do {
         try startSessionLightweight(engine: engine, promptId: promptId, locale: localeIdentifier, result: result)
       } catch {
@@ -223,6 +362,11 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
         ))
       }
       return
+    }
+
+    // 标记不一致时修正，确保完整初始化路径正确清理旧资源。
+    if isEngineRunning {
+      cleanupEngine()
     }
 
     // 引擎未就绪：回退到完整初始化。
@@ -310,25 +454,22 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
         self?.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
       }
 
-      inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-        guard let self, self.isRecording else { return }
-        self.handleVoiceActivity(buffer: buffer)
-        self.recognitionRequest?.append(buffer)
-        do {
-          let playbackBuffer = self.makeAmplifiedBuffer(from: buffer, gain: 2.2)
-          try self.audioFile?.write(from: playbackBuffer)
-        } catch {
-          self.emitError(
-            code: SpeechPracticeMacError.recordingFailed.rawValue,
-            message: "Failed to write recording buffer"
-          )
-        }
-      }
+      installInputTap(on: engine)
 
       engine.prepare()
       try engine.start()
       isEngineRunning = true
       isRecording = true
+
+      // startSessionFull 创建了新引擎，也需要监听 IO 配置变更。
+      configChangeObserver = NotificationCenter.default.addObserver(
+        forName: .AVAudioEngineConfigurationChange,
+        object: engine,
+        queue: .main
+      ) { [weak self] _ in
+        self?.handleEngineConfigurationChange()
+      }
+
       result(["filePath": fileURL.path])
     } catch {
       cleanupSentenceState(cancelRecognition: true)
@@ -703,6 +844,23 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
   /// 引擎级清理：removeTap + engine.stop + 释放全部引擎资源。
   private func cleanupEngine() {
+    configChangeRestartWorkItem?.cancel()
+    configChangeRestartWorkItem = nil
+    warmupTimeoutWorkItem?.cancel()
+    warmupTimeoutWorkItem = nil
+    // 必须在置 nil 前调用 pending result，否则 Dart 端 await warmup() 永远挂起。
+    if let pendingResult = warmupPendingResult {
+      warmupPendingResult = nil
+      pendingResult(FlutterError(
+        code: SpeechPracticeMacError.recordingFailed.rawValue,
+        message: "Audio engine was shut down during warmup",
+        details: nil
+      ))
+    }
+    if let observer = configChangeObserver {
+      NotificationCenter.default.removeObserver(observer)
+      configChangeObserver = nil
+    }
     if let engine = audioEngine {
       engine.inputNode.removeTap(onBus: 0)
       engine.stop()
@@ -725,6 +883,26 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
     lastDetectedSpeechMs = nil
     self.audioFile = audioFile
     recognitionRequest = request
+  }
+
+  /// 在 inputNode 上安装音频 tap，统一处理录音数据写入和语音识别。
+  private func installInputTap(on engine: AVAudioEngine) {
+    let inputNode = engine.inputNode
+    let inputFormat = inputNode.outputFormat(forBus: 0)
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+      guard let self, self.isRecording else { return }
+      self.handleVoiceActivity(buffer: buffer)
+      self.recognitionRequest?.append(buffer)
+      do {
+        let playbackBuffer = self.makeAmplifiedBuffer(from: buffer, gain: 2.2)
+        try self.audioFile?.write(from: playbackBuffer)
+      } catch {
+        self.emitError(
+          code: SpeechPracticeMacError.recordingFailed.rawValue,
+          message: "Failed to write recording buffer"
+        )
+      }
+    }
   }
 
   private func sanitizedFileName(_ promptId: String) -> String {
