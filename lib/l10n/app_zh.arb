@@ -171,7 +171,7 @@
   "blindListenBriefingTitle": "全文盲听",
   "blindListenBriefingSubtitle": "首次学习 - 全文盲听",
   "blindListenBriefingReviewSubtitle": "第{round}轮复习 - 全文盲听",
-  "blindListenBriefingTip": "不看字幕，完整听一遍，感受大意即可",
+  "blindListenBriefingTip": "不看字幕，完整听一遍，感受大意和难度",
   "startPractice": "开始练习",
   "blindListenAppBarTitle": "全文盲听",
   "blindListenPassLabel": "第 {count} 遍",
@@ -440,7 +440,7 @@
   },
 
   "retellBriefingTitle": "段落复述",
-  "retellBriefingSubtitle": "听一段音频，然后尝试复述。关键词会帮助你回忆内容。",
+  "retellBriefingSubtitle": "先盲听一段，再用英语复述大意。",
   "retellBriefingTargetDuration": "段落时长",
   "retellBriefingParagraphCount": "将分为 {count} 个段落",
   "@retellBriefingParagraphCount": {

@@ -174,13 +174,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     }
   }
 
-  /// 复习阶段：先展示任务提示弹窗，再按 subStage 分发到真实页面。
+  /// 复习阶段：按 subStage 分发到真实页面。
+  ///
+  /// 盲听和段落复述自带段落选择弹窗，无需再展示复习简报；
+  /// 其余子阶段先展示复习简报弹窗。
   void _startReviewSubStage(BuildContext context, LearningProgress progress) {
     final subStage = progress.currentSubStage;
 
     // 段落复述自带时长选择弹窗，无需再展示复习简报
     if (subStage == SubStageType.reviewRetellParagraph) {
       _startReviewRetell(context, isSummary: false);
+      return;
+    }
+
+    // 盲听自带段落选择弹窗，阶段名和预估时长直接显示在弹窗上
+    if (subStage == SubStageType.blindListen) {
+      _startReviewBlindListen(context, stage: progress.currentStage);
       return;
     }
 
@@ -194,8 +203,6 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       estimatedDuration: estimatedDuration,
       onStartPractice: () {
         switch (subStage) {
-          case SubStageType.blindListen:
-            _startReviewBlindListen(context);
           case SubStageType.reviewDifficultPractice:
             _startReviewDifficultPractice(context);
           case SubStageType.reviewRetellSummary:
@@ -232,15 +239,28 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   }
 
   /// 复习盲听：弹段落选择弹窗后进入段落播放
-  Future<void> _startReviewBlindListen(BuildContext context) async {
+  ///
+  /// [stage] 当前复习阶段，用于在弹窗上显示阶段名和预估时长。
+  Future<void> _startReviewBlindListen(
+    BuildContext context, {
+    required LearningStage stage,
+  }) async {
     final lpState = await _ensureAudioLoaded();
     if (!context.mounted) return;
     final sentences = lpState?.sentences ?? const [];
     if (sentences.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context)!;
+    final estimatedDuration = _estimateReviewDuration(SubStageType.blindListen);
+    final estimatedText = estimatedDuration != null
+        ? formatEstimatedDuration(l10n, estimatedDuration)
+        : null;
+
     showBlindListenParagraphSheet(
       context: context,
       sentences: sentences,
+      stageLabel: reviewStageLabel(l10n, stage),
+      estimatedDurationText: estimatedText,
       onStartPractice: (targetDuration, pauseMultiplier) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
@@ -378,10 +398,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId]
         ?.currentStage;
+
+    // 复习阶段显示阶段名和预估时长
+    final l10n = AppLocalizations.of(context)!;
+    final isReview = currentStage != null &&
+        currentStage != LearningStage.firstLearn;
+    final totalDuration = ref.read(audioEngineProvider).totalDuration;
+    final retellEstimate = totalDuration != null ? totalDuration * 3 : null;
+
     showRetellBriefingSheet(
       context: context,
       sentences: lpState.sentences,
       defaultSeconds: retellDefaultSeconds(currentStage),
+      stageLabel: isReview ? reviewStageLabel(l10n, currentStage) : null,
+      estimatedDurationText: isReview && retellEstimate != null
+          ? formatEstimatedDuration(l10n, retellEstimate)
+          : null,
       onStartPractice: (targetDuration, pauseMultiplier) async {
         final paragraphs = groupSentencesIntoParagraphs(
           lpState.sentences,

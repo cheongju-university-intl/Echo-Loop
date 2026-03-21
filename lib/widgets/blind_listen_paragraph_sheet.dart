@@ -10,9 +10,14 @@ import '../models/sentence.dart';
 import 'common/paragraph_selection_sheet.dart';
 
 /// 显示盲听段落选择弹窗
+///
+/// [stageLabel] 可选的阶段名（如"第三轮复习"），显示在标题下方
+/// [estimatedDurationText] 可选的预估时长文本，显示在说明下方
 Future<void> showBlindListenParagraphSheet({
   required BuildContext context,
   required List<Sentence> sentences,
+  String? stageLabel,
+  String? estimatedDurationText,
   required void Function(Duration targetDuration, double pauseMultiplier)
       onStartPractice,
 }) {
@@ -25,6 +30,8 @@ Future<void> showBlindListenParagraphSheet({
     sentences: sentences,
     showPauseMultiplier: true,
     pauseMultiplierOptions: const [0.5, 1.0, 1.5, 2.0, 3.0],
+    stageLabel: stageLabel,
+    estimatedDurationText: estimatedDurationText,
     onStartPractice: onStartPractice,
   );
 }

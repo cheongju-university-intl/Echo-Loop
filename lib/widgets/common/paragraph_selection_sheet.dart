@@ -23,6 +23,8 @@ const paragraphDurationOptions = [0, 10, 20, 30, 45, 60, 90, -1];
 /// [sentences] 字幕句子列表
 /// [defaultSeconds] 默认段落时长（秒）
 /// [showPauseMultiplier] 是否显示段间停顿行
+/// [stageLabel] 标题下方显示的阶段名（如"第三轮复习"），可选
+/// [estimatedDurationText] 说明下方显示的预估时长文本，可选
 /// [onStartPractice] 回调，传递 (目标时长, 停顿倍数)
 Future<void> showParagraphSelectionSheet({
   required BuildContext context,
@@ -33,6 +35,8 @@ Future<void> showParagraphSelectionSheet({
   int defaultSeconds = 30,
   bool showPauseMultiplier = false,
   List<double>? pauseMultiplierOptions,
+  String? stageLabel,
+  String? estimatedDurationText,
   required void Function(Duration targetDuration, double pauseMultiplier)
       onStartPractice,
 }) {
@@ -50,6 +54,8 @@ Future<void> showParagraphSelectionSheet({
       defaultSeconds: defaultSeconds,
       showPauseMultiplier: showPauseMultiplier,
       pauseMultiplierOptions: pauseMultiplierOptions,
+      stageLabel: stageLabel,
+      estimatedDurationText: estimatedDurationText,
       onStartPractice: onStartPractice,
     ),
   );
@@ -63,6 +69,8 @@ class _ParagraphSelectionSheet extends StatefulWidget {
   final int defaultSeconds;
   final bool showPauseMultiplier;
   final List<double>? pauseMultiplierOptions;
+  final String? stageLabel;
+  final String? estimatedDurationText;
   final void Function(Duration targetDuration, double pauseMultiplier)
       onStartPractice;
 
@@ -74,6 +82,8 @@ class _ParagraphSelectionSheet extends StatefulWidget {
     required this.defaultSeconds,
     required this.showPauseMultiplier,
     this.pauseMultiplierOptions,
+    this.stageLabel,
+    this.estimatedDurationText,
     required this.onStartPractice,
   });
 
@@ -134,6 +144,18 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+
+            // 阶段名（可选，如"第三轮复习"）
+            if (widget.stageLabel != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                widget.stageLabel!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+
             const SizedBox(height: AppSpacing.xs),
 
             // 说明
@@ -147,6 +169,29 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                 ),
               ),
             ),
+
+            // 预估时长（可选，如"预计 3 分钟"）
+            if (widget.estimatedDurationText != null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.estimatedDurationText!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
             const SizedBox(height: AppSpacing.l),
 
             // 段落时长行

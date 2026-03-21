@@ -340,7 +340,7 @@ void main() {
       expect(continueButton.onPressed, isNotNull);
     });
 
-    testWidgets('复习继续学习先弹窗再进入盲听播放器', (tester) async {
+    testWidgets('复习盲听直接弹段落选择弹窗，显示阶段名和预估时长', (tester) async {
       final now = DateTime(2026, 2, 25, 12, 0);
       final progressState = LearningProgressState(
         progressMap: {
@@ -361,13 +361,12 @@ void main() {
 
       await tester.tap(find.text('Continue Learning'));
       await tester.pumpAndSettle();
-      // 复习简报弹窗显示"开始练习"
-      expect(find.text('Start Practice'), findsOneWidget);
-
-      await tester.tap(find.text('Start Practice'));
-      await tester.pumpAndSettle();
-      // 复习盲听弹出段落选择弹窗（标题为 Full Listening）
+      // 跳过复习简报弹窗，直接弹出段落选择弹窗
       expect(find.text('Full Listening'), findsOneWidget);
+      // 显示阶段名
+      expect(find.text('Review 2'), findsAtLeast(1));
+      // 显示开始练习按钮
+      expect(find.text('Start Practice'), findsOneWidget);
     });
 
     testWidgets('有进度时显示正确的完成步骤数', (tester) async {

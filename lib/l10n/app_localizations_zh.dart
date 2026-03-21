@@ -550,7 +550,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get blindListenBriefingTip => '不看字幕，完整听一遍，感受大意即可';
+  String get blindListenBriefingTip => '不看字幕，完整听一遍，感受大意和难度';
 
   @override
   String get startPractice => '开始练习';
@@ -1082,7 +1082,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get retellBriefingTitle => '段落复述';
 
   @override
-  String get retellBriefingSubtitle => '听一段音频，然后尝试复述。关键词会帮助你回忆内容。';
+  String get retellBriefingSubtitle => '先盲听一段，再用英语复述大意。';
 
   @override
   String get retellBriefingTargetDuration => '段落时长';

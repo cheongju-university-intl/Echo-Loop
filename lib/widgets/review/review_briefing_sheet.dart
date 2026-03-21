@@ -44,9 +44,7 @@ class _ReviewBriefingSheet extends StatelessWidget {
 
   /// 格式化预估时长
   String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
-    final minutes = (duration.inSeconds / 60).ceil();
-    if (minutes < 1) return l10n.estimatedLessThanOneMinute;
-    return l10n.estimatedMinutes(minutes);
+    return formatEstimatedDuration(l10n, duration);
   }
 
   @override
@@ -88,7 +86,7 @@ class _ReviewBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            _stageLabel(l10n, stage),
+            reviewStageLabel(l10n, stage),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -195,7 +193,7 @@ String _tipForSubStage(bool isZh, SubStageType subStage) {
           : 'Listen once without subtitles and focus on the gist.',
     SubStageType.reviewDifficultPractice =>
       isZh
-          ? '先盲听难句，听不懂再进入补练。'
+          ? '先盲听难句，听不懂再跟读加练。'
           : 'Blind listen difficult sentences first, then do remedial practice.',
     SubStageType.reviewRetellParagraph =>
       isZh ? '按段复述本轮复习内容。' : 'Retell this review round paragraph by paragraph.',
@@ -212,7 +210,15 @@ String _tipForSubStage(bool isZh, SubStageType subStage) {
   };
 }
 
-String _stageLabel(AppLocalizations l10n, LearningStage stage) {
+/// 格式化预估时长为本地化文本（如"预计 3 分钟"）
+String formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
+  final minutes = (duration.inSeconds / 60).ceil();
+  if (minutes < 1) return l10n.estimatedLessThanOneMinute;
+  return l10n.estimatedMinutes(minutes);
+}
+
+/// 返回学习阶段的本地化标签文本（如"第三轮复习"）
+String reviewStageLabel(AppLocalizations l10n, LearningStage stage) {
   return switch (stage) {
     LearningStage.firstLearn => l10n.firstStudy,
     LearningStage.review0 => l10n.reviewRound0,
