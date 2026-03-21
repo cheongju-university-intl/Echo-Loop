@@ -121,9 +121,10 @@ final studyTaskProvider = Provider<List<StudyTask>>((ref) {
   return tasks;
 });
 
-/// 当天是否存在未完成任务（用于提醒调度）
+/// 当天待学习任务数量（用于提醒调度），仅计算可操作任务（不含待解锁）
 final pendingStudyTaskCountProvider = Provider<int>((ref) {
-  return ref.watch(studyTaskProvider).length;
+  final tasks = ref.watch(studyTaskProvider);
+  return tasks.where((t) => t.type != StudyTaskType.reviewUpcoming).length;
 });
 
 /// 已完成音频（LearningStage.completed）列表

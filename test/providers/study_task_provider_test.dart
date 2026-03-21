@@ -716,6 +716,124 @@ void main() {
     });
   });
 
+  group('pendingStudyTaskCountProvider', () {
+    test('不计入 reviewUpcoming 类型的任务', () {
+      final now = DateTime(2026, 2, 25, 12, 0);
+      final audioItems = [
+        AudioItem(
+          id: 'a',
+          name: 'Alpha',
+          audioPath: 'audios/a.mp3',
+          addedDate: now,
+        ),
+        AudioItem(
+          id: 'b',
+          name: 'Beta',
+          audioPath: 'audios/b.mp3',
+          addedDate: now,
+        ),
+        AudioItem(
+          id: 'c',
+          name: 'Gamma',
+          audioPath: 'audios/c.mp3',
+          addedDate: now,
+        ),
+      ];
+
+      final progressMap = {
+        // reviewReady：已过复习时间
+        'a': LearningProgress(
+          audioItemId: 'a',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.blindListen,
+          lastStageCompletedAt: now.subtract(const Duration(days: 2)),
+          updatedAt: now.subtract(const Duration(minutes: 2)),
+        ),
+        // reviewUpcoming：未到复习时间
+        'b': LearningProgress(
+          audioItemId: 'b',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.blindListen,
+          lastStageCompletedAt: now,
+          updatedAt: now.subtract(const Duration(minutes: 1)),
+        ),
+        // firstStudy：首次学习
+        'c': LearningProgress(
+          audioItemId: 'c',
+          currentStage: LearningStage.firstLearn,
+          currentSubStage: SubStageType.blindListen,
+          updatedAt: now,
+        ),
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(
+              LearningProgressState(progressMap: progressMap),
+            ),
+          ),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      // studyTaskProvider 包含 3 个任务（reviewReady + reviewUpcoming + firstStudy）
+      final tasks = container.read(studyTaskProvider);
+      expect(tasks.length, 3);
+
+      // pendingStudyTaskCountProvider 应只计算 reviewReady + firstStudy = 2
+      final count = container.read(pendingStudyTaskCountProvider);
+      expect(count, 2);
+    });
+
+    test('全部为 reviewUpcoming 时返回 0', () {
+      final now = DateTime(2026, 2, 25, 12, 0);
+      final audioItems = [
+        AudioItem(
+          id: 'a',
+          name: 'Upcoming Only',
+          audioPath: 'audios/a.mp3',
+          addedDate: now,
+        ),
+      ];
+
+      final progressMap = {
+        'a': LearningProgress(
+          audioItemId: 'a',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.blindListen,
+          lastStageCompletedAt: now,
+          updatedAt: now,
+        ),
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(
+              LearningProgressState(progressMap: progressMap),
+            ),
+          ),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final tasks = container.read(studyTaskProvider);
+      expect(tasks.single.type, StudyTaskType.reviewUpcoming);
+
+      final count = container.read(pendingStudyTaskCountProvider);
+      expect(count, 0);
+    });
+  });
+
   group('completedAudioProvider', () {
     test('已完成音频正确返回', () {
       final now = DateTime(2026, 2, 25, 12, 0);
