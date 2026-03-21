@@ -3,9 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/study_time_service.dart';
 import '../../providers/study_stats_provider.dart';
 import '../../theme/app_theme.dart';
+import 'day_stage_breakdown_sheet.dart';
 import 'learned_word_forms_sheet.dart';
 
 /// 学习统计头部组件
@@ -26,7 +29,10 @@ class StudyStatsHeader extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (stats) => Column(
         children: [
-          _TodayCard(stats: stats),
+          _TodayCard(
+            stats: stats,
+            studyTimeService: ref.read(studyTimeServiceProvider),
+          ),
           if (stats.dailySeconds.any((s) => s > 0)) ...[
             const SizedBox(height: AppSpacing.s),
             _WeeklyBarChart(
@@ -34,6 +40,14 @@ class StudyStatsHeader extends ConsumerWidget {
               dailyInputSeconds: stats.dailyInputSeconds,
               dailyOutputSeconds: stats.dailyOutputSeconds,
               dailyTotalSeconds: stats.dailySeconds,
+              onBarTap: (date) {
+                final service = ref.read(studyTimeServiceProvider);
+                showDayStageBreakdownSheet(
+                  context: context,
+                  date: date,
+                  studyTimeService: service,
+                );
+              },
             ),
           ],
         ],
@@ -46,15 +60,18 @@ class StudyStatsHeader extends ConsumerWidget {
 ///
 /// 顶部大字显示今日总时长，下方两列显示听/说明细。
 /// 所有数据均为"今日"维度，视觉上清晰统一。
+/// 点击今日时长行弹出阶段总览，点击听/说弹出对应维度阶段明细。
 class _TodayCard extends StatelessWidget {
   final StudyStats stats;
+  final StudyTimeService studyTimeService;
 
-  const _TodayCard({required this.stats});
+  const _TodayCard({required this.stats, required this.studyTimeService});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final today = DateTime.now();
 
     return Card(
       child: Padding(
@@ -64,30 +81,38 @@ class _TodayCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // 第一行：今日时长
-            Row(
-              children: [
-                Icon(
-                  Icons.timer_outlined,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  l10n.todayStudyTimeShort,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+            // 第一行：今日时长（点击弹出阶段总览）
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => showDayStageBreakdownSheet(
+                context: context,
+                date: today,
+                studyTimeService: studyTimeService,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 16,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _formatTime(l10n, stats.todaySeconds),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.todayStudyTimeShort,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatTime(l10n, stats.todaySeconds),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 10),
             // 第二行：听 / 说 / 词汇 三列（clamp 防御脏数据）
@@ -118,15 +143,11 @@ class _TodayCard extends StatelessWidget {
                     timeText: _formatTimeShort(clampedInput),
                     wordText:
                         '${_formatWordCount(stats.todayInputWords)}${l10n.localeName == 'zh' ? '词' : 'w'}',
-                    onTap: () => _showStatsTip(
+                    onTap: () => showDayStageBreakdownSheet(
                       context: context,
-                      icon: Icons.headphones_outlined,
-                      iconColor: Colors.teal,
-                      title: l10n.localeName == 'zh' ? '听' : 'Listening',
-                      description: l10n.localeName == 'zh'
-                          ? '今日音频播放时长和听到的总词数'
-                          : 'Audio play time and total words heard today',
-                      highlightColumn: _HighlightColumn.listening,
+                      date: today,
+                      studyTimeService: studyTimeService,
+                      mode: StageBreakdownMode.input,
                     ),
                   ),
                 ),
@@ -143,15 +164,11 @@ class _TodayCard extends StatelessWidget {
                     timeText: _formatTimeShort(clampedOutput),
                     wordText:
                         '${_formatWordCount(stats.todayOutputWords)}${l10n.localeName == 'zh' ? '词' : 'w'}',
-                    onTap: () => _showStatsTip(
+                    onTap: () => showDayStageBreakdownSheet(
                       context: context,
-                      icon: Icons.mic_outlined,
-                      iconColor: Colors.deepPurple,
-                      title: l10n.localeName == 'zh' ? '说' : 'Speaking',
-                      description: l10n.localeName == 'zh'
-                          ? '今日跟读和复述时长及对应词数'
-                          : 'Shadowing and retelling time and words today',
-                      highlightColumn: _HighlightColumn.speaking,
+                      date: today,
+                      studyTimeService: studyTimeService,
+                      mode: StageBreakdownMode.output,
                     ),
                   ),
                 ),
@@ -286,18 +303,50 @@ class _VocabItem extends StatelessWidget {
 ///
 /// 标题行显示"本周"累计时长，柱体底部 teal = 输入，顶部 deepPurple = 输出。
 /// 向前兼容：旧数据无 input/output 时，用 totalSeconds 当输入（teal 单色）。
-class _WeeklyBarChart extends StatelessWidget {
+/// 点击有数据的柱子可查看该天各阶段详细时长。
+class _WeeklyBarChart extends StatefulWidget {
   final int weekTotalSeconds;
   final List<int> dailyInputSeconds;
   final List<int> dailyOutputSeconds;
   final List<int> dailyTotalSeconds;
+  final void Function(DateTime date)? onBarTap;
 
   const _WeeklyBarChart({
     required this.weekTotalSeconds,
     required this.dailyInputSeconds,
     required this.dailyOutputSeconds,
     required this.dailyTotalSeconds,
+    this.onBarTap,
   });
+
+  @override
+  State<_WeeklyBarChart> createState() => _WeeklyBarChartState();
+}
+
+class _WeeklyBarChartState extends State<_WeeklyBarChart> {
+  /// 当前高亮的柱子索引（点击后短暂高亮）
+  int? _highlightIndex;
+
+  void _onBarTapped(int index) {
+    final totalSec = widget.dailyTotalSeconds[index];
+    if (totalSec <= 0 || widget.onBarTap == null) return;
+
+    // 计算对应日期
+    final now = DateTime.now();
+    final date = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: 6 - index));
+
+    // 短暂高亮 150ms
+    setState(() => _highlightIndex = index);
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _highlightIndex = null);
+    });
+
+    widget.onBarTap!(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -305,7 +354,8 @@ class _WeeklyBarChart extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     // 柱高基于 totalSeconds（而非 input+output），避免重叠计时导致柱高虚高
-    final maxSeconds = dailyTotalSeconds.reduce((a, b) => a > b ? a : b);
+    final maxSeconds =
+        widget.dailyTotalSeconds.reduce((a, b) => a > b ? a : b);
     const maxBarHeight = 56.0;
 
     // 计算最近 7 天的星期标签
@@ -335,7 +385,7 @@ class _WeeklyBarChart extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  '${l10n.weekStudyTimeShort}: ${_formatTime(l10n, weekTotalSeconds)}',
+                  '${l10n.weekStudyTimeShort}: ${_formatTime(l10n, widget.weekTotalSeconds)}',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
@@ -350,19 +400,22 @@ class _WeeklyBarChart extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
                 final isToday = i == 6;
-                final totalSec = dailyTotalSeconds[i];
+                final totalSec = widget.dailyTotalSeconds[i];
                 final ratio = maxSeconds > 0 ? totalSec / maxSeconds : 0.0;
                 final barHeight =
                     (ratio * maxBarHeight).clamp(3.0, maxBarHeight);
 
                 // Clamp input/output 防御历史脏数据
-                final hasBreakdown =
-                    dailyInputSeconds[i] > 0 || dailyOutputSeconds[i] > 0;
-                final rawInput =
-                    hasBreakdown ? dailyInputSeconds[i] : dailyTotalSeconds[i];
-                final rawOutput = hasBreakdown ? dailyOutputSeconds[i] : 0;
+                final hasBreakdown = widget.dailyInputSeconds[i] > 0 ||
+                    widget.dailyOutputSeconds[i] > 0;
+                final rawInput = hasBreakdown
+                    ? widget.dailyInputSeconds[i]
+                    : widget.dailyTotalSeconds[i];
+                final rawOutput =
+                    hasBreakdown ? widget.dailyOutputSeconds[i] : 0;
                 final inputSec = math.min(rawInput, totalSec);
-                final outputSec = math.min(rawOutput, math.max(0, totalSec - inputSec));
+                final outputSec =
+                    math.min(rawOutput, math.max(0, totalSec - inputSec));
                 if (rawInput != inputSec || rawOutput != outputSec) {
                   debugPrint(
                     '⚠️ 柱状图 clamp day$i: input $rawInput→$inputSec, '
@@ -372,62 +425,74 @@ class _WeeklyBarChart extends StatelessWidget {
                 final inputRatio =
                     totalSec > 0 ? inputSec / totalSec : 1.0;
 
+                // 点击高亮效果
+                final isHighlighted = _highlightIndex == i;
+                final highlightAlpha = isHighlighted ? 0.5 : 1.0;
+
                 return Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 柱顶数值
-                      if (totalSec > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 3),
-                          child: Text(
-                            _formatMinutes(totalSec),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _onBarTapped(i),
+                    child: Opacity(
+                      opacity: highlightAlpha,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 柱顶数值
+                          if (totalSec > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 3),
+                              child: Text(
+                                _formatMinutes(totalSec),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 9,
+                                  fontWeight: isToday
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isToday
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          // 柱体（双色堆叠或纯输入单色）
+                          if (outputSec > 0)
+                            _buildStackedBar(
+                              barHeight: barHeight,
+                              inputRatio: inputRatio,
+                              isToday: isToday,
+                            )
+                          else
+                            Container(
+                              height: barHeight,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 5),
+                              decoration: BoxDecoration(
+                                color: isToday
+                                    ? Colors.teal
+                                    : Colors.teal.withValues(alpha: 0.2),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4),
+                                  bottom: Radius.circular(2),
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 5),
+                          // 星期标签
+                          Text(
+                            weekdayLabels[i],
                             style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 9,
-                              fontWeight: isToday
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                              fontSize: 10,
+                              fontWeight:
+                                  isToday ? FontWeight.bold : FontWeight.normal,
                               color: isToday
                                   ? theme.colorScheme.primary
                                   : theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
-                        ),
-                      // 柱体（双色堆叠或纯输入单色）
-                      if (outputSec > 0)
-                        _buildStackedBar(
-                          barHeight: barHeight,
-                          inputRatio: inputRatio,
-                          isToday: isToday,
-                        )
-                      else
-                        Container(
-                          height: barHeight,
-                          margin: const EdgeInsets.symmetric(horizontal: 5),
-                          decoration: BoxDecoration(
-                            color: isToday
-                                ? Colors.teal
-                                : Colors.teal.withValues(alpha: 0.2),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(4),
-                              bottom: Radius.circular(2),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 5),
-                      // 星期标签
-                      Text(
-                        weekdayLabels[i],
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 10,
-                          fontWeight:
-                              isToday ? FontWeight.bold : FontWeight.normal,
-                          color: isToday
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 );
               }),
@@ -539,67 +604,7 @@ String _formatTime(AppLocalizations l10n, int seconds) {
 }
 
 /// 高亮列类型：听弹窗或说弹窗
-enum _HighlightColumn { listening, speaking }
-
-/// 显示统计指标说明弹窗（含 CEFR 推荐学习时长表格）
-void _showStatsTip({
-  required BuildContext context,
-  required IconData icon,
-  required Color iconColor,
-  required String title,
-  required String description,
-  required _HighlightColumn highlightColumn,
-}) {
-  final theme = Theme.of(context);
-  final isZh = AppLocalizations.of(context)!.localeName == 'zh';
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (_) => SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Icon(icon, size: 32, color: iconColor),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _CefrRecommendationTable(
-              highlightColumn: highlightColumn,
-              isZh: isZh,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
+enum HighlightColumn { listening, speaking }
 
 /// CEFR 每日推荐练习量表格
 ///
@@ -607,11 +612,11 @@ void _showStatsTip({
 /// 听力列显示听时长+输入词数，口语列显示说时长+输出词数。
 /// [highlightColumn] 控制哪一列用强调色，另一列弱化显示。
 /// 该组件被听/说两个弹窗共享，仅高亮列不同。
-class _CefrRecommendationTable extends StatelessWidget {
-  final _HighlightColumn highlightColumn;
+class CefrRecommendationTable extends StatelessWidget {
+  final HighlightColumn highlightColumn;
   final bool isZh;
 
-  const _CefrRecommendationTable({
+  const CefrRecommendationTable({
     required this.highlightColumn,
     required this.isZh,
   });
@@ -619,16 +624,16 @@ class _CefrRecommendationTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isListening = highlightColumn == _HighlightColumn.listening;
+    final isListening = highlightColumn == HighlightColumn.listening;
 
     // 基于 CEFR 各级别参考数据（取中间值）：
     //   初级: 日总 ~53min, 输入 30–45min → 38min, 输出 10–15min → 13min
     //   中级: 日总 ~68min, 输入 35–45min → 40min, 输出 25–30min → 28min
     //   高级: 日总 ~75min, 输入 30–45min → 38min, 输出 30–45min → 38min
     final levels = [
-      _CefrLevel('A1–A2', isZh ? '初级' : 'Beginner', '38', '13', '5,000', '1,700'),
-      _CefrLevel('B1–B2', isZh ? '中级' : 'Intermediate', '40', '28', '5,500', '3,500'),
-      _CefrLevel('C1–C2', isZh ? '高级' : 'Advanced', '38', '38', '6,000', '5,000'),
+      CefrLevel('A1–A2', isZh ? '初级' : 'Beginner', '38', '13', '5,000', '1,700'),
+      CefrLevel('B1–B2', isZh ? '中级' : 'Intermediate', '40', '28', '5,500', '3,500'),
+      CefrLevel('C1–C2', isZh ? '高级' : 'Advanced', '38', '38', '6,000', '5,000'),
     ];
 
     final listenHeader = isZh ? '听力（输入）' : 'Listening (input)';
@@ -826,7 +831,7 @@ class _CefrRecommendationTable extends StatelessWidget {
 }
 
 /// CEFR 等级推荐数据
-class _CefrLevel {
+class CefrLevel {
   final String cefr;
   final String name;
   final String listenMin;
@@ -834,7 +839,7 @@ class _CefrLevel {
   final String inputWords;
   final String outputWords;
 
-  const _CefrLevel(
+  const CefrLevel(
     this.cefr,
     this.name,
     this.listenMin,
