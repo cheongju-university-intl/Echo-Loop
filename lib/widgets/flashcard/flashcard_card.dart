@@ -464,7 +464,6 @@ class _BackContentState extends ConsumerState<_BackContent> {
             word.sentenceText!,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              fontStyle: FontStyle.italic,
               height: 1.6,
             ),
           ),
