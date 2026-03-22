@@ -19,6 +19,7 @@ import '../../providers/saved_word_provider.dart';
 import '../../services/dictionary_service.dart';
 import '../../services/tts_service.dart';
 import '../../theme/app_theme.dart';
+import '../common/text_context_menu.dart';
 
 /// 显示词典底部弹窗
 ///
@@ -219,12 +220,24 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 单词
-          Text(
-            _normalizedWord,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface,
+          // 单词（支持长按/右键复制）
+          GestureDetector(
+            onLongPressStart: (details) => TextContextMenu.show(
+              context,
+              details.globalPosition,
+              _normalizedWord,
+            ),
+            onSecondaryTapDown: (details) => TextContextMenu.show(
+              context,
+              details.globalPosition,
+              _normalizedWord,
+            ),
+            child: Text(
+              _normalizedWord,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.m),
@@ -272,12 +285,24 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            entry.word,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface,
-              letterSpacing: -0.3,
+          child: GestureDetector(
+            onLongPressStart: (details) => TextContextMenu.show(
+              context,
+              details.globalPosition,
+              entry.word,
+            ),
+            onSecondaryTapDown: (details) => TextContextMenu.show(
+              context,
+              details.globalPosition,
+              entry.word,
+            ),
+            child: Text(
+              entry.word,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+                letterSpacing: -0.3,
+              ),
             ),
           ),
         ),

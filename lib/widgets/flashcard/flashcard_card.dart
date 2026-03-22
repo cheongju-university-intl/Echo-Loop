@@ -189,14 +189,26 @@ class _FrontContent extends StatelessWidget {
               const SizedBox(height: AppSpacing.m),
             ],
 
-            // 单词（大号居中）
-            Text(
-              word.word,
-              style: theme.textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
+            // 单词（大号居中，支持长按/右键复制）
+            GestureDetector(
+              onLongPressStart: (details) => TextContextMenu.show(
+                context,
+                details.globalPosition,
+                word.word,
               ),
-              textAlign: TextAlign.center,
+              onSecondaryTapDown: (details) => TextContextMenu.show(
+                context,
+                details.globalPosition,
+                word.word,
+              ),
+              child: Text(
+                word.word,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
 
             // 音标
