@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/services.dart';
-import 'package:universal_io/io.dart';
+import 'package:universal_io/io.dart' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../l10n/app_localizations.dart';
@@ -15,6 +14,7 @@ import '../widgets/playback_controls.dart';
 import '../widgets/sentence_list_view.dart';
 import '../widgets/settings_dialog.dart';
 import '../widgets/player_hotkey_scope.dart';
+import '../widgets/common/text_context_menu.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -443,42 +443,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     BuildContext context,
     Offset position,
     String text,
-  ) async {
-    final l10n = AppLocalizations.of(context)!;
-    final RenderBox? overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-
-    final result = await showMenu(
-      context: context,
-      position: RelativeRect.fromRect(
-        position & const Size(40, 40),
-        Offset.zero & (overlay?.size ?? const Size(0, 0)),
-      ),
-      items: [
-        PopupMenuItem<String>(
-          value: 'copy',
-          child: Row(
-            children: [
-              const Icon(Icons.copy, size: 20),
-              const SizedBox(width: 12),
-              Text(l10n.copy),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    if (result == 'copy' && context.mounted) {
-      await Clipboard.setData(ClipboardData(text: text));
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.copied),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
+  ) {
+    TextContextMenu.show(context, position, text);
   }
 
   void _showSettingsDialog(BuildContext context) {

@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_io/io.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../models/sentence.dart';
 import '../services/subtitle_parser.dart';
-import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'common/text_context_menu.dart';
 
 class SentenceListView extends StatefulWidget {
   final List<Sentence> sentences;
@@ -187,42 +186,8 @@ class _SentenceTile extends StatelessWidget {
     required this.onBookmarkToggle,
   });
 
-  void _showContextMenu(BuildContext context, Offset position) async {
-    final l10n = AppLocalizations.of(context)!;
-    final RenderBox? overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-
-    final result = await showMenu(
-      context: context,
-      position: RelativeRect.fromRect(
-        position & const Size(40, 40),
-        Offset.zero & (overlay?.size ?? const Size(0, 0)),
-      ),
-      items: [
-        PopupMenuItem<String>(
-          value: 'copy',
-          child: Row(
-            children: [
-              const Icon(Icons.copy, size: 20),
-              const SizedBox(width: 12),
-              Text(l10n.copy),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    if (result == 'copy' && context.mounted) {
-      await Clipboard.setData(ClipboardData(text: sentence.text));
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.copied),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
+  void _showContextMenu(BuildContext context, Offset position) {
+    TextContextMenu.show(context, position, sentence.text);
   }
 
   @override

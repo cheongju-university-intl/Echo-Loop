@@ -20,6 +20,7 @@ import '../../providers/flashcard/flashcard_provider.dart';
 import '../../router/app_router.dart';
 import '../../services/tts_service.dart';
 import '../../theme/app_theme.dart';
+import '../common/text_context_menu.dart';
 
 /// Flashcard 翻转卡片
 class FlashcardCard extends StatefulWidget {
@@ -339,10 +340,24 @@ class _BackContentState extends ConsumerState<_BackContent> {
                       // 单词 + 音标
                       Row(
                         children: [
-                          Text(
-                            word.word,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
+                          GestureDetector(
+                            onLongPressStart: (details) =>
+                                TextContextMenu.show(
+                              context,
+                              details.globalPosition,
+                              word.word,
+                            ),
+                            onSecondaryTapDown: (details) =>
+                                TextContextMenu.show(
+                              context,
+                              details.globalPosition,
+                              word.word,
+                            ),
+                            child: Text(
+                              word.word,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           const SizedBox(width: AppSpacing.s),
@@ -469,14 +484,38 @@ class _BackContentState extends ConsumerState<_BackContent> {
     );
 
     // 可播放时，整行点击触发播放（同时阻止冒泡到卡片翻转）
+    // 长按/右键弹出复制菜单
     if (canPlay) {
       return GestureDetector(
         onTap: _playSentence,
+        onLongPressStart: (details) => TextContextMenu.show(
+          context,
+          details.globalPosition,
+          word.sentenceText!,
+        ),
+        onSecondaryTapDown: (details) => TextContextMenu.show(
+          context,
+          details.globalPosition,
+          word.sentenceText!,
+        ),
         behavior: HitTestBehavior.opaque,
         child: row,
       );
     }
-    return row;
+    // 不可播放时也支持长按/右键复制
+    return GestureDetector(
+      onLongPressStart: (details) => TextContextMenu.show(
+        context,
+        details.globalPosition,
+        word.sentenceText!,
+      ),
+      onSecondaryTapDown: (details) => TextContextMenu.show(
+        context,
+        details.globalPosition,
+        word.sentenceText!,
+      ),
+      child: row,
+    );
   }
 
   /// 播放来源句子的原声片段
