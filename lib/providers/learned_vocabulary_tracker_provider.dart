@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/providers.dart';
 import '../services/learned_vocabulary_tracker.dart';
-import 'study_stats_provider.dart';
 
 /// 已学习词形追踪器 Provider
 ///
@@ -16,9 +15,10 @@ final learnedVocabularyTrackerProvider = Provider<LearnedVocabularyTracker>((
   final dao = ref.watch(learnedWordFormDaoProvider);
   final tracker = LearnedVocabularyTracker(
     persistWordForms: dao.insertIfAbsentAll,
-    onStatsUpdated: () {
-      ref.read(studyStatsNotifierProvider.notifier).refresh();
-    },
+    // 不在 flush 时刷新统计：学习期间 flush 频繁（~400ms），会触发不可见的
+    // StudyScreen 重建（柱状图等）。统计在 session 结束时由
+    // LearningSessionNotifier.endSession / BookmarkReviewNotifier 统一刷新。
+    onStatsUpdated: () {},
     onError: (error, stackTrace) {
       debugPrint('LearnedVocabularyTracker flush failed: $error\n$stackTrace');
     },

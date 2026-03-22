@@ -416,7 +416,8 @@ class _ReviewDifficultPracticeScreenState
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;
 
-    if (result.action == StepCompleteAction.continueNext && stepCtx.nextStepName != null) {
+    if (result.action == StepCompleteAction.continueNext &&
+        stepCtx.nextStepName != null) {
       _navigateBackToPlanAndAutoStart();
     } else {
       context.pop();
@@ -428,13 +429,11 @@ class _ReviewDifficultPracticeScreenState
     if (!mounted) return;
     final route = widget.collectionId != null
         ? AppRoutes.learningPlan(
-            widget.collectionId!, widget.audioItemId,
-            autoStart: true,
-          )
-        : AppRoutes.audioLearningPlan(
+            widget.collectionId!,
             widget.audioItemId,
             autoStart: true,
-          );
+          )
+        : AppRoutes.audioLearningPlan(widget.audioItemId, autoStart: true);
     context.pushReplacement(route);
   }
 
@@ -446,8 +445,13 @@ class _ReviewDifficultPracticeScreenState
     final playerState = ref.watch(reviewDifficultPracticeProvider);
     final player = ref.read(reviewDifficultPracticeProvider.notifier);
 
-    // watch 录音相关状态
-    final turnState = ref.watch(shadowingRecordingControllerProvider);
+    // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
+    ref.watch(
+      shadowingRecordingControllerProvider.select(
+        (s) => (s.phase, s.currentAttempt, s.promptId),
+      ),
+    );
+    final turnState = ref.read(shadowingRecordingControllerProvider);
 
     // 监听句子切换 + 自动播完信号 + 控制模式变化
     ref.listen<ReviewDifficultPracticeState>(reviewDifficultPracticeProvider, (

@@ -114,8 +114,11 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     final controller = ref.read(retellRecordingControllerProvider.notifier);
 
     final maxRecording = settings.calculateRetellingDuration(paragraphDuration);
-    AppLogger.log('RetellScreen', '更新阈值: 静音=20s, '
-        '最大录音=${maxRecording.inMilliseconds}ms');
+    AppLogger.log(
+      'RetellScreen',
+      '更新阈值: 静音=20s, '
+          '最大录音=${maxRecording.inMilliseconds}ms',
+    );
     controller.setSilenceTimeout(const Duration(seconds: 20));
     controller.setMaxRecordingDuration(maxRecording);
   }
@@ -147,8 +150,11 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     // 停止录音回放
     await _stopPlayback();
 
-    AppLogger.log('RetellScreen', '手动开始录音: '
-        '段落${ref.read(retellPlayerProvider).currentParagraphIndex + 1}');
+    AppLogger.log(
+      'RetellScreen',
+      '手动开始录音: '
+          '段落${ref.read(retellPlayerProvider).currentParagraphIndex + 1}',
+    );
     _updateRecordingThresholds();
     await controller.startRecording(
       promptId: promptId,
@@ -307,7 +313,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
           .read(learningProgressNotifierProvider.notifier)
           .incrementRetellPassCount(widget.audioItemId);
 
-      if (!mounted) { _isShowingDialog = false; return; }
+      if (!mounted) {
+        _isShowingDialog = false;
+        return;
+      }
 
       await handleFreePlayComplete(
         context: context,
@@ -460,22 +469,26 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       );
     }
 
-    // 段间停顿：倒计时环取代录音按钮
+    // 段间停顿：倒计时环取代录音按钮（Consumer 隔离 tick 重建）
     if (state.isRetellCountdown) {
-      return CountdownChip(
-        remaining: state.pauseRemaining,
-        total: state.pauseDuration,
-        isPaused: state.isCountdownPaused,
-        onTap: () {
-          final p = ref.read(retellPlayerProvider.notifier);
-          state.isCountdownPaused ? p.resumeCountdown() : p.pauseCountdown();
+      return Consumer(
+        builder: (context, ref, _) {
+          final s = ref.watch(retellPlayerProvider);
+          return CountdownChip(
+            remaining: s.pauseRemaining,
+            total: s.pauseDuration,
+            isPaused: s.isCountdownPaused,
+            onTap: () {
+              final p = ref.read(retellPlayerProvider.notifier);
+              s.isCountdownPaused ? p.resumeCountdown() : p.pauseCountdown();
+            },
+          );
         },
       );
     }
 
     // retelling 阶段：录音按钮
-    final isProcessing =
-        turnState.phase == ListenAndRepeatTurnPhase.processing;
+    final isProcessing = turnState.phase == ListenAndRepeatTurnPhase.processing;
     return IgnorePointer(
       ignoring: isProcessing,
       child: Opacity(
@@ -508,8 +521,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
   /// 触发自动录音或 badge 消失。
   Future<void> _goToNextParagraph() async {
     final retellState = ref.read(retellPlayerProvider);
-    final isLastParagraph = retellState.currentParagraphIndex >=
-        retellState.totalParagraphs - 1;
+    final isLastParagraph =
+        retellState.currentParagraphIndex >= retellState.totalParagraphs - 1;
 
     if (!isLastParagraph) {
       _manualStoppedThisParagraph = false;
@@ -543,7 +556,29 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final state = ref.watch(retellPlayerProvider);
+    // 只监听非倒计时字段，排除 pauseRemaining，
+    // 避免倒计时每 100ms tick 导致整个页面重建
+    ref.watch(
+      retellPlayerProvider.select(
+        (s) => (
+          s.currentParagraphIndex,
+          s.totalParagraphs,
+          s.playingSentenceIndex,
+          s.phase,
+          s.currentRepeatCount,
+          s.displayMode,
+          s.settings,
+          s.isPlaying,
+          s.isRetellCountdown,
+          s.pauseDuration,
+          s.isCountdownPaused,
+          s.isCountdownFastForward,
+          s.userOverrodeDisplayMode,
+          s.stepFinished,
+        ),
+      ),
+    );
+    final state = ref.read(retellPlayerProvider);
     final player = ref.read(retellPlayerProvider.notifier);
 
     // 监听自然完成信号 → 触发完成弹窗
@@ -554,42 +589,47 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       }
     });
 
-    // watch 录音相关状态
-    final retellRecState = ref.watch(retellRecordingControllerProvider);
+    // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
+    ref.watch(
+      retellRecordingControllerProvider.select(
+        (s) =>
+            (s.phase, s.awaitingSpeechTimedOut, s.currentAttempt, s.promptId),
+      ),
+    );
+    final retellRecState = ref.read(retellRecordingControllerProvider);
 
     // 映射为 ListenAndRepeatTurnState 供 SpeechPracticeTurnPanel 复用
     final turnState = _mapToTurnState(retellRecState);
 
     // 评估完成 → 启动段间停顿倒计时
-    ref.listen<RetellRecordingState>(
-      retellRecordingControllerProvider,
-      (prev, next) {
-        if (prev?.phase == RetellRecordingPhase.processing &&
-            next.phase == RetellRecordingPhase.idle) {
-          // 评估完成 → 切换到全部显示，方便用户检查（用户手动切换过则不干预）
-          final currentPlayerState = ref.read(retellPlayerProvider);
-          if (!currentPlayerState.userOverrodeDisplayMode) {
-            ref.read(retellPlayerProvider.notifier)
-                .setDisplayModeWithoutOverride(RetellDisplayMode.showAll);
-          }
-
-          final latestState = ref.read(retellPlayerProvider);
-          if (latestState.phase == RetellPhase.retelling &&
-              !latestState.settings.isManualMode &&
-              !_manualStoppedThisParagraph) {
-            AppLogger.log('RetellScreen', '评估完成 → 启动段间停顿');
-            ref.read(retellPlayerProvider.notifier)
-                .startPostEvaluationPause();
-          }
+    ref.listen<RetellRecordingState>(retellRecordingControllerProvider, (
+      prev,
+      next,
+    ) {
+      if (prev?.phase == RetellRecordingPhase.processing &&
+          next.phase == RetellRecordingPhase.idle) {
+        // 评估完成 → 切换到全部显示，方便用户检查（用户手动切换过则不干预）
+        final currentPlayerState = ref.read(retellPlayerProvider);
+        if (!currentPlayerState.userOverrodeDisplayMode) {
+          ref
+              .read(retellPlayerProvider.notifier)
+              .setDisplayModeWithoutOverride(RetellDisplayMode.showAll);
         }
-      },
-    );
+
+        final latestState = ref.read(retellPlayerProvider);
+        if (latestState.phase == RetellPhase.retelling &&
+            !latestState.settings.isManualMode &&
+            !_manualStoppedThisParagraph) {
+          AppLogger.log('RetellScreen', '评估完成 → 启动段间停顿');
+          ref.read(retellPlayerProvider.notifier).startPostEvaluationPause();
+        }
+      }
+    });
 
     // controlMode 切换 → 同步到录音控制器
     ref.listen<RetellPlayerState>(retellPlayerProvider, (prev, next) {
       if (prev?.settings.controlMode != next.settings.controlMode) {
-        final controller =
-            ref.read(retellRecordingControllerProvider.notifier);
+        final controller = ref.read(retellRecordingControllerProvider.notifier);
         controller.setManualMode(next.settings.isManualMode);
         // 切入手动模式时取消正在进行的自动录音和倒计时
         if (next.settings.isManualMode) {
@@ -626,16 +666,16 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         if (latestState.isRetellCountdown) return;
         if (_manualStoppedThisParagraph) return;
 
-        AppLogger.log('RetellScreen', '自动开始录音: '
-            '段落${latestState.currentParagraphIndex + 1}');
+        AppLogger.log(
+          'RetellScreen',
+          '自动开始录音: '
+              '段落${latestState.currentParagraphIndex + 1}',
+        );
         _updateRecordingThresholds();
         unawaited(
           ref
               .read(retellRecordingControllerProvider.notifier)
-              .startRecording(
-                promptId: promptId,
-                referenceText: referenceText,
-              ),
+              .startRecording(promptId: promptId, referenceText: referenceText),
         );
       });
     }
@@ -650,7 +690,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     // 录音结果（从 controller state 获取）
     final currentPromptId = _currentPromptId();
     final currentAttempt = retellRecState.currentAttempt;
-    final isRecordingCurrent = retellRecState.isRecordingPrompt(currentPromptId);
+    final isRecordingCurrent = retellRecState.isRecordingPrompt(
+      currentPromptId,
+    );
 
     return LearningHotkeyScope(
       onPlayPause: () {
@@ -751,8 +793,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                       l10n: l10n,
                       attempt: currentAttempt,
                       isPlaying: _playingPromptId == currentPromptId,
-                      onTap: () =>
-                          _handleAttemptPlaybackTap(currentPromptId),
+                      onTap: () => _handleAttemptPlaybackTap(currentPromptId),
                       thresholds: RatingThresholds.retell,
                     ),
                   ),
@@ -817,25 +858,35 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                 height: 32,
                 child: Center(
                   child: _buildStatusText(
-                    state, turnState, currentAttempt, l10n, theme,
+                    state,
+                    turnState,
+                    currentAttempt,
+                    l10n,
+                    theme,
                   ),
                 ),
               ),
 
               // 录音按钮 或 段间停顿倒计时（固定位置）
-              _buildCenterButton(state, turnState, isRecordingCurrent, l10n, ref),
+              _buildCenterButton(
+                state,
+                turnState,
+                isRecordingCurrent,
+                l10n,
+                ref,
+              ),
 
               const SizedBox(height: AppSpacing.m),
 
               // 播放控制栏
               ParagraphBottomControls(
                 canGoPrev: state.currentParagraphIndex > 0,
-                isLastParagraph: state.currentParagraphIndex >=
-                    state.totalParagraphs - 1,
+                isLastParagraph:
+                    state.currentParagraphIndex >= state.totalParagraphs - 1,
                 centerIcon: state.phase == RetellPhase.listening
                     ? (state.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded)
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded)
                     : Icons.play_arrow_rounded,
                 onCenter: state.phase == RetellPhase.listening
                     ? (state.isPlaying ? player.pause : player.resume)
@@ -910,4 +961,3 @@ class _DisplayModeSegmentLabel extends StatelessWidget {
     );
   }
 }
-

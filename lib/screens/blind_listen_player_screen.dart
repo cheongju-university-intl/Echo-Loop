@@ -68,7 +68,6 @@ class _BlindListenPlayerScreenState
     });
   }
 
-
   // ========== 完成处理 ==========
 
   /// 播放完成处理
@@ -215,13 +214,11 @@ class _BlindListenPlayerScreenState
     if (!mounted) return;
     final route = widget.collectionId != null
         ? AppRoutes.learningPlan(
-            widget.collectionId!, widget.audioItemId,
-            autoStart: true,
-          )
-        : AppRoutes.audioLearningPlan(
+            widget.collectionId!,
             widget.audioItemId,
             autoStart: true,
-          );
+          )
+        : AppRoutes.audioLearningPlan(widget.audioItemId, autoStart: true);
     context.pushReplacement(route);
   }
 
@@ -270,7 +267,26 @@ class _BlindListenPlayerScreenState
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final session = ref.watch(learningSessionProvider);
-    final playerState = ref.watch(blindListenPlayerProvider);
+    // 只监听非倒计时字段，排除 pauseRemaining，
+    // 避免倒计时每 100ms tick 导致整个页面重建
+    ref.watch(
+      blindListenPlayerProvider.select(
+        (s) => (
+          s.currentParagraphIndex,
+          s.totalParagraphs,
+          s.playingSentenceIndex,
+          s.currentRepeatCount,
+          s.isPlaying,
+          s.isPauseCountdown,
+          s.pauseDuration,
+          s.isCountdownPaused,
+          s.displayMode,
+          s.settings,
+          s.stepFinished,
+        ),
+      ),
+    );
+    final playerState = ref.read(blindListenPlayerProvider);
 
     // 监听自然完成信号 → 触发完成弹窗
     ref.listen(blindListenPlayerProvider, (prev, next) {
@@ -304,8 +320,7 @@ class _BlindListenPlayerScreenState
     final sentences = player.currentParagraphSentences;
     final paragraphDuration = player.currentParagraphDuration;
     final progress = (playerState.totalParagraphs > 0)
-        ? (playerState.currentParagraphIndex + 1) /
-            playerState.totalParagraphs
+        ? (playerState.currentParagraphIndex + 1) / playerState.totalParagraphs
         : 0.0;
 
     return LearningHotkeyScope(
@@ -321,8 +336,7 @@ class _BlindListenPlayerScreenState
       onPrevious: () => player.goToPreviousParagraph(),
       onNext: () {
         final ps = ref.read(blindListenPlayerProvider);
-        final isLast =
-            ps.currentParagraphIndex >= ps.totalParagraphs - 1;
+        final isLast = ps.currentParagraphIndex >= ps.totalParagraphs - 1;
         if (isLast) {
           ref.read(blindListenPlayerProvider.notifier).pause();
           _handleCompleted();
@@ -365,44 +379,44 @@ class _BlindListenPlayerScreenState
               // 句子列表
               Expanded(
                 child: Card(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
                   child: ListView.separated(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
                     itemCount: sentences.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
                       indent: AppSpacing.m,
                       endIndent: AppSpacing.m,
-                      color: theme.colorScheme.outlineVariant
-                          .withValues(alpha: 0.3),
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.3,
+                      ),
                     ),
                     itemBuilder: (context, index) {
                       final sentence = sentences[index];
                       return RetellSentenceTile(
                         sentence: sentence,
                         phase: RetellPhase.listening,
-                        displayMode: playerState.displayMode ==
+                        displayMode:
+                            playerState.displayMode ==
                                 BlindListenDisplayMode.showAll
                             ? RetellDisplayMode.showAll
                             : RetellDisplayMode.hideAll,
                         keywordIndices: const {},
                         isPlayingSentence:
                             index == playerState.playingSentenceIndex,
-                        onWordTap: playerState.displayMode ==
+                        onWordTap:
+                            playerState.displayMode ==
                                 BlindListenDisplayMode.showAll
                             ? (word) => showWordDictionarySheet(
-                                  context: context,
-                                  word: word,
-                                  audioItemId: widget.audioItemId,
-                                  sentenceIndex: index,
-                                  sentenceText: sentence.text,
-                                  sentenceStartMs:
-                                      sentence.startTime.inMilliseconds,
-                                  sentenceEndMs:
-                                      sentence.endTime.inMilliseconds,
-                                )
+                                context: context,
+                                word: word,
+                                audioItemId: widget.audioItemId,
+                                sentenceIndex: index,
+                                sentenceText: sentence.text,
+                                sentenceStartMs:
+                                    sentence.startTime.inMilliseconds,
+                                sentenceEndMs: sentence.endTime.inMilliseconds,
+                              )
                             : null,
                       );
                     },
@@ -417,8 +431,8 @@ class _BlindListenPlayerScreenState
                 onTap: () {
                   final next =
                       playerState.displayMode == BlindListenDisplayMode.showAll
-                          ? BlindListenDisplayMode.hideAll
-                          : BlindListenDisplayMode.showAll;
+                      ? BlindListenDisplayMode.hideAll
+                      : BlindListenDisplayMode.showAll;
                   player.setDisplayMode(next);
                 },
                 child: Row(
@@ -429,8 +443,9 @@ class _BlindListenPlayerScreenState
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
                       size: 14,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.5),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -438,8 +453,9 @@ class _BlindListenPlayerScreenState
                           ? l10n.blindListenDisplayHideAll
                           : l10n.intensiveListenPeek,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.5),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
                     ),
                   ],
@@ -461,62 +477,65 @@ class _BlindListenPlayerScreenState
                 ),
               ),
 
-              // 倒计时/状态提示区域
+              // 倒计时/状态提示区域（倒计时用 Consumer 隔离 tick 重建）
               SizedBox(
                 height: 56,
                 child: Center(
                   child: playerState.isPauseCountdown
-                      ? CountdownChip(
-                          remaining: playerState.pauseRemaining,
-                          total: playerState.pauseDuration,
-                          isPaused: playerState.isCountdownPaused,
-                          onTap: () {
-                            playerState.isCountdownPaused
-                                ? player.resumeCountdown()
-                                : player.pauseCountdown();
+                      ? Consumer(
+                          builder: (context, ref, _) {
+                            final s = ref.watch(blindListenPlayerProvider);
+                            return CountdownChip(
+                              remaining: s.pauseRemaining,
+                              total: s.pauseDuration,
+                              isPaused: s.isCountdownPaused,
+                              onTap: () {
+                                s.isCountdownPaused
+                                    ? player.resumeCountdown()
+                                    : player.pauseCountdown();
+                              },
+                            );
                           },
                         )
                       : playerState.isPlaying
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.headphones,
-                                  size: 20,
-                                  color: theme.colorScheme.primary,
-                                ),
-                                const SizedBox(width: AppSpacing.s),
-                                Text(
-                                  l10n.blindListenListeningHint,
-                                  style:
-                                      theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : _isManualIdleState(playerState)
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.lightbulb_outline,
-                                      size: 20,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: AppSpacing.s),
-                                    Text(
-                                      l10n.blindListenRecallHint,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                        color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : null,
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.headphones,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: AppSpacing.s),
+                            Text(
+                              l10n.blindListenListeningHint,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        )
+                      : _isManualIdleState(playerState)
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.lightbulb_outline,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: AppSpacing.s),
+                            Text(
+                              l10n.blindListenRecallHint,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        )
+                      : null,
                 ),
               ),
 
@@ -525,16 +544,17 @@ class _BlindListenPlayerScreenState
               // 底部控制栏
               ParagraphBottomControls(
                 canGoPrev: playerState.currentParagraphIndex > 0,
-                isLastParagraph: playerState.currentParagraphIndex >=
+                isLastParagraph:
+                    playerState.currentParagraphIndex >=
                     playerState.totalParagraphs - 1,
                 centerIcon: playerState.isPlaying
                     ? Icons.pause_rounded
                     : Icons.play_arrow_rounded,
-                onCenter:
-                    playerState.isPlaying ? player.pause : player.resume,
+                onCenter: playerState.isPlaying ? player.pause : player.resume,
                 onPrevious: () => player.goToPreviousParagraph(),
                 onNext: () {
-                  final isLast = playerState.currentParagraphIndex >=
+                  final isLast =
+                      playerState.currentParagraphIndex >=
                       playerState.totalParagraphs - 1;
                   if (isLast) {
                     player.pause();
@@ -555,8 +575,9 @@ class _BlindListenPlayerScreenState
                       playerState.settings.repeatCount,
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.5),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
                   ),
                 )
@@ -568,7 +589,6 @@ class _BlindListenPlayerScreenState
       ),
     );
   }
-
 }
 
 /// 判断子步骤是否有专用播放器页面
@@ -593,4 +613,3 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.reviewRetellParagraph => l10n.stepRetelling,
       SubStageType.reviewRetellSummary => l10n.stepRetelling,
     };
-

@@ -270,8 +270,13 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     final playerState = ref.watch(bookmarkReviewProvider);
     final player = ref.read(bookmarkReviewProvider.notifier);
 
-    // watch 录音相关状态
-    final turnState = ref.watch(shadowingRecordingControllerProvider);
+    // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
+    ref.watch(
+      shadowingRecordingControllerProvider.select(
+        (s) => (s.phase, s.currentAttempt, s.promptId),
+      ),
+    );
+    final turnState = ref.read(shadowingRecordingControllerProvider);
 
     // 监听句子切换 + 自动播完信号 + 控制模式变化
     ref.listen<ReviewDifficultPracticeState>(bookmarkReviewProvider, (

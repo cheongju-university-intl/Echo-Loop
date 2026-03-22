@@ -49,7 +49,20 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(flashcardNotifierProvider);
+    // 只监听影响卡片/AppBar 的字段，排除倒计时相关字段，
+    // 避免倒计时每 100ms tick 导致整个页面（含 3D 变换卡片）重建
+    final state = ref.watch(
+      flashcardNotifierProvider.select(
+        (s) => (
+          words: s.words,
+          currentIndex: s.currentIndex,
+          isShowingBack: s.isShowingBack,
+          isCompleted: s.isCompleted,
+          removedCount: s.removedCount,
+          settings: s.settings,
+        ),
+      ),
+    );
     final l10n = AppLocalizations.of(context)!;
 
     if (state.isCompleted) {
@@ -58,6 +71,11 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
         removedCount: state.removedCount,
       );
     }
+
+    final currentWord =
+        state.words.isNotEmpty && state.currentIndex < state.words.length
+        ? state.words[state.currentIndex]
+        : null;
 
     return PopScope(
       canPop: false,
@@ -107,10 +125,10 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
                     horizontal: AppSpacing.l,
                     vertical: AppSpacing.m,
                   ),
-                  child: state.currentWord != null
+                  child: currentWord != null
                       ? FlashcardCard(
-                          key: ValueKey(state.currentWord!.savedWord.word),
-                          item: state.currentWord!,
+                          key: ValueKey(currentWord.savedWord.word),
+                          item: currentWord,
                           isShowingBack: state.isShowingBack,
                           onFlip: () => ref
                               .read(flashcardNotifierProvider.notifier)
@@ -124,25 +142,32 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
               ),
             ),
 
-            // 底部控制栏
-            _BottomControls(
-              currentIndex: state.currentIndex,
-              totalCount: state.words.length,
-              countdownRemaining: state.countdownRemaining,
-              countdownTotal: state.countdownTotal,
-              isPaused: state.isPaused,
-              showCountdown:
-                  !state.settings.isManualMode &&
-                  state.countdownTotal > Duration.zero,
-              onPrevious: state.currentIndex > 0
-                  ? () => ref
-                        .read(flashcardNotifierProvider.notifier)
-                        .previousCard()
-                  : null,
-              onNext: () =>
-                  ref.read(flashcardNotifierProvider.notifier).nextCard(),
-              onTogglePause: () =>
-                  ref.read(flashcardNotifierProvider.notifier).togglePause(),
+            // 底部控制栏：用 Consumer 隔离倒计时重建，
+            // 避免倒计时 tick 触发卡片区域重建
+            Consumer(
+              builder: (context, ref, _) {
+                final s = ref.watch(flashcardNotifierProvider);
+                return _BottomControls(
+                  currentIndex: s.currentIndex,
+                  totalCount: s.words.length,
+                  countdownRemaining: s.countdownRemaining,
+                  countdownTotal: s.countdownTotal,
+                  isPaused: s.isPaused,
+                  showCountdown:
+                      !s.settings.isManualMode &&
+                      s.countdownTotal > Duration.zero,
+                  onPrevious: s.currentIndex > 0
+                      ? () => ref
+                            .read(flashcardNotifierProvider.notifier)
+                            .previousCard()
+                      : null,
+                  onNext: () =>
+                      ref.read(flashcardNotifierProvider.notifier).nextCard(),
+                  onTogglePause: () => ref
+                      .read(flashcardNotifierProvider.notifier)
+                      .togglePause(),
+                );
+              },
             ),
           ],
         ),

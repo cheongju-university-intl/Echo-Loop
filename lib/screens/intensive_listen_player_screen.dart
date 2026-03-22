@@ -245,13 +245,11 @@ class _IntensiveListenPlayerScreenState
     if (!mounted) return;
     final route = widget.collectionId != null
         ? AppRoutes.learningPlan(
-            widget.collectionId!, widget.audioItemId,
-            autoStart: true,
-          )
-        : AppRoutes.audioLearningPlan(
+            widget.collectionId!,
             widget.audioItemId,
             autoStart: true,
-          );
+          )
+        : AppRoutes.audioLearningPlan(widget.audioItemId, autoStart: true);
     context.pushReplacement(route);
   }
 
@@ -429,7 +427,32 @@ class _IntensiveListenPlayerScreenState
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    final playerState = ref.watch(intensiveListenPlayerProvider);
+    // 只监听非倒计时字段，排除 pauseRemaining / annotationReplayRemaining，
+    // 避免倒计时每 100ms tick 导致整个页面（含 ListView、句子卡片）重建
+    ref.watch(
+      intensiveListenPlayerProvider.select(
+        (s) => (
+          s.currentSentenceIndex,
+          s.totalSentences,
+          s.currentPlayCount,
+          s.settings,
+          s.isPlaying,
+          s.isPauseBetweenPlays,
+          s.isPauseBetweenSentences,
+          s.pauseDuration,
+          s.annotationReplayDuration,
+          s.isAnnotationMode,
+          s.isAnnotationReplay,
+          s.isTextRevealed,
+          s.difficultSentences,
+          s.isCurrentSentenceAutoMarked,
+          s.isCountdownPaused,
+          s.isCountdownFastForward,
+          s.stepFinished,
+        ),
+      ),
+    );
+    final playerState = ref.read(intensiveListenPlayerProvider);
     final player = ref.read(intensiveListenPlayerProvider.notifier);
 
     // 监听自然完成信号 → 触发完成弹窗
@@ -517,8 +540,7 @@ class _IntensiveListenPlayerScreenState
                           isDifficult: playerState.difficultSentences.contains(
                             playerState.currentSentenceIndex,
                           ),
-                          isAutoMarked:
-                              playerState.isCurrentSentenceAutoMarked,
+                          isAutoMarked: playerState.isCurrentSentenceAutoMarked,
                           aiNotifier: ref.read(sentenceAiNotifierProvider),
                           audioItemId: widget.audioItemId,
                           sentenceIndex: playerState.currentSentenceIndex,
@@ -578,19 +600,27 @@ class _IntensiveListenPlayerScreenState
                           ),
                         ),
                       ),
+                    // 倒计时区域用 Consumer 隔离，避免 tick 触发外层重建
                     if ((playerState.isAnnotationMode ||
                             playerState.isAnnotationReplay) &&
                         playerState.isPauseBetweenSentences)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                        child: CountdownChip(
-                          remaining: playerState.pauseRemaining,
-                          total: playerState.pauseDuration,
-                          isPaused: playerState.isCountdownPaused,
-                          onTap: () => playerState.isCountdownPaused
-                              ? player.resumeCountdown()
-                              : player.pauseCountdown(),
-                        ),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final s = ref.watch(intensiveListenPlayerProvider);
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.m,
+                            ),
+                            child: CountdownChip(
+                              remaining: s.pauseRemaining,
+                              total: s.pauseDuration,
+                              isPaused: s.isCountdownPaused,
+                              onTap: () => s.isCountdownPaused
+                                  ? player.resumeCountdown()
+                                  : player.pauseCountdown(),
+                            ),
+                          );
+                        },
                       ),
 
                     // === 通用：播放控制 ===
@@ -728,8 +758,8 @@ class _AnnotationWithBookmark extends StatelessWidget {
     // 标记文案：自动标记 / 手动标记 / 未标记
     final labelText = isDifficult
         ? (isAutoMarked
-            ? l10n.intensiveListenAutoMarkedDifficult
-            : l10n.intensiveListenMarkedDifficult)
+              ? l10n.intensiveListenAutoMarkedDifficult
+              : l10n.intensiveListenMarkedDifficult)
         : l10n.intensiveListenNotDifficult;
 
     return Padding(
@@ -849,18 +879,17 @@ class _NormalModeView extends StatelessWidget {
                     child: playerState.isTextRevealed && sentenceText != null
                         ? GestureDetector(
                             onTap: () {}, // 拦截点击，不冒泡到外层
-                            onLongPressStart: (details) =>
-                                TextContextMenu.show(
+                            onLongPressStart: (details) => TextContextMenu.show(
                               context,
                               details.globalPosition,
                               sentenceText!,
                             ),
                             onSecondaryTapDown: (details) =>
                                 TextContextMenu.show(
-                              context,
-                              details.globalPosition,
-                              sentenceText!,
-                            ),
+                                  context,
+                                  details.globalPosition,
+                                  sentenceText!,
+                                ),
                             child: Text(
                               sentenceText!,
                               style: theme.textTheme.titleMedium?.copyWith(
@@ -889,15 +918,20 @@ class _NormalModeView extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 倒计时（固定 56 高度占位，避免字幕区跳动）
+              // 倒计时用 Consumer 隔离，避免 tick 触发外层重建
               SizedBox(
                 height: 56,
                 child: playerState.isPauseBetweenPlays
-                    ? CountdownChip(
-                        remaining: playerState.pauseRemaining,
-                        total: playerState.pauseDuration,
-                        isPaused: playerState.isCountdownPaused,
-                        onTap: onPauseCountdown,
+                    ? Consumer(
+                        builder: (context, ref, _) {
+                          final s = ref.watch(intensiveListenPlayerProvider);
+                          return CountdownChip(
+                            remaining: s.pauseRemaining,
+                            total: s.pauseDuration,
+                            isPaused: s.isCountdownPaused,
+                            onTap: onPauseCountdown,
+                          );
+                        },
                       )
                     : null,
               ),
@@ -1028,29 +1062,29 @@ class _AnnotationModeView extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(top: AppSpacing.s),
       child: SentenceAnnotationCard(
-            key: ValueKey(text),
-            text: text,
-            isDifficult: isDifficult,
-            showAutoMarkedLabel: isAutoMarked,
-            onRequestTranslation: ai != null
-                ? () async {
-                    final result = await ai.getTranslation(text);
-                    return result.translation;
-                  }
-                : null,
-            onRequestAnalysis: ai != null
-                ? () async {
-                    final result = await ai.getAnalysis(text);
-                    return result.toDisplayString();
-                  }
-                : null,
-            cachedTranslation: cachedTranslation,
-            cachedAnalysis: cachedAnalysisText,
-            audioItemId: audioItemId,
-            sentenceIndex: sentenceIndex,
-            sentenceStartMs: sentenceStartMs,
-            sentenceEndMs: sentenceEndMs,
-          ),
+        key: ValueKey(text),
+        text: text,
+        isDifficult: isDifficult,
+        showAutoMarkedLabel: isAutoMarked,
+        onRequestTranslation: ai != null
+            ? () async {
+                final result = await ai.getTranslation(text);
+                return result.translation;
+              }
+            : null,
+        onRequestAnalysis: ai != null
+            ? () async {
+                final result = await ai.getAnalysis(text);
+                return result.toDisplayString();
+              }
+            : null,
+        cachedTranslation: cachedTranslation,
+        cachedAnalysis: cachedAnalysisText,
+        audioItemId: audioItemId,
+        sentenceIndex: sentenceIndex,
+        sentenceStartMs: sentenceStartMs,
+        sentenceEndMs: sentenceEndMs,
+      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../database/providers.dart';
@@ -56,6 +57,39 @@ class StudyStats {
     this.dailyInputSeconds = const [0, 0, 0, 0, 0, 0, 0],
     this.dailyOutputSeconds = const [0, 0, 0, 0, 0, 0, 0],
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StudyStats &&
+          streak == other.streak &&
+          todaySeconds == other.todaySeconds &&
+          weekTotalSeconds == other.weekTotalSeconds &&
+          todayInputWords == other.todayInputWords &&
+          todayOutputWords == other.todayOutputWords &&
+          learnedWordFormCount == other.learnedWordFormCount &&
+          todayNewWordForms == other.todayNewWordForms &&
+          todayInputSeconds == other.todayInputSeconds &&
+          todayOutputSeconds == other.todayOutputSeconds &&
+          listEquals(dailySeconds, other.dailySeconds) &&
+          listEquals(dailyInputSeconds, other.dailyInputSeconds) &&
+          listEquals(dailyOutputSeconds, other.dailyOutputSeconds);
+
+  @override
+  int get hashCode => Object.hash(
+    streak,
+    todaySeconds,
+    weekTotalSeconds,
+    todayInputWords,
+    todayOutputWords,
+    learnedWordFormCount,
+    todayNewWordForms,
+    todayInputSeconds,
+    todayOutputSeconds,
+    Object.hashAll(dailySeconds),
+    Object.hashAll(dailyInputSeconds),
+    Object.hashAll(dailyOutputSeconds),
+  );
 }
 
 /// 学习统计 Provider
@@ -105,8 +139,13 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
   }
 
   /// 手动刷新统计数据
+  ///
+  /// 跳过 AsyncLoading 中间态以避免图表闪烁；
+  /// 若新数据与当前数据相同则不发射新状态，减少不必要的重建。
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = AsyncData(await _load());
+    final newStats = await _load();
+    if (newStats != state.valueOrNull) {
+      state = AsyncData(newStats);
+    }
   }
 }

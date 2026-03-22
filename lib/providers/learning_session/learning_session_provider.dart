@@ -197,14 +197,13 @@ class LearningSession extends _$LearningSession {
 
   /// 当前学习模式对应的 StudyStage（用于阶段明细双写）
   StudyStage? get _currentStage => switch (state.learningMode) {
-        LearningMode.blindListen => StudyStage.blindListen,
-        LearningMode.intensiveListen => StudyStage.intensiveListen,
-        LearningMode.listenAndRepeat => StudyStage.listenAndRepeat,
-        LearningMode.retell => StudyStage.retell,
-        LearningMode.reviewDifficultPractice =>
-          StudyStage.reviewDifficultPractice,
-        null => null,
-      };
+    LearningMode.blindListen => StudyStage.blindListen,
+    LearningMode.intensiveListen => StudyStage.intensiveListen,
+    LearningMode.listenAndRepeat => StudyStage.listenAndRepeat,
+    LearningMode.retell => StudyStage.retell,
+    LearningMode.reviewDifficultPractice => StudyStage.reviewDifficultPractice,
+    null => null,
+  };
 
   /// 停止计时并保存已记录的学习时长 + 输入/输出时间
   Future<void> _saveStudyTime() async {
@@ -315,21 +314,21 @@ class LearningSession extends _$LearningSession {
 
   /// 立即持久化输入词数（每播完一句调用，不丢数据）
   ///
-  /// 写入后刷新统计 UI，使词数实时可见。
+  /// 学习期间 study tab 不可见，无需实时刷新统计 UI。
+  /// 退出学习模式时 `exitLearningMode()` 会统一刷新。
   void addInputWords(int count) {
     if (count > 0) {
       _studyTimeService.addInputWords(count);
-      ref.read(studyStatsNotifierProvider.notifier).refresh();
     }
   }
 
   /// 立即持久化输出词数（每完成一次跟读/复述调用，不丢数据）
   ///
-  /// 写入后刷新统计 UI，使词数实时可见。
+  /// 学习期间 study tab 不可见，无需实时刷新统计 UI。
+  /// 退出学习模式时 `exitLearningMode()` 会统一刷新。
   void addOutputWords(int count) {
     if (count > 0) {
       _studyTimeService.addOutputWords(count);
-      ref.read(studyStatsNotifierProvider.notifier).refresh();
     }
   }
 

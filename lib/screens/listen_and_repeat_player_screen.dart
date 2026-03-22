@@ -488,13 +488,11 @@ class _ListenAndRepeatPlayerScreenState
     if (!mounted) return;
     final route = widget.collectionId != null
         ? AppRoutes.learningPlan(
-            widget.collectionId!, widget.audioItemId,
-            autoStart: true,
-          )
-        : AppRoutes.audioLearningPlan(
+            widget.collectionId!,
             widget.audioItemId,
             autoStart: true,
-          );
+          )
+        : AppRoutes.audioLearningPlan(widget.audioItemId, autoStart: true);
     context.pushReplacement(route);
   }
 
@@ -503,11 +501,37 @@ class _ListenAndRepeatPlayerScreenState
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    final playerState = ref.watch(listenAndRepeatPlayerProvider);
+    // 只监听非倒计时字段，排除 pauseRemaining，
+    // 避免倒计时每 100ms tick 导致整个页面重建
+    ref.watch(
+      listenAndRepeatPlayerProvider.select(
+        (s) => (
+          s.currentSentenceIndex,
+          s.totalSentences,
+          s.currentPlayCount,
+          s.targetPlayCount,
+          s.settings,
+          s.isPlaying,
+          s.isPauseBetweenPlays,
+          s.isPauseBetweenSentences,
+          s.pauseDuration,
+          s.isCountdownPaused,
+          s.isCountdownFastForward,
+          s.isPostEvalCountdown,
+          s.stepFinished,
+        ),
+      ),
+    );
+    final playerState = ref.read(listenAndRepeatPlayerProvider);
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
 
-    // watch 录音相关状态
-    final turnState = ref.watch(shadowingRecordingControllerProvider);
+    // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
+    ref.watch(
+      shadowingRecordingControllerProvider.select(
+        (s) => (s.phase, s.currentAttempt, s.promptId),
+      ),
+    );
+    final turnState = ref.read(shadowingRecordingControllerProvider);
 
     // 监听句子切换 + 自动播完信号
     ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
@@ -864,11 +888,17 @@ class _PostEvalCountdown extends StatelessWidget {
             children: [
               const SizedBox(width: 32),
               const SizedBox(width: 48),
-              CountdownChip(
-                remaining: playerState.pauseRemaining,
-                total: playerState.pauseDuration,
-                isPaused: playerState.isCountdownPaused,
-                onTap: onCountdownTap,
+              // Consumer 隔离倒计时 tick，避免触发外层重建
+              Consumer(
+                builder: (context, ref, _) {
+                  final s = ref.watch(listenAndRepeatPlayerProvider);
+                  return CountdownChip(
+                    remaining: s.pauseRemaining,
+                    total: s.pauseDuration,
+                    isPaused: s.isCountdownPaused,
+                    onTap: onCountdownTap,
+                  );
+                },
               ),
               const SizedBox(width: 48),
               GestureDetector(
