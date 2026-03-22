@@ -26,9 +26,6 @@ class TextContextMenu {
 
     final theme = Theme.of(context);
 
-    // 提前捕获根 ScaffoldMessenger，避免在 BottomSheet 等独立 Navigator 中找不到
-    final messenger = ScaffoldMessenger.maybeOf(context);
-
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(
@@ -71,14 +68,16 @@ class TextContextMenu {
       ],
     );
 
-    if (result == 'copy') {
+    if (result == 'copy' && context.mounted) {
       await Clipboard.setData(ClipboardData(text: text));
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(l10n.copied),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.copied),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
     }
   }
 }
