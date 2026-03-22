@@ -17,13 +17,13 @@ import '../../database/providers.dart';
 import '../../models/dict_entry.dart';
 import '../../models/flashcard_settings.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
+import '../../services/app_logger.dart';
 import '../../services/dictionary_service.dart';
 import '../../models/study_stage.dart';
 import '../../services/study_time_service.dart';
 import '../../services/tts_service.dart';
 import '../daily_study_time_provider.dart';
 import '../learning_session/countdown_controller.dart';
-import '../study_stats_provider.dart';
 
 part 'flashcard_provider.g.dart';
 
@@ -161,6 +161,9 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 音频播放状态监听（用于输入时间追踪）
   StreamSubscription<ja.PlayerState>? _inputTimePlayerStateSub;
 
+  /// TTS 代次计数器，切卡时递增，用于取消过期的 _speakCurrentWord
+  int _speakGeneration = 0;
+
   @override
   FlashcardState build() {
     _studyTimeService = ref.read(studyTimeServiceProvider);
@@ -184,8 +187,14 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     // 排序
     final sorted = _sortWords(words, settings.sortMode);
 
-    // 构建卡片列表
-    final items = sorted.map((w) => FlashcardWordItem(savedWord: w)).toList();
+    // 构建卡片列表并一次性加载全部词典
+    final allWords = sorted.map((w) => w.word).toList();
+    final allEntries = await DictionaryService.instance.lookupAll(allWords);
+    final items = sorted.map((w) => FlashcardWordItem(
+      savedWord: w,
+      dictEntry: allEntries[w.word],
+      dictLoaded: true,
+    )).toList();
 
     state = FlashcardState(
       words: items,
@@ -202,8 +211,6 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     _startInputTimeTracking();
 
     if (items.isNotEmpty) {
-      // 预加载词典（当前 + 前后 2 张）
-      _preloadDictionaries();
       // 自动 TTS 播放
       _speakCurrentWord();
       // 启动倒计时
@@ -217,6 +224,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   void flipCard() {
     if (state.isCompleted || state.words.isEmpty) return;
 
+    _speakGeneration++;
     final wasShowingBack = state.isShowingBack;
     // 先更新状态 → 翻转动画立即启动
     state = state.copyWith(isShowingBack: !wasShowingBack);
@@ -257,6 +265,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 先同步更新状态让 UI 立即刷新，再异步停止旧播放 + 朗读新单词，
   /// 避免平台通道调用（TTS stop / audio stop）阻塞当前帧渲染。
   void nextCard() {
+    final sw = Stopwatch()..start();
     if (state.isCompleted || state.words.isEmpty) return;
 
     if (state.currentIndex >= state.words.length - 1) {
@@ -269,6 +278,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     }
 
     // 1. 同步更新状态 → UI 立即刷新
+    _speakGeneration++;
     _countdown.cancel();
     _saveStudyTime();
     state = state.copyWith(
@@ -277,7 +287,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       cardStartTime: DateTime.now(),
     );
     _startCountdown();
-    _preloadDictionaries();
+    AppLogger.log('Flashcard', 'nextCard: sync=${sw.elapsedMilliseconds}ms');
 
     // 2. 异步停止旧播放 + 朗读新单词（不阻塞帧渲染）
     Future.microtask(() {
@@ -290,9 +300,11 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   ///
   /// 先同步更新状态让 UI 立即刷新，再异步停止旧播放 + 朗读新单词。
   void previousCard() {
+    final sw = Stopwatch()..start();
     if (state.currentIndex <= 0) return;
 
     // 1. 同步更新状态 → UI 立即刷新
+    _speakGeneration++;
     _countdown.cancel();
     _saveStudyTime();
     state = state.copyWith(
@@ -301,7 +313,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       cardStartTime: DateTime.now(),
     );
     _startCountdown();
-    _preloadDictionaries();
+    AppLogger.log('Flashcard', 'prevCard: sync=${sw.elapsedMilliseconds}ms');
 
     // 2. 异步停止旧播放 + 朗读新单词（不阻塞帧渲染）
     Future.microtask(() {
@@ -347,7 +359,6 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       cardStartTime: DateTime.now(),
     );
 
-    _preloadDictionaries();
     _speakCurrentWord();
     _startCountdown();
   }
@@ -356,11 +367,20 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   Future<void> updateSettings(FlashcardSettings newSettings) async {
     _countdown.cancel();
 
-    // 如果排序方式变了，重新排序
+    // 如果排序方式变了，重新排序（保留已加载的词典数据）
     if (newSettings.sortMode != state.settings.sortMode) {
+      // 建立 word → dictEntry 映射，排序后复用
+      final dictMap = <String, DictEntry?>{
+        for (final item in state.words)
+          if (item.dictLoaded) item.savedWord.word: item.dictEntry,
+      };
       final savedWords = state.words.map((w) => w.savedWord).toList();
       final sorted = _sortWords(savedWords, newSettings.sortMode);
-      final items = sorted.map((w) => FlashcardWordItem(savedWord: w)).toList();
+      final items = sorted.map((w) => FlashcardWordItem(
+        savedWord: w,
+        dictEntry: dictMap[w.word],
+        dictLoaded: dictMap.containsKey(w.word),
+      )).toList();
 
       state = state.copyWith(
         settings: newSettings,
@@ -370,7 +390,6 @@ class FlashcardNotifier extends _$FlashcardNotifier {
         cardStartTime: DateTime.now(),
       );
 
-      _preloadDictionaries();
       _speakCurrentWord();
     } else {
       state = state.copyWith(settings: newSettings);
@@ -553,48 +572,19 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
   /// TTS 朗读当前单词（受 autoPlayWord 设置控制）
   ///
-  /// TTS 朗读期间计入输入时间。
+  /// 使用 _speakGeneration 防止快速切卡时旧的 TTS 回调继续执行。
   Future<void> _speakCurrentWord() async {
     if (!state.settings.autoPlayWord) return;
     final word = state.currentWord?.savedWord.word;
     if (word != null) {
+      final gen = _speakGeneration;
       if (!_inputStopwatch.isRunning) _inputStopwatch.start();
       await TtsService.instance.speak(word);
+      // TTS 完成后检查是否已切卡，过期则跳过后续操作
+      if (gen != _speakGeneration) return;
       _inputStopwatch.stop();
       await _addInputWords(1);
     }
-  }
-
-  /// 预加载词典（当前 + 前后各 2 张）
-  void _preloadDictionaries() {
-    final start = (state.currentIndex - 2).clamp(0, state.words.length - 1);
-    final end = (state.currentIndex + 2).clamp(0, state.words.length - 1);
-
-    for (var i = start; i <= end; i++) {
-      if (!state.words[i].dictLoaded) {
-        _loadDictionary(i);
-      }
-    }
-  }
-
-  /// 加载单个词典条目
-  Future<void> _loadDictionary(int index) async {
-    if (index < 0 || index >= state.words.length) return;
-    if (state.words[index].dictLoaded) return;
-
-    final word = state.words[index].savedWord.word;
-    final entry = await DictionaryService.instance.lookup(word);
-
-    // 检查 state 是否仍然有效
-    if (index >= state.words.length) return;
-    if (state.words[index].savedWord.word != word) return;
-
-    final newWords = List<FlashcardWordItem>.from(state.words);
-    newWords[index] = newWords[index].copyWith(
-      dictEntry: entry,
-      dictLoaded: true,
-    );
-    state = state.copyWith(words: newWords);
   }
 
   /// 记录练习统计（翻到背面时）
@@ -678,7 +668,10 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     }
   }
 
-  /// 停止计时并保存已记录的学习时长 + 输入时间，刷新统计 UI
+  /// 停止计时并保存已记录的学习时长 + 输入时间
+  ///
+  /// stats UI（柱状图等）在切回学习 tab 时由 main_shell 自动刷新，
+  /// 这里只刷新 dailyStudyTimeProvider（顶部时长显示）。
   Future<void> _saveAndRefreshStudyTime() async {
     const stage = StudyStage.flashcard;
     // 保存输入时间
@@ -693,7 +686,6 @@ class FlashcardNotifier extends _$FlashcardNotifier {
         _studyStopwatch.elapsed == Duration.zero) {
       if (inputSecs > 0) {
         ref.read(dailyStudyTimeProvider.notifier).refresh();
-        ref.read(studyStatsNotifierProvider.notifier).refresh();
       }
       return;
     }
@@ -704,14 +696,12 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       await _studyTimeService.addStudyTime(seconds, stage: stage);
     }
     ref.read(dailyStudyTimeProvider.notifier).refresh();
-    ref.read(studyStatsNotifierProvider.notifier).refresh();
   }
 
-  /// 累加输入词数并刷新统计 UI
+  /// 累加输入词数（stats UI 在切回学习 tab 时由 main_shell 刷新）
   Future<void> _addInputWords(int count) async {
     if (count > 0) {
       await _studyTimeService.addInputWords(count);
-      ref.read(studyStatsNotifierProvider.notifier).refresh();
     }
   }
 
