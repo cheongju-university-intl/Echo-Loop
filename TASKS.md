@@ -489,6 +489,10 @@
 ---
 
 ## bug 修复
+- [x] iOS 点击收藏复习通知无法跳转收藏页（AppDelegate 缺少 UNUserNotificationCenter.delegate 设置 + 兼容旧 open_study_tasks payload）
+
+  **完成时间**: 2026-03-23
+
 - [ ] 在复习收藏内容（句子和单词）的时候要阻止息屏。
 - [ ] 确认一个学习任务完成之后，不能再阻止息屏了。
 
