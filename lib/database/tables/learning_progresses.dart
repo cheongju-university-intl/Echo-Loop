@@ -63,6 +63,12 @@ class LearningProgresses extends Table {
   /// 复述总完成遍数（每次完成复述 +1）
   IntColumn get retellPassCount => integer().nullable()();
 
+  /// 盲听断点续学段落索引（null 表示从头开始）
+  IntColumn get blindListenParagraphIndex => integer().nullable()();
+
+  /// 自由练习-盲听断点段落索引
+  IntColumn get freePlayBlindListenParagraphIndex => integer().nullable()();
+
   /// 自由练习-精听断点句子索引
   IntColumn get freePlayIntensiveListenSentenceIndex => integer().nullable()();
 

@@ -77,7 +77,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration {
@@ -189,6 +189,19 @@ class AppDatabase extends _$AppDatabase {
           );
         }
         // v21→v22：learning_progresses 双轨断点分离（各自独立索引 + 过期时间戳）
+        // v22→v23：盲听断点续学段落索引
+        if (from < 23) {
+          await _addColumnIfNotExists(
+            'learning_progresses',
+            'blind_listen_paragraph_index',
+            'INTEGER',
+          );
+          await _addColumnIfNotExists(
+            'learning_progresses',
+            'free_play_blind_listen_paragraph_index',
+            'INTEGER',
+          );
+        }
         if (from < 22) {
           await _addColumnIfNotExists(
             'learning_progresses',

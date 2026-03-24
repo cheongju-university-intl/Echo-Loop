@@ -2919,6 +2919,28 @@ class $LearningProgressesTable extends LearningProgresses
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _blindListenParagraphIndexMeta =
+      const VerificationMeta('blindListenParagraphIndex');
+  @override
+  late final GeneratedColumn<int> blindListenParagraphIndex =
+      GeneratedColumn<int>(
+        'blind_listen_paragraph_index',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _freePlayBlindListenParagraphIndexMeta =
+      const VerificationMeta('freePlayBlindListenParagraphIndex');
+  @override
+  late final GeneratedColumn<int> freePlayBlindListenParagraphIndex =
+      GeneratedColumn<int>(
+        'free_play_blind_listen_paragraph_index',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _freePlayIntensiveListenSentenceIndexMeta =
       const VerificationMeta('freePlayIntensiveListenSentenceIndex');
   @override
@@ -3015,6 +3037,8 @@ class $LearningProgressesTable extends LearningProgresses
     difficultPracticeSentenceIndex,
     retellParagraphIndex,
     retellPassCount,
+    blindListenParagraphIndex,
+    freePlayBlindListenParagraphIndex,
     freePlayIntensiveListenSentenceIndex,
     freePlayShadowingSentenceIndex,
     freePlayDifficultPracticeSentenceIndex,
@@ -3187,6 +3211,24 @@ class $LearningProgressesTable extends LearningProgresses
         ),
       );
     }
+    if (data.containsKey('blind_listen_paragraph_index')) {
+      context.handle(
+        _blindListenParagraphIndexMeta,
+        blindListenParagraphIndex.isAcceptableOrUnknown(
+          data['blind_listen_paragraph_index']!,
+          _blindListenParagraphIndexMeta,
+        ),
+      );
+    }
+    if (data.containsKey('free_play_blind_listen_paragraph_index')) {
+      context.handle(
+        _freePlayBlindListenParagraphIndexMeta,
+        freePlayBlindListenParagraphIndex.isAcceptableOrUnknown(
+          data['free_play_blind_listen_paragraph_index']!,
+          _freePlayBlindListenParagraphIndexMeta,
+        ),
+      );
+    }
     if (data.containsKey('free_play_intensive_listen_sentence_index')) {
       context.handle(
         _freePlayIntensiveListenSentenceIndexMeta,
@@ -3326,6 +3368,14 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.int,
         data['${effectivePrefix}retell_pass_count'],
       ),
+      blindListenParagraphIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}blind_listen_paragraph_index'],
+      ),
+      freePlayBlindListenParagraphIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}free_play_blind_listen_paragraph_index'],
+      ),
       freePlayIntensiveListenSentenceIndex: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}free_play_intensive_listen_sentence_index'],
@@ -3416,6 +3466,12 @@ class LearningProgressesData extends DataClass
   /// 复述总完成遍数（每次完成复述 +1）
   final int? retellPassCount;
 
+  /// 盲听断点续学段落索引（null 表示从头开始）
+  final int? blindListenParagraphIndex;
+
+  /// 自由练习-盲听断点段落索引
+  final int? freePlayBlindListenParagraphIndex;
+
   /// 自由练习-精听断点句子索引
   final int? freePlayIntensiveListenSentenceIndex;
 
@@ -3454,6 +3510,8 @@ class LearningProgressesData extends DataClass
     this.difficultPracticeSentenceIndex,
     this.retellParagraphIndex,
     this.retellPassCount,
+    this.blindListenParagraphIndex,
+    this.freePlayBlindListenParagraphIndex,
     this.freePlayIntensiveListenSentenceIndex,
     this.freePlayShadowingSentenceIndex,
     this.freePlayDifficultPracticeSentenceIndex,
@@ -3515,6 +3573,16 @@ class LearningProgressesData extends DataClass
     }
     if (!nullToAbsent || retellPassCount != null) {
       map['retell_pass_count'] = Variable<int>(retellPassCount);
+    }
+    if (!nullToAbsent || blindListenParagraphIndex != null) {
+      map['blind_listen_paragraph_index'] = Variable<int>(
+        blindListenParagraphIndex,
+      );
+    }
+    if (!nullToAbsent || freePlayBlindListenParagraphIndex != null) {
+      map['free_play_blind_listen_paragraph_index'] = Variable<int>(
+        freePlayBlindListenParagraphIndex,
+      );
     }
     if (!nullToAbsent || freePlayIntensiveListenSentenceIndex != null) {
       map['free_play_intensive_listen_sentence_index'] = Variable<int>(
@@ -3594,6 +3662,14 @@ class LearningProgressesData extends DataClass
       retellPassCount: retellPassCount == null && nullToAbsent
           ? const Value.absent()
           : Value(retellPassCount),
+      blindListenParagraphIndex:
+          blindListenParagraphIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(blindListenParagraphIndex),
+      freePlayBlindListenParagraphIndex:
+          freePlayBlindListenParagraphIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(freePlayBlindListenParagraphIndex),
       freePlayIntensiveListenSentenceIndex:
           freePlayIntensiveListenSentenceIndex == null && nullToAbsent
           ? const Value.absent()
@@ -3667,6 +3743,12 @@ class LearningProgressesData extends DataClass
         json['retellParagraphIndex'],
       ),
       retellPassCount: serializer.fromJson<int?>(json['retellPassCount']),
+      blindListenParagraphIndex: serializer.fromJson<int?>(
+        json['blindListenParagraphIndex'],
+      ),
+      freePlayBlindListenParagraphIndex: serializer.fromJson<int?>(
+        json['freePlayBlindListenParagraphIndex'],
+      ),
       freePlayIntensiveListenSentenceIndex: serializer.fromJson<int?>(
         json['freePlayIntensiveListenSentenceIndex'],
       ),
@@ -3723,6 +3805,12 @@ class LearningProgressesData extends DataClass
       ),
       'retellParagraphIndex': serializer.toJson<int?>(retellParagraphIndex),
       'retellPassCount': serializer.toJson<int?>(retellPassCount),
+      'blindListenParagraphIndex': serializer.toJson<int?>(
+        blindListenParagraphIndex,
+      ),
+      'freePlayBlindListenParagraphIndex': serializer.toJson<int?>(
+        freePlayBlindListenParagraphIndex,
+      ),
       'freePlayIntensiveListenSentenceIndex': serializer.toJson<int?>(
         freePlayIntensiveListenSentenceIndex,
       ),
@@ -3763,6 +3851,8 @@ class LearningProgressesData extends DataClass
     Value<int?> difficultPracticeSentenceIndex = const Value.absent(),
     Value<int?> retellParagraphIndex = const Value.absent(),
     Value<int?> retellPassCount = const Value.absent(),
+    Value<int?> blindListenParagraphIndex = const Value.absent(),
+    Value<int?> freePlayBlindListenParagraphIndex = const Value.absent(),
     Value<int?> freePlayIntensiveListenSentenceIndex = const Value.absent(),
     Value<int?> freePlayShadowingSentenceIndex = const Value.absent(),
     Value<int?> freePlayDifficultPracticeSentenceIndex = const Value.absent(),
@@ -3810,6 +3900,12 @@ class LearningProgressesData extends DataClass
     retellPassCount: retellPassCount.present
         ? retellPassCount.value
         : this.retellPassCount,
+    blindListenParagraphIndex: blindListenParagraphIndex.present
+        ? blindListenParagraphIndex.value
+        : this.blindListenParagraphIndex,
+    freePlayBlindListenParagraphIndex: freePlayBlindListenParagraphIndex.present
+        ? freePlayBlindListenParagraphIndex.value
+        : this.freePlayBlindListenParagraphIndex,
     freePlayIntensiveListenSentenceIndex:
         freePlayIntensiveListenSentenceIndex.present
         ? freePlayIntensiveListenSentenceIndex.value
@@ -3886,6 +3982,13 @@ class LearningProgressesData extends DataClass
       retellPassCount: data.retellPassCount.present
           ? data.retellPassCount.value
           : this.retellPassCount,
+      blindListenParagraphIndex: data.blindListenParagraphIndex.present
+          ? data.blindListenParagraphIndex.value
+          : this.blindListenParagraphIndex,
+      freePlayBlindListenParagraphIndex:
+          data.freePlayBlindListenParagraphIndex.present
+          ? data.freePlayBlindListenParagraphIndex.value
+          : this.freePlayBlindListenParagraphIndex,
       freePlayIntensiveListenSentenceIndex:
           data.freePlayIntensiveListenSentenceIndex.present
           ? data.freePlayIntensiveListenSentenceIndex.value
@@ -3937,6 +4040,10 @@ class LearningProgressesData extends DataClass
           )
           ..write('retellParagraphIndex: $retellParagraphIndex, ')
           ..write('retellPassCount: $retellPassCount, ')
+          ..write('blindListenParagraphIndex: $blindListenParagraphIndex, ')
+          ..write(
+            'freePlayBlindListenParagraphIndex: $freePlayBlindListenParagraphIndex, ',
+          )
           ..write(
             'freePlayIntensiveListenSentenceIndex: $freePlayIntensiveListenSentenceIndex, ',
           )
@@ -3977,6 +4084,8 @@ class LearningProgressesData extends DataClass
     difficultPracticeSentenceIndex,
     retellParagraphIndex,
     retellPassCount,
+    blindListenParagraphIndex,
+    freePlayBlindListenParagraphIndex,
     freePlayIntensiveListenSentenceIndex,
     freePlayShadowingSentenceIndex,
     freePlayDifficultPracticeSentenceIndex,
@@ -4009,6 +4118,9 @@ class LearningProgressesData extends DataClass
               this.difficultPracticeSentenceIndex &&
           other.retellParagraphIndex == this.retellParagraphIndex &&
           other.retellPassCount == this.retellPassCount &&
+          other.blindListenParagraphIndex == this.blindListenParagraphIndex &&
+          other.freePlayBlindListenParagraphIndex ==
+              this.freePlayBlindListenParagraphIndex &&
           other.freePlayIntensiveListenSentenceIndex ==
               this.freePlayIntensiveListenSentenceIndex &&
           other.freePlayShadowingSentenceIndex ==
@@ -4042,6 +4154,8 @@ class LearningProgressesCompanion
   final Value<int?> difficultPracticeSentenceIndex;
   final Value<int?> retellParagraphIndex;
   final Value<int?> retellPassCount;
+  final Value<int?> blindListenParagraphIndex;
+  final Value<int?> freePlayBlindListenParagraphIndex;
   final Value<int?> freePlayIntensiveListenSentenceIndex;
   final Value<int?> freePlayShadowingSentenceIndex;
   final Value<int?> freePlayDifficultPracticeSentenceIndex;
@@ -4068,6 +4182,8 @@ class LearningProgressesCompanion
     this.difficultPracticeSentenceIndex = const Value.absent(),
     this.retellParagraphIndex = const Value.absent(),
     this.retellPassCount = const Value.absent(),
+    this.blindListenParagraphIndex = const Value.absent(),
+    this.freePlayBlindListenParagraphIndex = const Value.absent(),
     this.freePlayIntensiveListenSentenceIndex = const Value.absent(),
     this.freePlayShadowingSentenceIndex = const Value.absent(),
     this.freePlayDifficultPracticeSentenceIndex = const Value.absent(),
@@ -4095,6 +4211,8 @@ class LearningProgressesCompanion
     this.difficultPracticeSentenceIndex = const Value.absent(),
     this.retellParagraphIndex = const Value.absent(),
     this.retellPassCount = const Value.absent(),
+    this.blindListenParagraphIndex = const Value.absent(),
+    this.freePlayBlindListenParagraphIndex = const Value.absent(),
     this.freePlayIntensiveListenSentenceIndex = const Value.absent(),
     this.freePlayShadowingSentenceIndex = const Value.absent(),
     this.freePlayDifficultPracticeSentenceIndex = const Value.absent(),
@@ -4123,6 +4241,8 @@ class LearningProgressesCompanion
     Expression<int>? difficultPracticeSentenceIndex,
     Expression<int>? retellParagraphIndex,
     Expression<int>? retellPassCount,
+    Expression<int>? blindListenParagraphIndex,
+    Expression<int>? freePlayBlindListenParagraphIndex,
     Expression<int>? freePlayIntensiveListenSentenceIndex,
     Expression<int>? freePlayShadowingSentenceIndex,
     Expression<int>? freePlayDifficultPracticeSentenceIndex,
@@ -4162,6 +4282,11 @@ class LearningProgressesCompanion
       if (retellParagraphIndex != null)
         'retell_paragraph_index': retellParagraphIndex,
       if (retellPassCount != null) 'retell_pass_count': retellPassCount,
+      if (blindListenParagraphIndex != null)
+        'blind_listen_paragraph_index': blindListenParagraphIndex,
+      if (freePlayBlindListenParagraphIndex != null)
+        'free_play_blind_listen_paragraph_index':
+            freePlayBlindListenParagraphIndex,
       if (freePlayIntensiveListenSentenceIndex != null)
         'free_play_intensive_listen_sentence_index':
             freePlayIntensiveListenSentenceIndex,
@@ -4199,6 +4324,8 @@ class LearningProgressesCompanion
     Value<int?>? difficultPracticeSentenceIndex,
     Value<int?>? retellParagraphIndex,
     Value<int?>? retellPassCount,
+    Value<int?>? blindListenParagraphIndex,
+    Value<int?>? freePlayBlindListenParagraphIndex,
     Value<int?>? freePlayIntensiveListenSentenceIndex,
     Value<int?>? freePlayShadowingSentenceIndex,
     Value<int?>? freePlayDifficultPracticeSentenceIndex,
@@ -4233,6 +4360,11 @@ class LearningProgressesCompanion
           difficultPracticeSentenceIndex ?? this.difficultPracticeSentenceIndex,
       retellParagraphIndex: retellParagraphIndex ?? this.retellParagraphIndex,
       retellPassCount: retellPassCount ?? this.retellPassCount,
+      blindListenParagraphIndex:
+          blindListenParagraphIndex ?? this.blindListenParagraphIndex,
+      freePlayBlindListenParagraphIndex:
+          freePlayBlindListenParagraphIndex ??
+          this.freePlayBlindListenParagraphIndex,
       freePlayIntensiveListenSentenceIndex:
           freePlayIntensiveListenSentenceIndex ??
           this.freePlayIntensiveListenSentenceIndex,
@@ -4326,6 +4458,16 @@ class LearningProgressesCompanion
     if (retellPassCount.present) {
       map['retell_pass_count'] = Variable<int>(retellPassCount.value);
     }
+    if (blindListenParagraphIndex.present) {
+      map['blind_listen_paragraph_index'] = Variable<int>(
+        blindListenParagraphIndex.value,
+      );
+    }
+    if (freePlayBlindListenParagraphIndex.present) {
+      map['free_play_blind_listen_paragraph_index'] = Variable<int>(
+        freePlayBlindListenParagraphIndex.value,
+      );
+    }
     if (freePlayIntensiveListenSentenceIndex.present) {
       map['free_play_intensive_listen_sentence_index'] = Variable<int>(
         freePlayIntensiveListenSentenceIndex.value,
@@ -4391,6 +4533,10 @@ class LearningProgressesCompanion
           )
           ..write('retellParagraphIndex: $retellParagraphIndex, ')
           ..write('retellPassCount: $retellPassCount, ')
+          ..write('blindListenParagraphIndex: $blindListenParagraphIndex, ')
+          ..write(
+            'freePlayBlindListenParagraphIndex: $freePlayBlindListenParagraphIndex, ',
+          )
           ..write(
             'freePlayIntensiveListenSentenceIndex: $freePlayIntensiveListenSentenceIndex, ',
           )
@@ -10887,6 +11033,8 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       Value<int?> difficultPracticeSentenceIndex,
       Value<int?> retellParagraphIndex,
       Value<int?> retellPassCount,
+      Value<int?> blindListenParagraphIndex,
+      Value<int?> freePlayBlindListenParagraphIndex,
       Value<int?> freePlayIntensiveListenSentenceIndex,
       Value<int?> freePlayShadowingSentenceIndex,
       Value<int?> freePlayDifficultPracticeSentenceIndex,
@@ -10915,6 +11063,8 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<int?> difficultPracticeSentenceIndex,
       Value<int?> retellParagraphIndex,
       Value<int?> retellPassCount,
+      Value<int?> blindListenParagraphIndex,
+      Value<int?> freePlayBlindListenParagraphIndex,
       Value<int?> freePlayIntensiveListenSentenceIndex,
       Value<int?> freePlayShadowingSentenceIndex,
       Value<int?> freePlayDifficultPracticeSentenceIndex,
@@ -11049,6 +11199,17 @@ class $$LearningProgressesTableFilterComposer
     column: $table.retellPassCount,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<int> get blindListenParagraphIndex => $composableBuilder(
+    column: $table.blindListenParagraphIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get freePlayBlindListenParagraphIndex =>
+      $composableBuilder(
+        column: $table.freePlayBlindListenParagraphIndex,
+        builder: (column) => ColumnFilters(column),
+      );
 
   ColumnFilters<int> get freePlayIntensiveListenSentenceIndex =>
       $composableBuilder(
@@ -11201,6 +11362,17 @@ class $$LearningProgressesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get blindListenParagraphIndex => $composableBuilder(
+    column: $table.blindListenParagraphIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get freePlayBlindListenParagraphIndex =>
+      $composableBuilder(
+        column: $table.freePlayBlindListenParagraphIndex,
+        builder: (column) => ColumnOrderings(column),
+      );
+
   ColumnOrderings<int> get freePlayIntensiveListenSentenceIndex =>
       $composableBuilder(
         column: $table.freePlayIntensiveListenSentenceIndex,
@@ -11352,6 +11524,17 @@ class $$LearningProgressesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get blindListenParagraphIndex => $composableBuilder(
+    column: $table.blindListenParagraphIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get freePlayBlindListenParagraphIndex =>
+      $composableBuilder(
+        column: $table.freePlayBlindListenParagraphIndex,
+        builder: (column) => column,
+      );
+
   GeneratedColumn<int> get freePlayIntensiveListenSentenceIndex =>
       $composableBuilder(
         column: $table.freePlayIntensiveListenSentenceIndex,
@@ -11464,6 +11647,9 @@ class $$LearningProgressesTableTableManager
                     const Value.absent(),
                 Value<int?> retellParagraphIndex = const Value.absent(),
                 Value<int?> retellPassCount = const Value.absent(),
+                Value<int?> blindListenParagraphIndex = const Value.absent(),
+                Value<int?> freePlayBlindListenParagraphIndex =
+                    const Value.absent(),
                 Value<int?> freePlayIntensiveListenSentenceIndex =
                     const Value.absent(),
                 Value<int?> freePlayShadowingSentenceIndex =
@@ -11495,6 +11681,9 @@ class $$LearningProgressesTableTableManager
                 difficultPracticeSentenceIndex: difficultPracticeSentenceIndex,
                 retellParagraphIndex: retellParagraphIndex,
                 retellPassCount: retellPassCount,
+                blindListenParagraphIndex: blindListenParagraphIndex,
+                freePlayBlindListenParagraphIndex:
+                    freePlayBlindListenParagraphIndex,
                 freePlayIntensiveListenSentenceIndex:
                     freePlayIntensiveListenSentenceIndex,
                 freePlayShadowingSentenceIndex: freePlayShadowingSentenceIndex,
@@ -11527,6 +11716,9 @@ class $$LearningProgressesTableTableManager
                     const Value.absent(),
                 Value<int?> retellParagraphIndex = const Value.absent(),
                 Value<int?> retellPassCount = const Value.absent(),
+                Value<int?> blindListenParagraphIndex = const Value.absent(),
+                Value<int?> freePlayBlindListenParagraphIndex =
+                    const Value.absent(),
                 Value<int?> freePlayIntensiveListenSentenceIndex =
                     const Value.absent(),
                 Value<int?> freePlayShadowingSentenceIndex =
@@ -11558,6 +11750,9 @@ class $$LearningProgressesTableTableManager
                 difficultPracticeSentenceIndex: difficultPracticeSentenceIndex,
                 retellParagraphIndex: retellParagraphIndex,
                 retellPassCount: retellPassCount,
+                blindListenParagraphIndex: blindListenParagraphIndex,
+                freePlayBlindListenParagraphIndex:
+                    freePlayBlindListenParagraphIndex,
                 freePlayIntensiveListenSentenceIndex:
                     freePlayIntensiveListenSentenceIndex,
                 freePlayShadowingSentenceIndex: freePlayShadowingSentenceIndex,

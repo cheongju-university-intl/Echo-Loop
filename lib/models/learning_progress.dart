@@ -42,6 +42,9 @@ class LearningProgress {
   /// 跟读总完成遍数（每次完成跟读 +1）
   final int? shadowingPassCount;
 
+  /// 盲听断点续学段落索引（null 表示从头开始）
+  final int? blindListenParagraphIndex;
+
   /// 精听断点续学句子索引（null 表示从头开始）
   final int? intensiveListenSentenceIndex;
 
@@ -56,6 +59,9 @@ class LearningProgress {
 
   /// 复述总完成遍数（每次完成复述 +1）
   final int? retellPassCount;
+
+  /// 自由练习-盲听断点段落索引
+  final int? freePlayBlindListenParagraphIndex;
 
   /// 自由练习-精听断点句子索引
   final int? freePlayIntensiveListenSentenceIndex;
@@ -91,11 +97,13 @@ class LearningProgress {
     this.intensiveListenDifficultCount,
     this.intensiveListenPassCount,
     this.shadowingPassCount,
+    this.blindListenParagraphIndex,
     this.intensiveListenSentenceIndex,
     this.shadowingSentenceIndex,
     this.difficultPracticeSentenceIndex,
     this.retellParagraphIndex,
     this.retellPassCount,
+    this.freePlayBlindListenParagraphIndex,
     this.freePlayIntensiveListenSentenceIndex,
     this.freePlayShadowingSentenceIndex,
     this.freePlayDifficultPracticeSentenceIndex,
@@ -259,11 +267,15 @@ class LearningProgress {
     int? intensiveListenDifficultCount,
     int? intensiveListenPassCount,
     int? shadowingPassCount,
+    int? blindListenParagraphIndex,
+    bool clearBlindListenParagraphIndex = false,
     int? intensiveListenSentenceIndex,
     int? shadowingSentenceIndex,
     int? difficultPracticeSentenceIndex,
     int? retellParagraphIndex,
     int? retellPassCount,
+    int? freePlayBlindListenParagraphIndex,
+    bool clearFreePlayBlindListenParagraphIndex = false,
     int? freePlayIntensiveListenSentenceIndex,
     bool clearFreePlayIntensiveListenSentenceIndex = false,
     int? freePlayShadowingSentenceIndex,
@@ -299,6 +311,9 @@ class LearningProgress {
       intensiveListenPassCount:
           intensiveListenPassCount ?? this.intensiveListenPassCount,
       shadowingPassCount: shadowingPassCount ?? this.shadowingPassCount,
+      blindListenParagraphIndex: clearBlindListenParagraphIndex
+          ? null
+          : (blindListenParagraphIndex ?? this.blindListenParagraphIndex),
       intensiveListenSentenceIndex: clearIntensiveListenSentenceIndex
           ? null
           : (intensiveListenSentenceIndex ?? this.intensiveListenSentenceIndex),
@@ -308,25 +323,29 @@ class LearningProgress {
       difficultPracticeSentenceIndex: clearDifficultPracticeSentenceIndex
           ? null
           : (difficultPracticeSentenceIndex ??
-              this.difficultPracticeSentenceIndex),
+                this.difficultPracticeSentenceIndex),
       retellParagraphIndex: clearRetellParagraphIndex
           ? null
           : (retellParagraphIndex ?? this.retellParagraphIndex),
       retellPassCount: retellPassCount ?? this.retellPassCount,
+      freePlayBlindListenParagraphIndex: clearFreePlayBlindListenParagraphIndex
+          ? null
+          : (freePlayBlindListenParagraphIndex ??
+                this.freePlayBlindListenParagraphIndex),
       freePlayIntensiveListenSentenceIndex:
           clearFreePlayIntensiveListenSentenceIndex
-              ? null
-              : (freePlayIntensiveListenSentenceIndex ??
-                  this.freePlayIntensiveListenSentenceIndex),
+          ? null
+          : (freePlayIntensiveListenSentenceIndex ??
+                this.freePlayIntensiveListenSentenceIndex),
       freePlayShadowingSentenceIndex: clearFreePlayShadowingSentenceIndex
           ? null
           : (freePlayShadowingSentenceIndex ??
-              this.freePlayShadowingSentenceIndex),
+                this.freePlayShadowingSentenceIndex),
       freePlayDifficultPracticeSentenceIndex:
           clearFreePlayDifficultPracticeSentenceIndex
-              ? null
-              : (freePlayDifficultPracticeSentenceIndex ??
-                  this.freePlayDifficultPracticeSentenceIndex),
+          ? null
+          : (freePlayDifficultPracticeSentenceIndex ??
+                this.freePlayDifficultPracticeSentenceIndex),
       freePlayRetellParagraphIndex: clearFreePlayRetellParagraphIndex
           ? null
           : (freePlayRetellParagraphIndex ?? this.freePlayRetellParagraphIndex),
