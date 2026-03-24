@@ -273,10 +273,13 @@ class BookmarkReview extends _$BookmarkReview {
   }
 
   /// 恢复播放
+  ///
+  /// 跟读模式下从当前遍数恢复跟读循环。
+  /// 盲听模式下从当前句重新开始。
   Future<void> resume() async {
     _studyStopwatch.start();
     if (state.isAnnotationMode) {
-      _startShadowReading();
+      _startShadowReading(startPlayCount: state.currentPlayCount);
       return;
     }
     await _startSentence(startPlayCount: state.currentPlayCount);
@@ -301,6 +304,7 @@ class BookmarkReview extends _$BookmarkReview {
     if (_sentences.isEmpty) return null;
 
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     _outputStopwatch.stop();
 
     final removedIndex = state.currentSentenceIndex;
@@ -383,7 +387,7 @@ class BookmarkReview extends _$BookmarkReview {
     _engine.invalidateSession();
     _invalidatePostEvalCountdown();
     if (state.isAnnotationMode) {
-      _startShadowReading();
+      _startShadowReading(startPlayCount: state.currentPlayCount);
     } else {
       state = state.copyWith(
         isPauseBetweenPlays: false,
@@ -452,10 +456,18 @@ class BookmarkReview extends _$BookmarkReview {
     );
   }
 
-  /// 使当前评估后倒计时失效
+  /// 使当前评估后倒计时失效，同时清除 state 中的倒计时标志
+  ///
+  /// 将 timer 取消和 state 清除合并在一起，避免调用点遗漏 copyWith。
   void _invalidatePostEvalCountdown() {
     _countdownRunId += 1;
     _countdown.cancel();
+    if (state.isPostEvalCountdown) {
+      state = state.copyWith(
+        isPostEvalCountdown: false,
+        isCountdownPaused: false,
+      );
+    }
   }
 
   /// 强制完成（用户在最后一句主动点击完成按钮）

@@ -253,11 +253,11 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
   /// 恢复播放
   ///
-  /// 跟读模式下从第 1 遍重新开始跟读循环（与跟读页行为一致）。
+  /// 跟读模式下从当前遍数恢复跟读循环。
   /// 盲听模式下从当前句重新开始。
   Future<void> resume() async {
     if (state.isAnnotationMode) {
-      _startShadowReading();
+      _startShadowReading(startPlayCount: state.currentPlayCount);
       return;
     }
     await _startSentence(startPlayCount: state.currentPlayCount);
@@ -300,6 +300,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (_sentences.isEmpty) return null;
 
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     try {
       ref.read(learningSessionProvider.notifier).stopOutputTimer();
     } catch (_) {}
@@ -309,10 +310,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     _sentences.removeAt(removedIndex);
 
     if (_sentences.isEmpty) {
-      state = state.copyWith(
-        isPlaying: false,
-        totalSentences: 0,
-      );
+      state = state.copyWith(isPlaying: false, totalSentences: 0);
       return removed;
     }
 
@@ -405,7 +403,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     _engine.invalidateSession();
     _invalidatePostEvalCountdown();
     if (state.isAnnotationMode) {
-      _startShadowReading();
+      _startShadowReading(startPlayCount: state.currentPlayCount);
     } else {
       state = state.copyWith(
         isPauseBetweenPlays: false,
@@ -475,10 +473,18 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     );
   }
 
-  /// 使当前评估后倒计时失效
+  /// 使当前评估后倒计时失效，同时清除 state 中的倒计时标志
+  ///
+  /// 将 timer 取消和 state 清除合并在一起，避免调用点遗漏 copyWith。
   void _invalidatePostEvalCountdown() {
     _countdownRunId += 1;
     _countdown.cancel();
+    if (state.isPostEvalCountdown) {
+      state = state.copyWith(
+        isPostEvalCountdown: false,
+        isCountdownPaused: false,
+      );
+    }
   }
 
   /// 停止播放（用户在最后一句主动点击完成按钮时调用）
