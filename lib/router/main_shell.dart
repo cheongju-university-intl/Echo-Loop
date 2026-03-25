@@ -45,10 +45,12 @@ class _MainShellState extends ConsumerState<MainShell> {
       _progressMapSubscription;
   ProviderSubscription<AppUpdateState>? _appUpdateSubscription;
   ProviderSubscription<ReminderSettings>? _reminderSettingsSubscription;
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
+    _lifecycleListener = AppLifecycleListener(onResume: _refreshStudyData);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
         ref.read(collectionListProvider.notifier).loadCollections();
@@ -104,6 +106,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _pendingTaskCountSubscription?.close();
     _progressMapSubscription?.close();
     _appUpdateSubscription?.close();
