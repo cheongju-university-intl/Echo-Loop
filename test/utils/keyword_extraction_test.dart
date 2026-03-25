@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/utils/keyword_extraction.dart';
+import 'package:fluency/utils/stopwords.dart';
 
 /// 辅助函数：创建带指定文本的句子列表
 List<Sentence> _makeSentences(List<String> texts) {
@@ -39,27 +40,12 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('短句（所有词 ≤ 4 字符但 > 2 字符）也能选出关键词', () {
-      final sentences = _makeSentences(['I am a dog', 'Go to bed now']);
-      final result = extractKeywords(sentences, random: Random(42));
-      // 候选词（长度>2）：dog(3), bed(3), now(3) → 应有关键词
-      expect(result, isNotEmpty);
-      expect(_totalKeywords(result), greaterThanOrEqualTo(1));
-    });
-
     test('至少提取 1 个关键词（保底机制）', () {
       final sentences = _makeSentences([
         'The beautiful sunset illuminated the entire valley',
       ]);
       final result = extractKeywords(sentences, random: Random(42));
       expect(_totalKeywords(result), greaterThanOrEqualTo(1));
-    });
-
-    test('单词句也能选出 1 个关键词', () {
-      final sentences = _makeSentences(['Hello']);
-      final result = extractKeywords(sentences, random: Random(42));
-      // "Hello" 长度 5 > 2，是候选词
-      expect(_totalKeywords(result), equals(1));
     });
 
     test('关键词索引在有效范围内', () {
@@ -94,33 +80,15 @@ void main() {
       }
     });
 
-    test('每句至少有 1 个关键词（有候选词的情况下）', () {
-      final sentences = _makeSentences([
-        'The beautiful sunset illuminated the valley',
-        'Complex algorithms require practice',
-        'Mathematical foundations knowledge',
-      ]);
-      final result = extractKeywords(
-        sentences,
-        ratio: KeywordRatio.oneTenth,
-        random: Random(42),
-      );
-      // 每句都有候选词（长度>2），所以每句至少 1 个
-      for (var i = 0; i < sentences.length; i++) {
-        expect(result.containsKey(i), isTrue, reason: '句子 $i 应该至少有 1 个关键词');
-        expect(result[i]!.length, greaterThanOrEqualTo(1));
-      }
-    });
-
     group('比例测试', () {
-      // 构造大量长词句子用于比例验证
+      // 构造全为非停用词的句子用于比例验证
       final sentences = _makeSentences([
         'absolutely beautiful certainly delightful especially fantastic generally hopefully',
         'incredibly joyfully knowledgeable lovingly meaningfully naturally obviously potentially',
         'remarkably significantly tremendously unfortunately wonderfully yesterday',
       ]);
 
-      // 总词数 22，全部 > 2 字符
+      // 总词数 22，全部 > 2 字符且非停用词
       test('1/2 比例选出约 50% 关键词', () {
         final result = extractKeywords(
           sentences,
@@ -150,7 +118,7 @@ void main() {
           random: Random(42),
         );
         final count = _totalKeywords(result);
-        // 22 * 0.2 ≈ 4，但每句至少 1 个（3 句 → 至少 3）
+        // 22 * 0.2 ≈ 4
         expect(count, inInclusiveRange(3, 7));
       });
 
@@ -161,32 +129,77 @@ void main() {
           random: Random(42),
         );
         final count = _totalKeywords(result);
-        // 22 * 0.1 ≈ 2，但每句至少 1 个（3 句 → 至少 3）
-        expect(count, inInclusiveRange(3, 5));
+        // 22 * 0.1 ≈ 2
+        expect(count, inInclusiveRange(1, 5));
       });
     });
 
-    test('长词被选中的概率更高（统计验证）', () {
-      // 构造一个短候选词（3 字母）和一个长候选词（15 字母）
-      final sentences = _makeSentences(['dog internationally']);
-      // 运行多次统计
-      var longWordSelected = 0;
-      const runs = 1000;
-      for (var i = 0; i < runs; i++) {
+    group('停用词过滤', () {
+      test('停用词不会被选为关键词', () {
+        final sentences = _makeSentences([
+          'The beautiful sunset was absolutely wonderful',
+        ]);
+        for (var seed = 0; seed < 100; seed++) {
+          final result = extractKeywords(
+            sentences,
+            ratio: KeywordRatio.half,
+            random: Random(seed),
+          );
+          if (result.containsKey(0)) {
+            final words = tokenize(sentences[0].text);
+            for (final idx in result[0]!) {
+              expect(
+                isStopword(words[idx]),
+                isFalse,
+                reason: '停用词 "${words[idx]}" 不应被选为关键词 (seed=$seed)',
+              );
+            }
+          }
+        }
+      });
+
+      test('仅含停用词的句子不产生关键词', () {
+        final sentences = _makeSentences(['The and with from they were']);
+        final result = extractKeywords(sentences, random: Random(42));
+        expect(result, isEmpty);
+      });
+
+      test('带标点的停用词也能正确过滤', () {
+        final sentences = _makeSentences(['The, beautiful through. wonderful']);
+        for (var seed = 0; seed < 50; seed++) {
+          final result = extractKeywords(
+            sentences,
+            ratio: KeywordRatio.half,
+            random: Random(seed),
+          );
+          if (result.containsKey(0)) {
+            final words = tokenize(sentences[0].text);
+            for (final idx in result[0]!) {
+              expect(
+                isStopword(words[idx]),
+                isFalse,
+                reason: '停用词 "${words[idx]}" 不应被选中 (seed=$seed)',
+              );
+            }
+          }
+        }
+      });
+
+      test('targetCount 基于总词数，上限为候选词数量', () {
+        // 11 个词，其中 5 个停用词 + 6 个内容词
+        final sentences = _makeSentences([
+          'The beautiful and wonderful but magnificent or spectacular yet incredible also extraordinary',
+        ]);
         final result = extractKeywords(
           sentences,
-          ratio: KeywordRatio.oneTenth,
-          random: Random(i),
+          ratio: KeywordRatio.half,
+          random: Random(42),
         );
-        // ratio 1/10 → target = max(1, round(2*0.1)) = 1，但每句至少1
-        // 所以只选 1 个关键词
-        if (result.isNotEmpty && result[0]!.contains(1)) {
-          longWordSelected++;
-        }
-      }
-      // "internationally"(15 字母) 应比 "dog"(3 字母) 更常被选中
-      // 期望比例：15/(15+3) ≈ 83%
-      expect(longWordSelected, greaterThan(runs * 0.6));
+        // 总词数 11，ratio 1/2 → targetCount = round(11 * 0.5) = 6
+        // 候选词恰好 6 个，clamp 上限 6 → 选 6 个
+        final count = _totalKeywords(result);
+        expect(count, inInclusiveRange(5, 6));
+      });
     });
   });
 
