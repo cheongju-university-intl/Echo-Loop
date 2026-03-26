@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 
 import '../models/speech_practice_models.dart';
+import 'app_logger.dart';
 import '../services/speech_practice_platform.dart';
 import 'study_event_recorder.dart';
 
@@ -238,8 +239,8 @@ class RecordingService {
       if (filePath != null && filePath.isNotEmpty) {
         await deleteRecording(filePath);
       }
-    } catch (_) {
-      // 忽略中断错误，目标只是尽快结束录音态。
+    } catch (e) {
+      AppLogger.log('Recording', '⚠ cancelRecording 异常（已忽略）: $e');
     }
 
     _currentFilePath = null;
@@ -251,8 +252,8 @@ class RecordingService {
     if (!_backend.isSupported) return;
     try {
       await _backend.deleteRecording(filePath);
-    } catch (_) {
-      // 删除失败不影响流程。
+    } catch (e) {
+      AppLogger.log('Recording', '⚠ deleteRecording 失败（已忽略）: $e');
     }
   }
 

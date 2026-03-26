@@ -3,6 +3,7 @@ import 'package:just_audio/just_audio.dart' as ja;
 import '../../database/app_database.dart' hide AudioItem;
 import '../../database/daos/playback_state_dao.dart';
 import '../../models/audio_item.dart';
+import '../../services/app_logger.dart';
 import '../../models/listening_practice_state.dart';
 
 /// 播放状态持久化
@@ -22,7 +23,7 @@ class PlaybackStateStorage {
         savedAt: Value(DateTime.now()),
       ),
     );
-    print('Saved playback state for ${audioItem.name}');
+    AppLogger.log('Player', '✓ 保存播放状态: ${audioItem.name}');
   }
 
   static Future<PlaybackStateRestoreResult?> loadPlaybackState(
@@ -38,7 +39,7 @@ class PlaybackStateStorage {
         playlistMode: PlaylistMode.values[dbState.playlistMode],
       );
     } catch (e) {
-      print('Error loading playback state: $e');
+      AppLogger.log('Player', '⚠ 加载播放状态失败: $e');
       return null;
     }
   }

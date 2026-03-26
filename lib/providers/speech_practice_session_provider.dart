@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/speech_practice_models.dart';
 import '../services/speech_practice_matcher.dart';
+import '../services/app_logger.dart';
 import '../services/speech_practice_platform.dart';
 
 const _finalTranscriptTimeout = Duration(seconds: 5);
@@ -340,8 +341,8 @@ class SpeechPracticeSession extends Notifier<SpeechPracticeSessionState> {
       if (filePath != null && filePath.isNotEmpty) {
         await _deleteRecording(filePath);
       }
-    } catch (_) {
-      // 忽略中断错误，目标只是尽快结束录音态。
+    } catch (e) {
+      AppLogger.log('Recording', '⚠ cancelActiveRecording 异常（已忽略）: $e');
     }
 
     final current = attemptFor(promptId);
@@ -520,8 +521,8 @@ class SpeechPracticeSession extends Notifier<SpeechPracticeSessionState> {
     }
     try {
       await backend.deleteRecording(filePath);
-    } catch (_) {
-      // 删除失败不影响学习流程。
+    } catch (e) {
+      AppLogger.log('Recording', '⚠ deleteRecording 失败（已忽略）: $e');
     }
   }
 

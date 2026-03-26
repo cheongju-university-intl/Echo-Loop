@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/audio_item.dart';
+import '../services/app_logger.dart';
 import '../utils/audio_duration.dart';
 import '../utils/transcript_stats.dart';
 import 'collection_provider.dart';
@@ -73,9 +74,9 @@ class AudioLibrary extends _$AudioLibrary {
         if (migratedItem != null) {
           processedItem = migratedItem;
           hasMigratedItems = true;
-          print('Migrated ${item.name} from absolute to relative path');
+          AppLogger.log('AudioLib','Migrated ${item.name} from absolute to relative path');
         } else {
-          print('Failed to migrate ${item.name}, marking as invalid');
+          AppLogger.log('AudioLib','Failed to migrate ${item.name}, marking as invalid');
           continue;
         }
       }
@@ -105,7 +106,7 @@ class AudioLibrary extends _$AudioLibrary {
       } else {
         // 软删除无效音频
         await dao.softDelete(item.id);
-        print(
+        AppLogger.log('AudioLib',
           'Removed invalid audio item: ${processedItem.name} (audio file not found at: $fullAudioPath)',
         );
       }
@@ -118,7 +119,7 @@ class AudioLibrary extends _$AudioLibrary {
       for (final item in validItems) {
         await _upsertItem(item);
       }
-      print('Migrated paths from absolute to relative format');
+      AppLogger.log('AudioLib','Migrated paths from absolute to relative format');
     }
   }
 
@@ -149,7 +150,7 @@ class AudioLibrary extends _$AudioLibrary {
         transcriptPath: relativeTranscriptPath,
       );
     } catch (e) {
-      print('Error migrating path for ${item.name}: $e');
+      AppLogger.log('AudioLib','Error migrating path for ${item.name}: $e');
       return null;
     }
   }
@@ -164,7 +165,7 @@ class AudioLibrary extends _$AudioLibrary {
     try {
       item = state.audioItems.firstWhere((item) => item.id == id);
     } catch (e) {
-      print('Audio item not found: $id');
+      AppLogger.log('AudioLib','Audio item not found: $id');
       return;
     }
 
@@ -173,10 +174,10 @@ class AudioLibrary extends _$AudioLibrary {
       final audioFile = File(audioPath);
       if (await audioFile.exists()) {
         await audioFile.delete();
-        print('Deleted audio file: $audioPath');
+        AppLogger.log('AudioLib','Deleted audio file: $audioPath');
       }
     } catch (e) {
-      print('Error deleting audio file: $e');
+      AppLogger.log('AudioLib','Error deleting audio file: $e');
     }
 
     if (item.hasTranscript) {
@@ -186,11 +187,11 @@ class AudioLibrary extends _$AudioLibrary {
           final transcriptFile = File(transcriptPath);
           if (await transcriptFile.exists()) {
             await transcriptFile.delete();
-            print('Deleted transcript file: $transcriptPath');
+            AppLogger.log('AudioLib','Deleted transcript file: $transcriptPath');
           }
         }
       } catch (e) {
-        print('Error deleting transcript file: $e');
+        AppLogger.log('AudioLib','Error deleting transcript file: $e');
       }
     }
 

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../database/app_database.dart';
+import '../../services/app_logger.dart';
 import '../../database/daos/bookmark_dao.dart';
 import '../../models/sentence.dart';
 
@@ -30,7 +31,7 @@ class BookmarkManager {
     try {
       return await dao.getBookmarkedIndices(audioId);
     } catch (e) {
-      print('Error loading bookmarks: $e');
+      AppLogger.log('Bookmark', '✗ 加载书签失败: $e');
       return {};
     }
   }
@@ -55,7 +56,7 @@ class BookmarkManager {
         ),
       );
     } catch (e) {
-      print('Error adding bookmark: $e');
+      AppLogger.log('Bookmark', '✗ 添加书签失败: $e');
     }
   }
 
@@ -68,7 +69,7 @@ class BookmarkManager {
     try {
       await dao.removeBookmarks(audioId, indices);
     } catch (e) {
-      print('Error removing bookmarks: $e');
+      AppLogger.log('Bookmark', '✗ 移除书签失败: $e');
     }
   }
 

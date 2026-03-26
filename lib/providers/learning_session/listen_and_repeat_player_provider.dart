@@ -157,8 +157,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     LearnedVocabularyTracker? vocabTracker;
     try {
       vocabTracker = ref.read(learnedVocabularyTrackerProvider);
-    } catch (_) {
-      // 测试环境可能未注入数据库，忽略词形统计即可。
+    } catch (e) {
+      AppLogger.log('Player', '⚠ vocabTracker 不可用（测试环境？）: $e');
     }
     _recorder = StudyEventRecorder(
       studyTimeService: ref.read(studyTimeServiceProvider),

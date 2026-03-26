@@ -23,6 +23,7 @@ import '../../services/study_event_recorder.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
+import '../../services/app_logger.dart';
 import '../learning_progress_provider.dart';
 import '../listen_and_repeat_turn_controller_provider.dart';
 import 'countdown_controller.dart';
@@ -167,8 +168,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     LearnedVocabularyTracker? vocabTracker;
     try {
       vocabTracker = ref.read(learnedVocabularyTrackerProvider);
-    } catch (_) {
-      // 测试环境可能未注入数据库，忽略词形统计即可。
+    } catch (e) {
+      AppLogger.log('Player', '⚠ vocabTracker 不可用（测试环境？）: $e');
     }
     _recorder = StudyEventRecorder(
       studyTimeService: ref.read(studyTimeServiceProvider),

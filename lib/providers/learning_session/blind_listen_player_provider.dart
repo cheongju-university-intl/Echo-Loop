@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
+import '../../services/app_logger.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/blind_listen_settings.dart';
@@ -149,8 +150,8 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     LearnedVocabularyTracker? vocabTracker;
     try {
       vocabTracker = ref.read(learnedVocabularyTrackerProvider);
-    } catch (_) {
-      // 测试环境可能未注入数据库，忽略词形统计即可。
+    } catch (e) {
+      AppLogger.log('Player', '⚠ vocabTracker 不可用（测试环境？）: $e');
     }
     _recorder = StudyEventRecorder(
       studyTimeService: ref.read(studyTimeServiceProvider),

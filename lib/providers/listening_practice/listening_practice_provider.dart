@@ -6,6 +6,7 @@ import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
 import '../../models/playback_settings.dart';
 import '../../models/listening_practice_state.dart';
+import '../../services/app_logger.dart';
 import '../../services/storage_service.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import 'bookmark_manager.dart';
@@ -183,7 +184,7 @@ class ListeningPractice extends _$ListeningPractice {
       try {
         await _engine.loadAudio(audioItem, state.settings.playbackSpeed);
       } catch (e) {
-        print('Error loading audio file: $e');
+        AppLogger.log('Player', '✗ 音频文件加载失败: $e');
         state = state.copyWith(clearCurrentAudioItem: true);
         rethrow;
       }
@@ -251,7 +252,7 @@ class ListeningPractice extends _$ListeningPractice {
         await _engine.seek(state.sentences[0].startTime);
       }
     } catch (e) {
-      print('Error loading audio: $e');
+      AppLogger.log('Player', '✗ loadAudio 失败: $e');
       state = state.copyWith(clearCurrentAudioItem: true);
     } finally {
       state = state.copyWith(isLoading: false);
@@ -277,9 +278,9 @@ class ListeningPractice extends _$ListeningPractice {
         await _engine.seek(result.position!);
         // 从 position 计算 currentFullIndex（由 SentenceTracker 自动处理）
       }
-      print('Restored playback state for ${audioItem.name}');
+      AppLogger.log('Player', '✓ 恢复播放状态: ${audioItem.name}');
     } catch (e) {
-      print('Error restoring playback state: $e');
+      AppLogger.log('Player', '⚠ 恢复播放状态失败: $e');
     }
   }
 
@@ -371,7 +372,7 @@ class ListeningPractice extends _$ListeningPractice {
       );
     }
 
-    print("playContinuous end");
+    AppLogger.log('Player', 'playContinuous end');
     if (_engine.isActiveSession(sessionId)) {
       await _engine.stop();
     }

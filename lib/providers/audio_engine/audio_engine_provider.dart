@@ -78,7 +78,7 @@ class AudioEngine extends _$AudioEngine {
       }
       return [];
     } catch (e) {
-      print('Error loading transcript: $e');
+      AppLogger.log('Player', '✗ loadTranscript 失败: $e');
       return [];
     }
   }

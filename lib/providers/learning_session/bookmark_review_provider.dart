@@ -15,6 +15,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import '../../services/app_logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../database/daos/bookmark_dao.dart';
@@ -614,7 +615,7 @@ class BookmarkReview extends _$BookmarkReview {
       await engine.loadAudio(audioItem, 1.0);
       return true;
     } catch (e) {
-      debugPrint('收藏复习：加载音频失败: $e');
+      AppLogger.log('Player', '✗ 收藏复习加载音频失败: $e');
       return false;
     }
   }
@@ -636,7 +637,7 @@ class BookmarkReview extends _$BookmarkReview {
     final loaded = await _ensureAudioLoaded(bookmarkSentence);
     if (!loaded) {
       // 音频加载失败，跳过该句
-      debugPrint('收藏复习：跳过句子（音频不可用）: ${bookmarkSentence.audioName}');
+      AppLogger.log('Player', '⚠ 收藏复习跳过句子（音频不可用）: ${bookmarkSentence.audioName}');
       await _autoAdvance();
       return;
     }

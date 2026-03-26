@@ -24,6 +24,7 @@ import '../../models/study_stage.dart';
 import '../../services/learned_vocabulary_tracker.dart';
 import '../../services/study_event_recorder.dart';
 import '../learned_vocabulary_tracker_provider.dart';
+import '../../services/app_logger.dart';
 import '../learning_progress_provider.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import 'countdown_controller.dart';
@@ -212,8 +213,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     LearnedVocabularyTracker? vocabTracker;
     try {
       vocabTracker = ref.read(learnedVocabularyTrackerProvider);
-    } catch (_) {
-      // 测试环境可能未注入数据库，忽略词形统计即可。
+    } catch (e) {
+      AppLogger.log('Player', '⚠ vocabTracker 不可用（测试环境？）: $e');
     }
     _recorder = StudyEventRecorder(
       studyTimeService: ref.read(studyTimeServiceProvider),

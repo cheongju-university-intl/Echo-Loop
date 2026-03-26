@@ -298,7 +298,8 @@ class LearningSession extends _$LearningSession {
   LearnedVocabularyTracker? _readLearnedVocabularyTracker() {
     try {
       return ref.read(learnedVocabularyTrackerProvider);
-    } on Exception {
+    } on Exception catch (e) {
+      AppLogger.log('Session', '⚠ vocabTracker 不可用（测试环境？）: $e');
       return null;
     }
   }
