@@ -49,47 +49,54 @@ class StudyScreen extends ConsumerWidget {
     // 判断空状态类型
     final hasAnyTask = tasks.isNotEmpty || completedAudios.isNotEmpty;
 
-    // AppBar streak chip
-    final streakChip = statsAsync.whenOrNull(
-      data: (stats) => stats.streak > 0
-          ? Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.m),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.local_fire_department_rounded,
-                      size: 16,
-                      color: Colors.orange,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      l10n.streakDays(stats.streak),
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange.shade800,
-                      ),
-                    ),
-                  ],
+    // AppBar streak chip（始终显示，可点击进入活动日历）
+    final streak = statsAsync.valueOrNull?.streak ?? 0;
+    final isStreakActive = streak > 0;
+    final streakChip = Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.m),
+      child: GestureDetector(
+        onTap: () => context.push(AppRoutes.activityCalendar),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 4,
+          ),
+          decoration: BoxDecoration(
+            color: isStreakActive
+                ? Colors.orange.withValues(alpha: 0.1)
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.local_fire_department_rounded,
+                size: 16,
+                color: isStreakActive
+                    ? Colors.orange
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                l10n.streakDays(streak),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isStreakActive
+                      ? Colors.orange.shade800
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
-            )
-          : null,
+            ],
+          ),
+        ),
+      ),
     );
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.studyTasks),
-        actions: [if (streakChip != null) streakChip],
+        actions: [streakChip],
       ),
       body: !hasAnyTask
           ? const _EmptyState(type: _EmptyStateType.noTasks)

@@ -25,6 +25,7 @@ import '../screens/retell_player_screen.dart';
 import '../screens/review_difficult_practice_screen.dart';
 import '../screens/bookmark_review_screen.dart';
 import '../screens/flashcard_screen.dart';
+import '../screens/activity_calendar_screen.dart';
 import 'main_shell.dart';
 
 /// 全局根导航器 key
@@ -98,6 +99,9 @@ abstract class AppRoutes {
 
   /// Flashcard 单词卡片复习页路径
   static const flashcard = '/flashcard';
+
+  /// 活动日历页路径
+  static const activityCalendar = '/activity-calendar';
 
   /// 难句补练页路径
   static String reviewDifficultPractice(String? collectionId, String audioId) =>
@@ -179,6 +183,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/flashcard',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const FlashcardScreen(),
+      ),
+      // 活动日历（全屏）
+      GoRoute(
+        path: '/activity-calendar',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ActivityCalendarScreen(),
       ),
       // 独立音频路由（不依赖合集）
       GoRoute(

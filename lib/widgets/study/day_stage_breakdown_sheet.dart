@@ -30,12 +30,16 @@ class DayStageBreakdownSheet extends StatelessWidget {
   /// 弹窗显示模式
   final StageBreakdownMode mode;
 
+  /// 是否显示三色图例（听/说/其它）
+  final bool showLegend;
+
   const DayStageBreakdownSheet({
     super.key,
     required this.date,
     required this.stageRecords,
     this.totalData,
     this.mode = StageBreakdownMode.total,
+    this.showLegend = true,
   });
 
   @override
@@ -79,8 +83,8 @@ class DayStageBreakdownSheet extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            // 总览模式显示三色图例
-            if (mode == StageBreakdownMode.total) ...[
+            // 总览模式显示三色图例（可通过 showLegend 关闭）
+            if (mode == StageBreakdownMode.total && showLegend) ...[
               const SizedBox(height: 8),
               _ChartLegend(l10n: l10n, theme: theme),
             ],
@@ -415,6 +419,7 @@ Future<void> showDayStageBreakdownSheet({
   required DateTime date,
   required StudyTimeService studyTimeService,
   StageBreakdownMode mode = StageBreakdownMode.total,
+  bool showLegend = true,
 }) async {
   // 并行加载阶段明细和总量
   final results = await Future.wait([
@@ -437,6 +442,7 @@ Future<void> showDayStageBreakdownSheet({
       stageRecords: stageRecords,
       totalData: totalData,
       mode: mode,
+      showLegend: showLegend,
     ),
   );
 }
