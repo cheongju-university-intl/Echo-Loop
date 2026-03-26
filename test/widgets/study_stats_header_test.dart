@@ -324,7 +324,7 @@ void main() {
       // 弹窗标题
       expect(find.text('Listening Details'), findsOneWidget);
       // 小节标题 + 表头
-      expect(find.text('Daily recommendation'), findsOneWidget);
+      expect(find.text('Daily minimum recommendation'), findsOneWidget);
       expect(find.text('Listening (input)'), findsOneWidget);
       expect(find.text('Speaking (output)'), findsOneWidget);
       // 等级标签

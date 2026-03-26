@@ -4,8 +4,10 @@
 /// 新增测试流程时，在 groups/ 下创建文件并在此处调用即可。
 library;
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'helpers/test_notifiers.dart';
 import 'groups/navigation_tests.dart';
 import 'groups/settings_tests.dart';
 import 'groups/collection_tests.dart';
@@ -24,6 +26,10 @@ import 'groups/flashcard_tests.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    await initTestAnalytics();
+  });
 
   navigationTests();
   settingsTests();

@@ -10,7 +10,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:fluency/analytics/analytics_channel.dart';
+import 'package:fluency/analytics/analytics_providers.dart';
+import 'package:fluency/analytics/analytics_service.dart';
+import 'package:fluency/analytics/consent_manager.dart';
 import 'package:fluency/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluency/models/audio_item.dart';
 import 'package:fluency/models/collection.dart';
 import 'package:fluency/models/tag.dart';
@@ -24,8 +29,11 @@ import 'package:fluency/database/enums.dart';
 import 'package:fluency/database/app_database.dart'
     show Bookmark, BookmarksCompanion, SavedWord;
 import 'package:fluency/database/daos/bookmark_dao.dart';
+import 'package:fluency/database/daos/saved_word_dao.dart';
 import 'package:fluency/database/providers.dart';
+import 'package:fluency/providers/review_reminder_provider.dart';
 import 'package:fluency/providers/settings_provider.dart';
+import 'package:fluency/services/review_reminder_service.dart';
 import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
 import 'package:fluency/providers/tag_provider.dart';
@@ -1690,6 +1698,12 @@ class TestBookmarkDao implements BookmarkDao {
   }
 
   @override
+  Future<int> countAll() {
+    final total = _store.values.fold<int>(0, (sum, s) => sum + s.length);
+    return Future.value(total);
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) {
     final memberName = invocation.memberName.toString();
     if (memberName.contains('watchByAudioId')) {
@@ -1698,6 +1712,25 @@ class TestBookmarkDao implements BookmarkDao {
     }
     return null;
   }
+}
+
+// ========== ReviewReminderService 测试替身 ==========
+
+/// 空操作复习提醒服务（集成测试用）
+class TestReviewReminderService implements ReviewReminderService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
+}
+
+// ========== SavedWordDao 测试替身 ==========
+
+/// 空操作 SavedWordDao（集成测试用）
+class TestSavedWordDao implements SavedWordDao {
+  @override
+  Future<List<SavedWord>> getAll() => Future.value([]);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }
 
 // ========== Flashcard 测试替身 ==========
@@ -1801,6 +1834,33 @@ class TestFlashcardNotifier extends FlashcardNotifier {
   void setState(FlashcardState newState) => state = newState;
 }
 
+// ========== Analytics 测试替身 ==========
+
+/// 空操作分析通道（集成测试用）
+class _NoOpChannel implements AnalyticsChannel {
+  @override
+  String get name => 'NoOp';
+  @override
+  Future<void> initialize() async {}
+  @override
+  Future<void> logEvent(String name, Map<String, Object>? parameters) async {}
+  @override
+  Future<void> setUserId(String? id) async {}
+  @override
+  Future<void> setUserProperty(String name, String? value) async {}
+}
+
+/// 初始化测试用 AnalyticsService（须在 createTestApp 前调用一次）
+Future<void> initTestAnalytics() async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  final service = AnalyticsService(
+    channel: _NoOpChannel(),
+    consent: ConsentManager(prefs),
+  );
+  initAnalytics(service);
+}
+
 // ========== App 工厂 ==========
 
 final _testPackageInfo = PackageInfo(
@@ -1849,6 +1909,10 @@ Widget createTestApp() {
       speechPracticeBackendProvider.overrideWithValue(
         TestSpeechPracticePlatform(),
       ),
+      reviewReminderServiceProvider.overrideWithValue(
+        TestReviewReminderService(),
+      ),
+      savedWordDaoProvider.overrideWithValue(TestSavedWordDao()),
     ],
     child: const FluencyApp(),
   );
@@ -1918,6 +1982,10 @@ Widget createTestAppWithAudio({
       speechPracticeBackendProvider.overrideWithValue(
         TestSpeechPracticePlatform(),
       ),
+      reviewReminderServiceProvider.overrideWithValue(
+        TestReviewReminderService(),
+      ),
+      savedWordDaoProvider.overrideWithValue(TestSavedWordDao()),
     ],
     child: _AudioPreloadWrapper(
       audioItem: audioItem,

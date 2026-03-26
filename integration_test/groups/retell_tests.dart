@@ -437,7 +437,8 @@ void retellTests() {
       expect(find.text('Visible words'), findsOneWidget);
       expect(find.text('Off'), findsOneWidget);
       expect(find.text('Random'), findsOneWidget);
-      expect(find.text('AI'), findsOneWidget);
+      // AI 选项暂时隐藏（功能未实现）
+      expect(find.text('AI'), findsNothing);
 
       // 默认 random → 比例区域可见
       expect(find.text('Visible ratio'), findsOneWidget);

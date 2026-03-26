@@ -113,8 +113,8 @@ void intensiveListenTests() {
       await tester.tap(find.text('Peek'));
       await tester.pumpAndSettle();
 
-      // 验证点击后文本显示
-      expect(find.text('Test sentence number 1.'), findsOneWidget);
+      // 验证点击后文本显示（逐词可点击布局，每个单词是独立 Text）
+      expect(find.text('sentence'), findsOneWidget);
       expect(find.text('Peek'), findsOneWidget);
 
       // 第二次点击后文本隐藏
@@ -122,7 +122,7 @@ void intensiveListenTests() {
       await tester.pumpAndSettle();
 
       // 验证再次点击后文本隐藏
-      expect(find.text('Test sentence number 1.'), findsNothing);
+      expect(find.text('sentence'), findsNothing);
     });
 
     testWidgets('上一句/下一句导航', (tester) async {
