@@ -23,6 +23,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/listen_and_repeat_player_provider.dart';
+import '../providers/listening_practice/bookmark_manager.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
@@ -295,8 +296,13 @@ class _ListenAndRepeatPlayerScreenState
     return SentenceAnnotationCard(
       key: ValueKey(text),
       text: text,
-      isDifficult: true,
-      onToggle: _handleRemoveDifficult,
+      isDifficult:
+          ref
+              .read(listenAndRepeatPlayerProvider.notifier)
+              .currentSentence
+              ?.isBookmarked ??
+          true,
+      onToggle: _handleToggleDifficult,
       audioItemId: widget.audioItemId,
       sentenceIndex: sentenceIndex,
       inlineFeedback: inlineFeedback,
@@ -314,25 +320,24 @@ class _ListenAndRepeatPlayerScreenState
     );
   }
 
-  /// 取消当前句子的难句收藏
-  Future<void> _handleRemoveDifficult() async {
-    await _cancelRecordingAndPlayback();
-    ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
-
+  /// 切换当前句子的难句标记
+  Future<void> _handleToggleDifficult() async {
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
-    final removed = player.removeDifficultMark();
+    final sentence = player.currentSentence;
+    if (sentence == null) return;
 
-    if (removed != null) {
-      // 从数据库删除书签
-      final bookmarkDao = ref.read(bookmarkDaoProvider);
-      await bookmarkDao.removeBookmark(widget.audioItemId, removed.index);
-    }
+    final isCurrentlyBookmarked = sentence.isBookmarked;
+    player.toggleCurrentBookmark();
 
-    // 如果还有句子且未完成，自动开始播放下一句
-    final state = ref.read(listenAndRepeatPlayerProvider);
-    if (state.totalSentences > 0) {
-      _manualStoppedThisSentence = false;
-      await player.startPlaying();
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (isCurrentlyBookmarked) {
+      await bookmarkDao.removeBookmark(widget.audioItemId, sentence.index);
+    } else {
+      await BookmarkManager.addBookmarkToDb(
+        widget.audioItemId,
+        sentence,
+        dao: bookmarkDao,
+      );
     }
   }
 
@@ -539,6 +544,7 @@ class _ListenAndRepeatPlayerScreenState
           s.isCountdownFastForward,
           s.isPostEvalCountdown,
           s.stepFinished,
+          s.bookmarkVersion,
         ),
       ),
     );
@@ -633,7 +639,10 @@ class _ListenAndRepeatPlayerScreenState
           if (!mounted) return;
           final latestRecState = ref.read(shadowingRecordingControllerProvider);
           if (latestRecState.phase != ListenAndRepeatTurnPhase.idle) {
-            AppLogger.log('ShadowScreen', '⏭ 自动录音跳过: phase=${latestRecState.phase.name}');
+            AppLogger.log(
+              'ShadowScreen',
+              '⏭ 自动录音跳过: phase=${latestRecState.phase.name}',
+            );
             return;
           }
           final latestState = ref.read(listenAndRepeatPlayerProvider);

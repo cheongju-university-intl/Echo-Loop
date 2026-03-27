@@ -26,6 +26,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
+import '../providers/listening_practice/bookmark_manager.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
@@ -274,24 +275,24 @@ class _ReviewDifficultPracticeScreenState
     if (mounted) context.pop();
   }
 
-  /// 取消当前句子的难句标记
-  Future<void> _handleRemoveDifficult() async {
-    await _cancelRecordingAndPlayback();
-    ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
-    _manualStoppedThisSentence = false;
-
+  /// 切换当前句子的难句标记
+  Future<void> _handleToggleDifficult() async {
     final player = ref.read(reviewDifficultPracticeProvider.notifier);
-    final removed = player.removeDifficultMark();
+    final sentence = player.currentSentence;
+    if (sentence == null) return;
 
-    if (removed != null) {
-      final bookmarkDao = ref.read(bookmarkDaoProvider);
-      await bookmarkDao.removeBookmark(widget.audioItemId, removed.index);
-    }
+    final isCurrentlyBookmarked = sentence.isBookmarked;
+    player.toggleCurrentBookmark();
 
-    // 如果还有句子且未完成，自动开始播放下一句
-    final playerState = ref.read(reviewDifficultPracticeProvider);
-    if (playerState.totalSentences > 0) {
-      await player.startPlaying();
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (isCurrentlyBookmarked) {
+      await bookmarkDao.removeBookmark(widget.audioItemId, sentence.index);
+    } else {
+      await BookmarkManager.addBookmarkToDb(
+        widget.audioItemId,
+        sentence,
+        dao: bookmarkDao,
+      );
     }
   }
 
@@ -678,7 +679,8 @@ class _ReviewDifficultPracticeScreenState
                           text: currentSentence?.text ?? '',
                           playerState: playerState,
                           l10n: l10n,
-                          onRemoveMark: _handleRemoveDifficult,
+                          onToggleMark: _handleToggleDifficult,
+                          isDifficult: currentSentence?.isBookmarked ?? true,
                           aiNotifier: ref.read(sentenceAiNotifierProvider),
                           audioItemId: widget.audioItemId,
                           sentenceIndex: player.currentIndex,
@@ -717,7 +719,8 @@ class _ReviewDifficultPracticeScreenState
                             !playerState.isTextRevealed,
                           ),
                           onCantUnderstand: () => player.enterAnnotationMode(),
-                          onRemoveMark: _handleRemoveDifficult,
+                          onToggleMark: _handleToggleDifficult,
+                          isDifficult: currentSentence?.isBookmarked ?? true,
                           onPauseCountdown: () => playerState.isCountdownPaused
                               ? player.resumeCountdown()
                               : player.pauseCountdown(),

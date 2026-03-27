@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../database/providers.dart';
+import '../providers/listening_practice/bookmark_manager.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
@@ -209,29 +210,27 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
   }
 
   /// 取消当前句子的收藏
-  Future<void> _handleRemoveBookmark() async {
-    await _cancelRecordingAndPlayback();
-    ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
-    _manualStoppedThisSentence = false;
-
+  /// 切换当前句子的收藏标记
+  Future<void> _handleToggleBookmark() async {
     final player = ref.read(bookmarkReviewProvider.notifier);
-    final removed = player.removeBookmark();
+    final sentence = player.currentBookmarkSentence;
+    if (sentence == null) return;
 
-    if (removed != null) {
-      final bookmarkDao = ref.read(bookmarkDaoProvider);
+    final isCurrentlyBookmarked = sentence.sentence.isBookmarked;
+    player.toggleCurrentBookmark();
+
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (isCurrentlyBookmarked) {
       await bookmarkDao.removeBookmark(
-        removed.audioItemId,
-        removed.originalSentenceIndex,
+        sentence.audioItemId,
+        sentence.originalSentenceIndex,
       );
-    }
-
-    // 如果还有句子且未完成，自动开始播放下一句
-    final playerState = ref.read(bookmarkReviewProvider);
-    if (playerState.totalSentences > 0) {
-      await player.startPlaying();
     } else {
-      // 所有收藏已删除 → 直接触发完成
-      _handleCompleted();
+      await BookmarkManager.addBookmarkToDb(
+        sentence.audioItemId,
+        sentence.sentence,
+        dao: bookmarkDao,
+      );
     }
   }
 
@@ -482,7 +481,8 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                           text: currentSentence?.text ?? '',
                           playerState: playerState,
                           l10n: l10n,
-                          onRemoveMark: _handleRemoveBookmark,
+                          onToggleMark: _handleToggleBookmark,
+                          isDifficult: currentSentence?.isBookmarked ?? true,
                           aiNotifier: ref.read(sentenceAiNotifierProvider),
                           audioItemId: currentBookmark?.audioItemId,
                           sentenceIndex: currentBookmark?.originalSentenceIndex,
@@ -521,7 +521,8 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                             !playerState.isTextRevealed,
                           ),
                           onCantUnderstand: () => player.enterAnnotationMode(),
-                          onRemoveMark: _handleRemoveBookmark,
+                          onToggleMark: _handleToggleBookmark,
+                          isDifficult: currentSentence?.isBookmarked ?? true,
                           onPauseCountdown: () => playerState.isCountdownPaused
                               ? player.resumeCountdown()
                               : player.pauseCountdown(),

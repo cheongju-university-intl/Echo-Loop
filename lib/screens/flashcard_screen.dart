@@ -153,6 +153,9 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
                                 .read(flashcardNotifierProvider.notifier)
                                 .flipCard(),
                             onUnsave: () => _handleUnsave(context),
+                            isUnsaved: ref
+                                .read(flashcardNotifierProvider.notifier)
+                                .isCurrentWordUnsaved,
                             autoPlaySentence: state.settings.autoPlaySentence,
                             autoPlayWord: state.settings.autoPlayWord,
                             onPlayWord: () => ref
@@ -220,16 +223,9 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
     });
   }
 
-  /// 取消收藏
+  /// 切换收藏状态（只写 DB，卡片保留在列表中继续复习）
   void _handleUnsave(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    ref.read(flashcardNotifierProvider.notifier).unsaveCurrentWord();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(l10n.favoritesWordRemoved),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    ref.read(flashcardNotifierProvider.notifier).toggleCurrentWordSave();
   }
 }
 

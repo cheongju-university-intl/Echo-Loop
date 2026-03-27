@@ -105,7 +105,9 @@ void main() {
     )?
     playerFactory,
   }) {
-    final sentences = createTestSentences(count: 5);
+    final sentences = createTestSentences(count: 5)
+        .map((s) => s.copyWith(isBookmarked: true))
+        .toList();
     final initialPlayerState = playerState ?? createPlayerState();
 
     final router = GoRouter(
