@@ -161,12 +161,6 @@ class FluencyApp extends ConsumerStatefulWidget {
   ConsumerState<FluencyApp> createState() => _FluencyAppState();
 }
 
-/// 全局 ScaffoldMessenger key，用于在任何页面可靠地显示 SnackBar。
-///
-/// 避免嵌套 Scaffold（MainShell + 子页面各自的 Scaffold）导致
-/// SnackBar 挂载在错误的 Scaffold 上、timer 失效不自动消失的问题。
-final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
-
 class _FluencyAppState extends ConsumerState<FluencyApp> {
   StreamSubscription<NotificationIntent>? _intentSubscription;
   late final AppLifecycleListener _lifecycleListener;
@@ -263,7 +257,6 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: 'Fluency',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),

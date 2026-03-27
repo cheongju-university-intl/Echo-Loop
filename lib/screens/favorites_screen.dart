@@ -4,7 +4,6 @@
 /// 通过 SegmentedButton 在句子/单词视图间切换。
 library;
 
-import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,7 +27,6 @@ import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/ai_content_section.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
-import '../widgets/undo_snack_bar.dart';
 
 /// 收藏页面视图模式
 enum _FavoritesView { sentences, words }
@@ -532,21 +530,6 @@ class _BookmarkSentenceTileState extends ConsumerState<_BookmarkSentenceTile> {
       ),
       onDismissed: (_) {
         bookmarkDao.removeBookmark(widget.audioId, bm.sentenceIndex);
-        showUndoSnackBar(
-          message: l10n.favoritesBookmarkRemoved,
-          undoLabel: l10n.undo,
-          onUndo: () => bookmarkDao.addBookmark(
-            BookmarksCompanion(
-              audioItemId: Value(widget.audioId),
-              sentenceIndex: Value(bm.sentenceIndex),
-              sentenceText: Value(bm.sentenceText),
-              startTime: Value(bm.startTime),
-              endTime: Value(bm.endTime),
-              createdAt: Value(bm.createdAt),
-              updatedAt: Value(DateTime.now()),
-            ),
-          ),
-        );
       },
       child: Column(
         children: [
@@ -720,6 +703,7 @@ class _WordsViewState extends ConsumerState<_WordsView> {
 
   /// 上次触发查询的单词列表，用于去重
   List<String> _lastWordKeys = [];
+
 
   /// 当单词列表变化时，批量查询字典释义
   void _loadDictEntries(List<SavedWord> words) {
@@ -912,10 +896,6 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
     final l10n = AppLocalizations.of(context)!;
     final word = widget.savedWord;
 
-    // 提前捕获 DAO/notifier，避免 Dismissible 销毁 widget 后 ref 失效
-    final dao = ref.read(savedWordDaoProvider);
-    final notifier = ref.read(savedWordListProvider.notifier);
-
     return Dismissible(
       key: ValueKey('word_${word.id}'),
       direction: DismissDirection.endToStart,
@@ -926,19 +906,7 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
         child: Icon(Icons.bookmark_remove, color: theme.colorScheme.onError),
       ),
       onDismissed: (_) {
-        notifier.removeWord(word.word);
-        showUndoSnackBar(
-          message: l10n.favoritesWordRemoved,
-          undoLabel: l10n.undo,
-          onUndo: () => dao.saveWord(
-            word: word.word,
-            audioItemId: word.audioItemId,
-            sentenceIndex: word.sentenceIndex,
-            sentenceText: word.sentenceText,
-            sentenceStartMs: word.sentenceStartMs,
-            sentenceEndMs: word.sentenceEndMs,
-          ),
-        );
+        ref.read(savedWordListProvider.notifier).removeWord(word.word);
       },
       child: Card(
         margin: const EdgeInsets.only(bottom: AppSpacing.xs),
