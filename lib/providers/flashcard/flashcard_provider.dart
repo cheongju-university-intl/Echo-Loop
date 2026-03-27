@@ -249,8 +249,16 @@ class FlashcardNotifier extends _$FlashcardNotifier {
         _startCountdown();
       }
     } else {
-      // 翻回正面：朗读单词
-      _startCountdown();
+      // 翻回正面：autoPlayWord 时隐藏倒计时，等 TTS 播完再启动
+      if (state.settings.autoPlayWord) {
+        _countdown.cancel();
+        state = state.copyWith(
+          countdownRemaining: Duration.zero,
+          countdownTotal: Duration.zero,
+        );
+      } else {
+        _startCountdown();
+      }
     }
 
     // 异步停止旧播放（翻回正面时同时朗读新单词）
@@ -285,8 +293,13 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       currentIndex: state.currentIndex + 1,
       isShowingBack: false,
       cardStartTime: DateTime.now(),
+      countdownRemaining: Duration.zero,
+      countdownTotal: Duration.zero,
     );
-    _startCountdown();
+    // autoPlayWord 时先不启动倒计时，等 TTS 播完后再启动
+    if (!state.settings.autoPlayWord) {
+      _startCountdown();
+    }
     AppLogger.log('Flashcard', 'nextCard: sync=${sw.elapsedMilliseconds}ms');
 
     // 2. 异步停止旧播放 + 朗读新单词（不阻塞帧渲染）
@@ -311,8 +324,12 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       currentIndex: state.currentIndex - 1,
       isShowingBack: false,
       cardStartTime: DateTime.now(),
+      countdownRemaining: Duration.zero,
+      countdownTotal: Duration.zero,
     );
-    _startCountdown();
+    if (!state.settings.autoPlayWord) {
+      _startCountdown();
+    }
     AppLogger.log('Flashcard', 'prevCard: sync=${sw.elapsedMilliseconds}ms');
 
     // 2. 异步停止旧播放 + 朗读新单词（不阻塞帧渲染）
@@ -427,17 +444,22 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   }
 
   /// 手动点击例句开始播放时隐藏倒计时
+  ///
+  /// 暂停状态下不改变倒计时显示，保持暂停。
   void onSentencePlaybackStarted() {
+    if (state.isPaused) return;
     _countdown.cancel();
     state = state.copyWith(
       countdownRemaining: Duration.zero,
       countdownTotal: Duration.zero,
-      isPaused: false,
     );
   }
 
   /// 手动例句播放结束后重新启动倒计时
+  ///
+  /// 暂停状态下不重启倒计时。
   void onSentencePlaybackEnded() {
+    if (state.isPaused) return;
     if (state.isShowingBack && !state.isCompleted) {
       _startCountdown();
     }
@@ -446,6 +468,28 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// TTS 朗读当前单词
   void speakCurrentWord() {
     _speakCurrentWord();
+  }
+
+  /// 用户在正面手动点击发音按钮。
+  ///
+  /// 暂停状态下只播放，不改变倒计时；非暂停状态下隐藏倒计时，播完后重启。
+  Future<void> speakWordAndRestartCountdown() async {
+    final wasPaused = state.isPaused;
+    if (!wasPaused) {
+      _countdown.cancel();
+      state = state.copyWith(
+        countdownRemaining: Duration.zero,
+        countdownTotal: Duration.zero,
+      );
+    }
+    final word = state.currentWord?.savedWord.word;
+    if (word != null) {
+      await TtsService.instance.speak(word);
+    }
+    // 暂停状态下不重启倒计时；非暂停状态下播完后重启
+    if (!wasPaused && state.currentWord?.savedWord.word == word) {
+      _startCountdown();
+    }
   }
 
   /// 暂停（AppLifecycle / 弹窗时调用）
@@ -584,6 +628,10 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       if (gen != _speakGeneration) return;
       _inputStopwatch.stop();
       await _addInputWords(1);
+      // 正面 TTS 播完后启动倒计时
+      if (!state.isShowingBack && !state.isCompleted) {
+        _startCountdown();
+      }
     }
   }
 

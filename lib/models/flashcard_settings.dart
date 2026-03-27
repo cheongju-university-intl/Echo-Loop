@@ -150,8 +150,8 @@ class FlashcardSettings {
   }) {
     // 根据单词长度确定 base 范围
     final ratio = ((wordLength - 4) / (12 - 4)).clamp(0.0, 1.0);
-    final maxTime = 4.0 + ratio * 4.0; // 4→8
-    final minTime = 2.0 + ratio * 3.0; // 2→5
+    final maxTime = 3.0 + ratio * 3.0; // 3→6
+    final minTime = 2.0 + ratio * 2.0; // 2→4
 
     // 根据练习次数从 maxTime 衰减到 minTime
     final decay = (practiceCount / 5.0).clamp(0.0, 1.0);

@@ -155,6 +155,9 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
                             onUnsave: () => _handleUnsave(context),
                             autoPlaySentence: state.settings.autoPlaySentence,
                             autoPlayWord: state.settings.autoPlayWord,
+                            onPlayWord: () => ref
+                                .read(flashcardNotifierProvider.notifier)
+                                .speakWordAndRestartCountdown(),
                           )
                         : const SizedBox.shrink(),
                   ),

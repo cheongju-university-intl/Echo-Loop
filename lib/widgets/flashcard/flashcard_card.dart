@@ -43,6 +43,9 @@ class FlashcardCard extends StatefulWidget {
   /// 是否自动 TTS 朗读单词
   final bool autoPlayWord;
 
+  /// 正面点击发音按钮时的回调（用于重置倒计时等）
+  final VoidCallback? onPlayWord;
+
   const FlashcardCard({
     super.key,
     required this.item,
@@ -51,6 +54,7 @@ class FlashcardCard extends StatefulWidget {
     required this.onUnsave,
     this.autoPlaySentence = true,
     this.autoPlayWord = true,
+    this.onPlayWord,
   });
 
   @override
@@ -135,7 +139,11 @@ class _FlashcardCardState extends State<FlashcardCard>
             alignment: Alignment.center,
             transform: transform,
             child: _showFrontContent
-                ? _FrontContent(item: widget.item, onUnsave: widget.onUnsave)
+                ? _FrontContent(
+                    item: widget.item,
+                    onUnsave: widget.onUnsave,
+                    onPlayWord: widget.onPlayWord,
+                  )
                 : Transform(
                     alignment: Alignment.center,
                     transform: Matrix4.identity()..rotateY(math.pi),
@@ -157,8 +165,13 @@ class _FlashcardCardState extends State<FlashcardCard>
 class _FrontContent extends StatelessWidget {
   final FlashcardWordItem item;
   final VoidCallback onUnsave;
+  final VoidCallback? onPlayWord;
 
-  const _FrontContent({required this.item, required this.onUnsave});
+  const _FrontContent({
+    required this.item,
+    required this.onUnsave,
+    this.onPlayWord,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -226,7 +239,7 @@ class _FrontContent extends StatelessWidget {
             // 发音按钮
             const SizedBox(height: AppSpacing.m),
             IconButton.filled(
-              onPressed: () => TtsService.instance.speak(word.word),
+              onPressed: onPlayWord ?? () => TtsService.instance.speak(word.word),
               icon: const Icon(Icons.volume_up),
               style: IconButton.styleFrom(
                 backgroundColor: theme.colorScheme.primaryContainer.withValues(
