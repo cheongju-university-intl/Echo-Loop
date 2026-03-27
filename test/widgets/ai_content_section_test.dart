@@ -23,7 +23,7 @@ void main() {
       expect(find.byIcon(Icons.expand_less), findsNothing);
     });
 
-    testWidgets('cachedContent 非空时直接显示内容', (tester) async {
+    testWidgets('cachedContent 非空时初始仍折叠，点击后立即显示', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           const AiContentSection(
@@ -36,7 +36,14 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // 已展开且显示缓存内容
+      // 初始应折叠，不自动展开
+      expect(find.byIcon(Icons.expand_more), findsOneWidget);
+      expect(find.text('缓存的翻译内容'), findsNothing);
+
+      // 点击展开 — 立即显示缓存内容，无 loading
+      await tester.tap(find.text('Translation'));
+      await tester.pumpAndSettle();
+
       expect(find.byIcon(Icons.expand_less), findsOneWidget);
       expect(find.text('缓存的翻译内容'), findsOneWidget);
     });
@@ -112,6 +119,10 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+
+      // 先点击展开
+      await tester.tap(find.text('Translation'));
+      await tester.pumpAndSettle();
       expect(find.text('内容'), findsOneWidget);
 
       // 点击折叠
@@ -135,11 +146,16 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+
+      // 点击展开
+      await tester.tap(find.text('Analysis'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Custom: custom data'), findsOneWidget);
     });
 
     testWidgets('cachedContent 从有值变为 null 时回到折叠状态', (tester) async {
-      // 初始渲染：有缓存内容，应为 loaded
+      // 初始渲染：有缓存内容
       await tester.pumpWidget(
         createTestApp(
           const AiContentSection(
@@ -150,6 +166,10 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+
+      // 手动展开
+      await tester.tap(find.text('Translation'));
       await tester.pumpAndSettle();
       expect(find.text('有内容'), findsOneWidget);
       expect(find.byIcon(Icons.expand_less), findsOneWidget);
@@ -205,7 +225,7 @@ void main() {
       expect(requestCount, 1);
     });
 
-    testWidgets('cachedContent 变化时更新显示', (tester) async {
+    testWidgets('cachedContent 变化时更新已展开的内容', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           const AiContentSection(
@@ -217,9 +237,13 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+
+      // 手动展开
+      await tester.tap(find.text('Translation'));
+      await tester.pumpAndSettle();
       expect(find.text('旧内容'), findsOneWidget);
 
-      // 更新 cachedContent
+      // 更新 cachedContent — 已展开时应更新显示
       await tester.pumpWidget(
         createTestApp(
           const AiContentSection(
@@ -232,6 +256,42 @@ void main() {
 
       await tester.pumpAndSettle();
       expect(find.text('新内容'), findsOneWidget);
+    });
+
+    testWidgets('loading 状态下收到 cachedContent 自动展开', (tester) async {
+      final completer = Completer<String>();
+
+      await tester.pumpWidget(
+        createTestApp(
+          AiContentSection(
+            icon: Icons.translate,
+            title: 'Translation',
+            onRequest: () => completer.future,
+          ),
+        ),
+      );
+
+      // 点击展开 → loading 状态
+      await tester.tap(find.text('Translation'));
+      await tester.pump();
+      expect(find.byIcon(Icons.expand_less), findsOneWidget);
+
+      // 模拟：父组件 rebuild 带上 cachedContent（如 API 返回后缓存同步到父组件）
+      await tester.pumpWidget(
+        createTestApp(
+          AiContentSection(
+            icon: Icons.translate,
+            title: 'Translation',
+            cachedContent: '从缓存加载',
+            onRequest: () => completer.future,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // loading → loaded，显示缓存内容
+      expect(find.text('从缓存加载'), findsOneWidget);
     });
   });
 }

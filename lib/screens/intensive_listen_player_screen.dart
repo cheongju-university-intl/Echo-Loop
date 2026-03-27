@@ -914,7 +914,7 @@ class _NormalModeView extends StatelessWidget {
               onTap: onPeekToggle,
               child: Stack(
                 children: [
-                  // 字幕内容偏上（-0.4 ≈ 上方 30% 位置）
+                  // 字幕内容偏上（-0.4 ≈ 上方 30% 位置），左对齐与标注模式一致
                   Align(
                     alignment: const Alignment(0, -0.4),
                     child: playerState.isTextRevealed && sentenceText != null
@@ -945,7 +945,6 @@ class _NormalModeView extends StatelessWidget {
                                     sentenceText!,
                                     style: theme.textTheme.titleMedium
                                         ?.copyWith(height: 1.6),
-                                    textAlign: TextAlign.center,
                                   ),
                           )
                         : _HiddenTextPlaceholder(),
@@ -1335,7 +1334,7 @@ class _TappableText extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = text.split(RegExp(r'\s+'));
     return Wrap(
-      alignment: WrapAlignment.center,
+      alignment: WrapAlignment.start,
       spacing: 4,
       runSpacing: 2,
       children: tokens.map((token) {

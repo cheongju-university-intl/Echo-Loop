@@ -55,21 +55,24 @@ class _AiContentSectionState extends State<AiContentSection> {
   @override
   void initState() {
     super.initState();
-    // 如果有缓存内容，直接设为 loaded
+    // 预存缓存内容，但不自动展开（用户点击时可立即显示）
     if (widget.cachedContent != null) {
       _content = widget.cachedContent;
-      _state = AiContentState.loaded;
     }
   }
 
   @override
   void didUpdateWidget(AiContentSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 缓存内容变化（如切换句子后重新传入），同步更新
+    // 缓存内容变化时同步更新
     if (widget.cachedContent != oldWidget.cachedContent) {
       if (widget.cachedContent != null) {
         _content = widget.cachedContent;
-        _state = AiContentState.loaded;
+        // 仅在用户已主动请求（loading 状态）时自动展开，
+        // 避免切换句子或多遍播放时因缓存存在而自动展开
+        if (_state == AiContentState.loading) {
+          _state = AiContentState.loaded;
+        }
       } else {
         _content = null;
         _state = AiContentState.collapsed;

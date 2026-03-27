@@ -96,7 +96,7 @@ void main() {
       expect(toggled, isTrue);
     });
 
-    testWidgets('cachedTranslation 直接展示', (tester) async {
+    testWidgets('cachedTranslation 初始折叠，点击后立即展示', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           SentenceAnnotationCard(
@@ -109,10 +109,16 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      // 初始折叠，不自动展开
+      expect(find.text('你好'), findsNothing);
+
+      // 点击翻译区域展开
+      await tester.tap(find.byIcon(Icons.translate));
+      await tester.pumpAndSettle();
       expect(find.text('你好'), findsOneWidget);
     });
 
-    testWidgets('cachedAnalysis 直接展示', (tester) async {
+    testWidgets('cachedAnalysis 初始折叠，点击后立即展示', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           SentenceAnnotationCard(
@@ -124,6 +130,12 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+      // 初始折叠
+      expect(find.text('语法分析'), findsNothing);
+
+      // 点击解析区域展开
+      await tester.tap(find.byIcon(Icons.auto_awesome));
       await tester.pumpAndSettle();
       expect(find.text('语法分析'), findsOneWidget);
       expect(find.text('词汇分析'), findsOneWidget);
@@ -410,9 +422,13 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // 缓存内容直接展示
+      // 初始折叠
+      expect(find.text('已缓存的翻译'), findsNothing);
+
+      // 点击展开 — 使用缓存内容，不触发网络请求
+      await tester.tap(find.byIcon(Icons.translate));
+      await tester.pumpAndSettle();
       expect(find.text('已缓存的翻译'), findsOneWidget);
-      // 未触发网络请求
       expect(requested, isFalse);
     });
   });
