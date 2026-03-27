@@ -110,32 +110,28 @@ class PracticeNormalModeView extends StatelessWidget {
               onTap: onPeekToggle,
               child: Stack(
                 children: [
-                  // 字幕内容偏上（-0.4 ≈ 上方 30% 位置）
                   Align(
                     alignment: const Alignment(0, -0.4),
                     child: isRevealed && sentenceText != null
                         ? GestureDetector(
-                            onTap: () {}, // 拦截点击，不冒泡到外层
+                            onTap: () {}, // 拦截文字区域点击，不冒泡到偷看切换
                             child: onWordTap != null
                                 ? _TappableText(
                                     text: sentenceText!,
-                                    style:
-                                        theme.textTheme.titleMedium?.copyWith(
-                                          height: 1.6,
-                                        ) ??
+                                    style: theme.textTheme.bodyLarge
+                                            ?.copyWith(height: 1.6) ??
                                         const TextStyle(),
                                     onWordTap: onWordTap!,
                                   )
                                 : Text(
                                     sentenceText!,
-                                    style: theme.textTheme.titleMedium
+                                    style: theme.textTheme.bodyLarge
                                         ?.copyWith(height: 1.6),
-                                    textAlign: TextAlign.center,
+                                    textAlign: TextAlign.left,
                                   ),
                           )
                         : const _HiddenTextPlaceholder(),
                   ),
-                  // 偷看字幕标签（固定在字幕区中间偏下）
                   Align(
                     alignment: const Alignment(0, 0.55),
                     child: _PeekLabel(
@@ -264,7 +260,7 @@ String _cleanWord(String word) => word.replaceAll(
   '',
 );
 
-/// 逐词可点击的文本（Wrap 布局，点击单词触发查词，带按压高亮反馈）
+/// 逐词可点击的文本（Wrap 布局，点击单词触发查词）
 class _TappableText extends StatelessWidget {
   final String text;
   final TextStyle style;
@@ -280,60 +276,15 @@ class _TappableText extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = text.split(RegExp(r'\s+'));
     return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 4,
-      runSpacing: 2,
+      alignment: WrapAlignment.start,
       children: tokens.map((token) {
         final clean = _cleanWord(token);
-        if (clean.isEmpty) return Text(token, style: style);
-        return _TappableWord(
-          token: token,
-          style: style,
+        if (clean.isEmpty) return Text('$token ', style: style);
+        return GestureDetector(
           onTap: () => onWordTap(clean),
+          child: Text('$token ', style: style),
         );
       }).toList(),
-    );
-  }
-}
-
-/// 单个可点击单词（按压时显示浅色背景高亮）
-class _TappableWord extends StatefulWidget {
-  final String token;
-  final TextStyle style;
-  final VoidCallback onTap;
-
-  const _TappableWord({
-    required this.token,
-    required this.style,
-    required this.onTap,
-  });
-
-  @override
-  State<_TappableWord> createState() => _TappableWordState();
-}
-
-class _TappableWordState extends State<_TappableWord> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final highlightColor = Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: 0.1);
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        decoration: BoxDecoration(
-          color: _isPressed ? highlightColor : null,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(widget.token, style: widget.style),
-      ),
     );
   }
 }
