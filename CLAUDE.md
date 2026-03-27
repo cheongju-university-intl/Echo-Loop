@@ -114,5 +114,20 @@ flutter test integration_test -d macos
 - 需要通过 Method Channel 调用 iOS 原生 `URLSession` 才能触发
 - 当前方案：App 启动时通过 `top.echo-loop/network` Channel 发起原生请求（见 `AppDelegate.swift` + `main.dart`）
 
-**文档版本**: v4.1
-**更新时间**: 2026-03-05
+**文档版本**: v4.2
+**更新时间**: 2026-03-27
+
+---
+
+## 6 Troubleshooting（踩坑记录）
+
+记录已修复的典型问题和设计约束，防止同类问题再次出现。
+
+### 6.1 iOS 语音识别：异步回调破坏新 session
+
+- **现象**：录音播放不正确、卡在"分析中"~5 秒、评级却显示很棒
+- **根因**：`SFSpeechRecognitionTask.cancel()` 的回调是**异步**的（排入主队列下一轮事件循环）。若新 session 已启动，旧回调读到新 session 状态并破坏它（`isRecording = false` + 取消新识别任务）
+- **解法**：generation counter 模式 — 每次新 session 递增计数器，闭包捕获当前值，回调中校验不匹配则丢弃
+- **规则**：识别回调的 error 分支**不做资源清理**，资源清理统一由 stop/cancel/shutdown 发起
+- **相关代码**：`ios/Runner/AppDelegate.swift` → `IOSSpeechPracticeHandler`
+- **修复时间**：2026-03-27

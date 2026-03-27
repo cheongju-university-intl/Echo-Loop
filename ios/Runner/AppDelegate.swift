@@ -40,6 +40,7 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   private var recordedDurationMs = 0.0
   private var firstDetectedSpeechMs: Double?
   private var lastDetectedSpeechMs: Double?
+  private var sessionGeneration: Int = 0
 
   init(binaryMessenger: FlutterBinaryMessenger) {
     methodChannel = FlutterMethodChannel(
@@ -257,8 +258,10 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
     resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
 
+    let generation = sessionGeneration
     recognitionTask = recognizer.recognitionTask(with: request) { [weak self] recognitionResult, error in
-      self?.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
+      guard let self, self.sessionGeneration == generation else { return }
+      self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
     }
 
     isRecording = true
@@ -310,8 +313,10 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       cachedRecognizer = recognizer
       audioEngine = engine
 
+      let generation = sessionGeneration
       recognitionTask = recognizer.recognitionTask(with: request) { [weak self] recognitionResult, error in
-        self?.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
+        guard let self, self.sessionGeneration == generation else { return }
+        self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
       }
 
       inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
@@ -398,8 +403,6 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
         "errorCode": SpeechPracticeError.noSpeech.rawValue,
         "errorMessage": error.localizedDescription
       ])
-      isRecording = false
-      cleanupSentenceState(cancelRecognition: true)
       return
     }
 
@@ -720,6 +723,7 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
   /// 重置句子级状态变量。
   private func resetSentenceState(promptId: String, fileURL: URL, audioFile: AVAudioFile, request: SFSpeechAudioBufferRecognitionRequest) {
+    sessionGeneration += 1
     currentPromptId = promptId
     currentFileURL = fileURL
     hasDetectedSpeech = false
