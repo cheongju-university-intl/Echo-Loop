@@ -340,10 +340,10 @@ void main() {
     });
 
     testWidgets('有意群数据时显示色块并可 toggle', (tester) async {
-      final groups = [
-        SenseGroup(text: 'Hello', isCore: true),
-        SenseGroup(text: 'world'),
-      ];
+      final senseGroupResult = SenseGroupResult(
+        medium: ['Hello', 'world'],
+        fine: ['Hello', 'world'],
+      );
       final timings = [
         SenseGroupTiming(
           start: const Duration(seconds: 0),
@@ -360,7 +360,7 @@ void main() {
           SentenceAnnotationCard(
             text: 'Hello world',
             onRequestTranslation: () async => '翻译',
-            senseGroups: groups,
+            senseGroupResult: senseGroupResult,
             senseGroupTimings: timings,
             hasWordTimestamps: true,
             onRequestSenseGroups: () async {},
@@ -370,18 +370,17 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // 意群色块组件已渲染
+      // 有意群数据时自动进入 medium 模式，显示色块
       expect(find.byType(SenseGroupText), findsOneWidget);
 
-      // 点击拆意群按钮 toggle 回纯文本
-      await tester.tap(find.text('Groups'));
+      // 点击拆意群按钮切换（medium == fine → 直接 off）
+      final senseGroupBtn = find.byKey(const ValueKey('senseGroup'));
+      await tester.tap(senseGroupBtn);
       await tester.pumpAndSettle();
-
-      // 意群色块不再显示（已切回纯文本模式）
       expect(find.byType(SenseGroupText), findsNothing);
 
-      // 再次点击恢复色块
-      await tester.tap(find.text('Groups'));
+      // 再次点击恢复 medium
+      await tester.tap(senseGroupBtn);
       await tester.pumpAndSettle();
       expect(find.byType(SenseGroupText), findsOneWidget);
     });
