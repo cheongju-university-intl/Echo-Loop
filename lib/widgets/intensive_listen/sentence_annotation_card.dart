@@ -272,19 +272,22 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       return;
     }
     if (widget.onRequestAnalysis == null) return;
-    setState(() => _analysisExpanded = true);
     try {
       final result = await widget.onRequestAnalysis!();
       if (mounted) {
         setState(() {
           _analysisContent = result;
+          _analysisExpanded = true;
           _analysisState = ContentLoadState.loaded;
         });
         _notifyToolbar();
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _analysisState = ContentLoadState.error);
+        setState(() {
+          _analysisExpanded = true;
+          _analysisState = ContentLoadState.error;
+        });
         _notifyToolbar();
       }
     }
