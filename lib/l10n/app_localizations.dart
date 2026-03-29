@@ -1745,7 +1745,7 @@ abstract class AppLocalizations {
   /// No description provided for @listenAndRepeatProgress.
   ///
   /// In en, this message translates to:
-  /// **'Repeat {current}/{total}'**
+  /// **'Sentence {current}/{total}'**
   String listenAndRepeatProgress(int current, int total);
 
   /// No description provided for @listenAndRepeatPlayCount.

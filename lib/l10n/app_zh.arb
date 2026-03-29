@@ -321,7 +321,7 @@
   "deleteTag": "删除标签",
   "deleteTagConfirm": "确定要删除「{name}」吗？将从所有音频中移除。",
   "listenAndRepeatAppBarTitle": "难句跟读",
-  "listenAndRepeatProgress": "跟读 {current}/{total}",
+  "listenAndRepeatProgress": "第 {current}/{total} 句",
   "@listenAndRepeatProgress": {
     "placeholders": {
       "current": { "type": "int" },

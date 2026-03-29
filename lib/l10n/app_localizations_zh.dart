@@ -904,7 +904,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String listenAndRepeatProgress(int current, int total) {
-    return '跟读 $current/$total';
+    return '第 $current/$total 句';
   }
 
   @override

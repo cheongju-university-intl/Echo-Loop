@@ -922,7 +922,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String listenAndRepeatProgress(int current, int total) {
-    return 'Repeat $current/$total';
+    return 'Sentence $current/$total';
   }
 
   @override

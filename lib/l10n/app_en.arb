@@ -478,7 +478,7 @@
     }
   },
   "listenAndRepeatAppBarTitle": "Listen & Repeat",
-  "listenAndRepeatProgress": "Repeat {current}/{total}",
+  "listenAndRepeatProgress": "Sentence {current}/{total}",
   "@listenAndRepeatProgress": {
     "placeholders": {
       "current": { "type": "int" },
