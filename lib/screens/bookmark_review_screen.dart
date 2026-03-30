@@ -503,9 +503,17 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                 currentSentence?.startTime.inMilliseconds,
                             sentenceEndMs:
                                 currentSentence?.endTime.inMilliseconds,
-                            onStopMainPlayer: () => ref
-                                .read(bookmarkReviewProvider.notifier)
-                                .pause(),
+                            onStopMainPlayer: () {
+                              ref
+                                  .read(bookmarkReviewProvider.notifier)
+                                  .pause();
+                              ref
+                                  .read(
+                                    shadowingRecordingControllerProvider
+                                        .notifier,
+                                  )
+                                  .cancelActiveRecording();
+                            },
                             turnState: turnState,
                             currentPromptId: currentPromptId,
                             currentAttempt: currentAttempt,

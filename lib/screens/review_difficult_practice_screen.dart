@@ -699,9 +699,19 @@ class _ReviewDifficultPracticeScreenState
                                 currentSentence?.startTime.inMilliseconds,
                             sentenceEndMs:
                                 currentSentence?.endTime.inMilliseconds,
-                            onStopMainPlayer: () => ref
-                                .read(reviewDifficultPracticeProvider.notifier)
-                                .pause(),
+                            onStopMainPlayer: () {
+                              ref
+                                  .read(
+                                    reviewDifficultPracticeProvider.notifier,
+                                  )
+                                  .pause();
+                              ref
+                                  .read(
+                                    shadowingRecordingControllerProvider
+                                        .notifier,
+                                  )
+                                  .cancelActiveRecording();
+                            },
                             turnState: turnState,
                             currentPromptId: currentPromptId,
                             currentAttempt: currentAttempt,

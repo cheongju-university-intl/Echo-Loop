@@ -753,11 +753,19 @@ class _ListenAndRepeatPlayerScreenState
                                       .endTime.inMilliseconds,
                                   highlightedSegments:
                                       currentAttempt?.referenceSegments,
-                                  onStopMainPlayer: () => ref
-                                      .read(
-                                        listenAndRepeatPlayerProvider.notifier,
-                                      )
-                                      .pause(),
+                                  onStopMainPlayer: () {
+                                    ref
+                                        .read(
+                                          listenAndRepeatPlayerProvider.notifier,
+                                        )
+                                        .pause();
+                                    ref
+                                        .read(
+                                          shadowingRecordingControllerProvider
+                                              .notifier,
+                                        )
+                                        .cancelActiveRecording();
+                                  },
                                 ),
                               ),
                             ],
