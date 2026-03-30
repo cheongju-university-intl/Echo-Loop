@@ -263,8 +263,8 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
             final isSaved = savedTexts.contains(normalized);
 
             return Positioned(
-              left: badgeRect.left + badgeRect.width / 2 - 40,
-              top: badgeRect.top - 40,
+              left: badgeRect.left + badgeRect.width / 2 - 15,
+              top: badgeRect.top - 34,
               child: TapRegion(
                 onTapOutside: (_) => _dismissActionBar(),
                 child: SenseGroupActionBar(
