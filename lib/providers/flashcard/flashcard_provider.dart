@@ -243,8 +243,8 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     }
 
     // 异步停止旧播放（翻回正面时同时朗读新单词）
-    Future.microtask(() {
-      _stopAllPlayback();
+    Future.microtask(() async {
+      await _stopAllPlayback();
       if (wasShowingBack) _speakCurrentWord();
     });
   }
@@ -284,8 +284,8 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     AppLogger.log('Flashcard', 'nextCard: sync=${sw.elapsedMilliseconds}ms');
 
     // 2. 异步停止旧播放 + 朗读新单词（不阻塞帧渲染）
-    Future.microtask(() {
-      _stopAllPlayback();
+    Future.microtask(() async {
+      await _stopAllPlayback();
       _speakCurrentWord();
     });
   }
@@ -314,8 +314,8 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     AppLogger.log('Flashcard', 'prevCard: sync=${sw.elapsedMilliseconds}ms');
 
     // 2. 异步停止旧播放 + 朗读新单词（不阻塞帧渲染）
-    Future.microtask(() {
-      _stopAllPlayback();
+    Future.microtask(() async {
+      await _stopAllPlayback();
       _speakCurrentWord();
     });
   }
@@ -580,13 +580,9 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   }
 
   /// 停止所有播放（TTS + 音频引擎）
-  void _stopAllPlayback() {
-    AppLogger.log(
-      'Flashcard',
-      '_stopAllPlayback: sessionId=${ref.read(audioEngineProvider).sessionId}',
-    );
-    TtsService.instance.stop();
-    ref.read(audioEngineProvider.notifier).stop();
+  Future<void> _stopAllPlayback() async {
+    await TtsService.instance.stop();
+    await ref.read(audioEngineProvider.notifier).stop();
   }
 
   /// 开始监听 AudioEngine playerState，追踪输入时间（例句音频播放）
