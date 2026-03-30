@@ -20,6 +20,7 @@ import '../providers/audio_engine/audio_engine_provider.dart';
 import '../services/tts_service.dart';
 import '../providers/flashcard/flashcard_provider.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
+import '../providers/saved_sense_group_provider.dart';
 import '../providers/saved_word_provider.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../services/dictionary_service.dart';
@@ -49,13 +50,16 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
 
     // 获取收藏数量
     final sentenceCount = ref.watch(bookmarkListProvider).valueOrNull?.length;
-    final wordCount = ref.watch(savedWordListProvider).valueOrNull?.length;
+    final wordCount = ref.watch(savedWordListProvider).valueOrNull?.length ?? 0;
+    final phraseCount =
+        ref.watch(savedSenseGroupListProvider).valueOrNull?.length ?? 0;
+    final vocabCount = wordCount + phraseCount;
 
     final sentenceLabel = sentenceCount != null && sentenceCount > 0
         ? '${l10n.favoritesSentences} ($sentenceCount)'
         : l10n.favoritesSentences;
-    final wordLabel = wordCount != null && wordCount > 0
-        ? '${l10n.favoritesVocabulary} ($wordCount)'
+    final wordLabel = vocabCount > 0
+        ? '${l10n.favoritesVocabulary} ($vocabCount)'
         : l10n.favoritesVocabulary;
 
     return Scaffold(
@@ -728,36 +732,160 @@ class _WordsViewState extends ConsumerState<_WordsView> {
   @override
   Widget build(BuildContext context) {
     final savedWordsAsync = ref.watch(savedWordListProvider);
+    final savedPhrasesAsync = ref.watch(savedSenseGroupListProvider);
 
-    return savedWordsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (words) {
-        if (words.isEmpty) {
-          return _buildEmptyState(context, isSentences: false);
-        }
+    // 等待两个数据源都加载完成
+    if (savedWordsAsync.isLoading || savedPhrasesAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator.adaptive());
+    }
+    if (savedWordsAsync.hasError) {
+      return Center(child: Text('Error: ${savedWordsAsync.error}'));
+    }
 
-        // 触发批量字典查询（异步完成后 setState 更新释义）
-        _loadDictEntries(words);
+    final words = savedWordsAsync.valueOrNull ?? [];
+    final phrases = savedPhrasesAsync.valueOrNull ?? [];
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.m,
-            AppSpacing.s,
-            AppSpacing.m,
-            80, // 底部留出悬浮按钮空间
-          ),
-          itemCount: words.length,
-          itemBuilder: (context, index) {
-            final w = words[index];
-            return _SavedWordTile(
-              key: ValueKey(w.id),
+    if (words.isEmpty && phrases.isEmpty) {
+      return _buildEmptyState(context, isSentences: false);
+    }
+
+    // 触发批量字典查询
+    _loadDictEntries(words);
+
+    // 合并并按 createdAt 倒序排列
+    final items = <_VocabularyItem>[
+      for (final w in words) _VocabularyWord(w),
+      for (final p in phrases) _VocabularyPhrase(p),
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.m,
+        AppSpacing.s,
+        AppSpacing.m,
+        80,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return switch (item) {
+          _VocabularyWord(word: final w) => _SavedWordTile(
+              key: ValueKey('w_${w.id}'),
               savedWord: w,
               dictEntry: _dictMap[w.word],
-            );
-          },
-        );
+            ),
+          _VocabularyPhrase(phrase: final p) => _SavedPhraseTile(
+              key: ValueKey('p_${p.id}'),
+              savedPhrase: p,
+            ),
+        };
       },
+    );
+  }
+}
+
+/// 词汇列表项（单词 / 意群）
+sealed class _VocabularyItem {
+  DateTime get createdAt;
+}
+
+class _VocabularyWord extends _VocabularyItem {
+  final SavedWord word;
+  _VocabularyWord(this.word);
+  @override
+  DateTime get createdAt => word.createdAt;
+}
+
+class _VocabularyPhrase extends _VocabularyItem {
+  final SavedSenseGroup phrase;
+  _VocabularyPhrase(this.phrase);
+  @override
+  DateTime get createdAt => phrase.createdAt;
+}
+
+/// 收藏意群列表项
+class _SavedPhraseTile extends ConsumerWidget {
+  final SavedSenseGroup savedPhrase;
+
+  const _SavedPhraseTile({super.key, required this.savedPhrase});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.orange.shade200,
+            width: 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.m),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 意群文本
+              Row(
+                children: [
+                  Icon(
+                    Icons.auto_fix_high,
+                    size: 14,
+                    color: Colors.orange.shade700,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      savedPhrase.displayText,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  // 删除按钮
+                  IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                    onPressed: () {
+                      ref
+                          .read(savedSenseGroupListProvider.notifier)
+                          .removeSenseGroup(savedPhrase.phraseText);
+                    },
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                  ),
+                ],
+              ),
+              // 来源句子
+              if (savedPhrase.sentenceText != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  savedPhrase.sentenceText!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
