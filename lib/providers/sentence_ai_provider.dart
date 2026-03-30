@@ -104,7 +104,10 @@ class SentenceAiNotifier {
     // L1: 内存缓存（空结果不视为有效缓存）
     final cached = _senseGroupCache[hash];
     if (cached != null && cached.medium.isNotEmpty) {
-      AppLogger.log('SenseGroup', 'L1 命中 | medium=${cached.medium.length}组 fine=${cached.fine.length}组 | "${text.length > 40 ? '${text.substring(0, 40)}...' : text}"');
+      AppLogger.log(
+        'SenseGroup',
+        'L1 命中 | medium=${cached.medium.length}组 fine=${cached.fine.length}组 | "${text.length > 40 ? '${text.substring(0, 40)}...' : text}"',
+      );
       return cached;
     }
     if (cached != null) {
@@ -238,7 +241,10 @@ class SentenceAiNotifier {
         // 检查结果是否有效（旧格式数据 fromJson 不会报错但会返回空列表）
         if (result.medium.isNotEmpty) {
           _senseGroupCache[hash] = result;
-          AppLogger.log('SenseGroup', 'L2 SQLite 命中 | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual}');
+          AppLogger.log(
+            'SenseGroup',
+            'L2 SQLite 命中 | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual}',
+          );
           return result;
         }
         // 空结果视为旧格式缓存，删除并 fallthrough 到 L3
@@ -259,7 +265,10 @@ class SentenceAiNotifier {
       cancelToken: cancelToken,
     );
     sw.stop();
-    AppLogger.log('SenseGroup', 'L3 API 返回 | ${sw.elapsedMilliseconds}ms | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual}');
+    AppLogger.log(
+      'SenseGroup',
+      'L3 API 返回 | ${sw.elapsedMilliseconds}ms | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual}',
+    );
 
     // 打印具体分组内容
     for (var i = 0; i < result.medium.length; i++) {
@@ -269,13 +278,12 @@ class SentenceAiNotifier {
       AppLogger.log('SenseGroup', '  细粒[$i]: "${result.fine[i]}"');
     }
 
+    // 空结果不缓存（允许用户重试）
+    if (result.medium.isEmpty) return result;
+
     // 写入 L1 + L2
     _senseGroupCache[hash] = result;
-    await _cacheDao.upsert(
-      hash,
-      'sense_groups',
-      jsonEncode(result.toJson()),
-    );
+    await _cacheDao.upsert(hash, 'sense_groups', jsonEncode(result.toJson()));
     return result;
   }
 }

@@ -245,10 +245,9 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
   /// - 两种结果不同：off → medium（大意群）→ fine（小意群）→ off
   Future<void> _onTapSenseGroup() async {
     final result = widget.senseGroupResult;
-    // result != null 即视为有数据（即使列表为空，也不再重复请求 API）
-    final hasData = result != null;
 
-    if (hasData && result.medium.isNotEmpty) {
+    if (result != null && result.medium.isNotEmpty) {
+      // 已有有效数据，切换显示模式
       final bothEqual = result.areBothEqual;
       final prevMode = _senseGroupMode;
       setState(() {
@@ -256,25 +255,30 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
           case SenseGroupMode.off:
             _senseGroupMode = SenseGroupMode.medium;
           case SenseGroupMode.medium:
-            _senseGroupMode = bothEqual ? SenseGroupMode.off : SenseGroupMode.fine;
+            _senseGroupMode = bothEqual
+                ? SenseGroupMode.off
+                : SenseGroupMode.fine;
           case SenseGroupMode.fine:
             _senseGroupMode = SenseGroupMode.off;
         }
       });
-      AppLogger.log('SenseGroup', '切换模式: $prevMode → $_senseGroupMode (bothEqual=$bothEqual)');
+      AppLogger.log(
+        'SenseGroup',
+        '切换模式: $prevMode → $_senseGroupMode (bothEqual=$bothEqual)',
+      );
       // 通知外部重新计算时间范围 + 停止播放（off 时传空列表）
       widget.onSenseGroupModeChanged?.call(_activeSenseGroups ?? []);
       _notifyToolbar();
-    } else if (hasData && result.medium.isEmpty) {
-      // API 返回了结果但意群列表为空（极短句无法拆分），不重复请求
-      AppLogger.log('SenseGroup', '意群列表为空，无法拆分');
-    } else if (!hasData && widget.onRequestSenseGroups != null) {
+    } else if (widget.onRequestSenseGroups != null) {
       // 无数据时 await 异步请求，按钮自动显示 loading
+      // （空结果不会被父组件缓存，因此可重复点击重试）
       AppLogger.log('SenseGroup', '无数据，发起 API 请求...');
       await widget.onRequestSenseGroups!();
       // 请求完成后，父组件已通过 setState 将 senseGroupResult 传入。
       // 显式进入 medium 模式（不依赖 didUpdateWidget 的时序）。
-      if (mounted && widget.senseGroupResult != null && widget.senseGroupResult!.medium.isNotEmpty) {
+      if (mounted &&
+          widget.senseGroupResult != null &&
+          widget.senseGroupResult!.medium.isNotEmpty) {
         setState(() => _senseGroupMode = SenseGroupMode.medium);
         AppLogger.log('SenseGroup', 'API 返回后进入 medium 模式');
         widget.onSenseGroupModeChanged?.call(widget.senseGroupResult!.medium);
@@ -490,7 +494,9 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     final l10n = AppLocalizations.of(context)!;
 
     final showSenseGroupBlocks =
-        _senseGroupMode != SenseGroupMode.off && _activeSenseGroups != null && _activeSenseGroups!.isNotEmpty;
+        _senseGroupMode != SenseGroupMode.off &&
+        _activeSenseGroups != null &&
+        _activeSenseGroups!.isNotEmpty;
 
     // 按钮文案根据当前模式变化
     final senseGroupLabel = switch (_senseGroupMode) {

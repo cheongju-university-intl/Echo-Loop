@@ -170,6 +170,21 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
       if (!mounted) return;
 
+      // API 返回空结果（极短句无法拆分）时，提示用户重试，不缓存结果
+      if (result.medium.isEmpty) {
+        AppLogger.log('SenseGroup', '意群列表为空，提示用户重试');
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n?.senseGroupLoadFailed ??
+                  'Failed to split sense groups, please retry',
+            ),
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _senseGroupResult = result;
         _senseGroupTimings = timings;
@@ -270,12 +285,8 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                 onTapOutside: (_) => _dismissActionBar(),
                 child: SenseGroupActionBar(
                   isSaved: isSaved,
-                  onToggleSave: () => _toggleSaveSenseGroup(
-                    index,
-                    chunk,
-                    normalized,
-                    isSaved,
-                  ),
+                  onToggleSave: () =>
+                      _toggleSaveSenseGroup(index, chunk, normalized, isSaved),
                   onCopy: () {
                     Clipboard.setData(ClipboardData(text: chunk.trim()));
                     _dismissActionBar();
@@ -359,8 +370,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   @override
   Widget build(BuildContext context) {
     final ai = widget.aiNotifier;
-    final cachedTranslation =
-        ai?.getCachedTranslation(widget.text)?.translation;
+    final cachedTranslation = ai
+        ?.getCachedTranslation(widget.text)
+        ?.translation;
     final cachedAnalysis = ai?.getCachedAnalysis(widget.text);
     final cachedAnalysisText = cachedAnalysis?.toDisplayString();
 
