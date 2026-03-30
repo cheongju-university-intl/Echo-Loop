@@ -2180,6 +2180,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get senseGroupSingleGroup => 'This sentence is a single group';
 
   @override
+  String get senseGroupSave => 'Save';
+
+  @override
+  String get senseGroupSaved => 'Saved';
+
+  @override
   String get annotationBtnSenseGroup => 'Groups';
 
   @override

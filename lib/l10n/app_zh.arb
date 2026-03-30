@@ -874,6 +874,8 @@
   "senseGroupSplit": "拆分意群",
   "senseGroupLoading": "拆分中...",
   "senseGroupSingleGroup": "此句为单个意群",
+  "senseGroupSave": "收藏",
+  "senseGroupSaved": "已收藏",
   "annotationBtnSenseGroup": "意群",
   "annotationBtnSenseGroupMedium": "大意群",
   "annotationBtnSenseGroupFine": "小意群",

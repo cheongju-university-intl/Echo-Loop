@@ -3908,6 +3908,18 @@ abstract class AppLocalizations {
   /// **'This sentence is a single group'**
   String get senseGroupSingleGroup;
 
+  /// No description provided for @senseGroupSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get senseGroupSave;
+
+  /// No description provided for @senseGroupSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get senseGroupSaved;
+
   /// No description provided for @annotationBtnSenseGroup.
   ///
   /// In en, this message translates to:

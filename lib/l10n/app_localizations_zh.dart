@@ -2120,6 +2120,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get senseGroupSingleGroup => '此句为单个意群';
 
   @override
+  String get senseGroupSave => '收藏';
+
+  @override
+  String get senseGroupSaved => '已收藏';
+
+  @override
   String get annotationBtnSenseGroup => '意群';
 
   @override

@@ -1184,6 +1184,8 @@
   "senseGroupSplit": "Split into Groups",
   "senseGroupLoading": "Splitting...",
   "senseGroupSingleGroup": "This sentence is a single group",
+  "senseGroupSave": "Save",
+  "senseGroupSaved": "Saved",
   "annotationBtnSenseGroup": "Groups",
   "annotationBtnSenseGroupMedium": "Medium",
   "annotationBtnSenseGroupFine": "Fine",

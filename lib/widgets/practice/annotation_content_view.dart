@@ -6,6 +6,8 @@
 /// 用于精听、难句补练、难句跟读和收藏复习页面。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,12 +18,15 @@ import '../../models/speech_practice_models.dart';
 import '../../models/word_timestamp.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
 import '../../providers/sentence_ai_provider.dart';
+import '../../providers/saved_sense_group_provider.dart';
 import '../../services/app_logger.dart';
 import '../../services/transcription_api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/sense_group_service.dart';
 import '../../utils/sense_group_timing.dart';
 import '../intensive_listen/sentence_annotation_card.dart';
+import 'sense_group_action_bar.dart';
+import 'sense_group_text.dart';
 
 /// 标注模式内容视图
 ///
@@ -96,6 +101,11 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   /// 意群播放 session（用于取消）
   int? _sgPlaybackSession;
 
+  // --- 意群快捷菜单 Overlay ---
+  OverlayEntry? _actionBarOverlay;
+  int? _actionBarGroupIndex;
+  Timer? _actionBarTimer;
+
   @override
   void initState() {
     super.initState();
@@ -104,6 +114,7 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
   @override
   void dispose() {
+    _dismissActionBar();
     _toolbarNotifier.dispose();
     super.dispose();
   }
@@ -111,10 +122,11 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   @override
   void didUpdateWidget(AnnotationContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 切句时重建 GlobalKey + 重置意群数据
+    // 切句时重建 GlobalKey + 重置意群数据 + 关闭工具条
     if (widget.text != oldWidget.text) {
       _cardKey = GlobalKey<SentenceAnnotationCardState>();
       _resetSenseGroups();
+      _dismissActionBar();
     }
     // 音频切换时重新加载词级时间戳
     if (widget.audioItemId != oldWidget.audioItemId) {
@@ -231,6 +243,104 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     }
   }
 
+  /// 显示意群快捷菜单
+  void _showActionBar(int index, Rect badgeRect) {
+    _dismissActionBar();
+    _actionBarGroupIndex = index;
+
+    final chunks = _senseGroupResult?.medium ?? [];
+    if (index >= chunks.length) return;
+    final chunk = chunks[index];
+    final normalized = normalizeSenseGroupPhrase(chunk);
+
+    _actionBarOverlay = OverlayEntry(
+      builder: (context) {
+        // 从 provider 获取收藏状态
+        return Consumer(
+          builder: (context, ref, _) {
+            final savedTextsAsync = ref.watch(savedSenseGroupTextsProvider);
+            final savedTexts = savedTextsAsync.valueOrNull ?? {};
+            final isSaved = savedTexts.contains(normalized);
+
+            return Positioned(
+              left: badgeRect.left + badgeRect.width / 2 - 40,
+              top: badgeRect.top - 40,
+              child: TapRegion(
+                onTapOutside: (_) => _dismissActionBar(),
+                child: SenseGroupActionBar(
+                  isSaved: isSaved,
+                  onToggleSave: () => _toggleSaveSenseGroup(
+                    index,
+                    chunk,
+                    normalized,
+                    isSaved,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_actionBarOverlay!);
+
+    // 5 秒自动消失
+    _actionBarTimer?.cancel();
+    _actionBarTimer = Timer(const Duration(seconds: 5), _dismissActionBar);
+  }
+
+  /// 关闭意群快捷菜单
+  void _dismissActionBar() {
+    _actionBarTimer?.cancel();
+    _actionBarTimer = null;
+    _actionBarOverlay?.remove();
+    _actionBarOverlay = null;
+    _actionBarGroupIndex = null;
+  }
+
+  /// 收藏/取消收藏意群
+  Future<void> _toggleSaveSenseGroup(
+    int index,
+    String displayText,
+    String normalizedText,
+    bool currentlySaved,
+  ) async {
+    final provider = ref.read(savedSenseGroupListProvider.notifier);
+
+    if (currentlySaved) {
+      await provider.removeSenseGroup(normalizedText);
+    } else {
+      // 获取意群时间范围
+      int? groupStartMs;
+      int? groupEndMs;
+      if (_senseGroupTimings != null && index < _senseGroupTimings!.length) {
+        final timing = _senseGroupTimings![index];
+        groupStartMs = timing.start.inMilliseconds;
+        groupEndMs = timing.end.inMilliseconds;
+      }
+
+      await provider.saveSenseGroup(
+        phraseText: normalizedText,
+        displayText: displayText.trim(),
+        audioItemId: widget.audioItemId,
+        sentenceIndex: widget.sentenceIndex,
+        sentenceText: widget.text,
+        sentenceStartMs: widget.sentenceStartMs,
+        sentenceEndMs: widget.sentenceEndMs,
+        groupStartMs: groupStartMs,
+        groupEndMs: groupEndMs,
+      );
+    }
+
+    // 收藏后 500ms 关闭工具条
+    _actionBarTimer?.cancel();
+    _actionBarTimer = Timer(
+      const Duration(milliseconds: 500),
+      _dismissActionBar,
+    );
+  }
+
   /// 重置意群数据
   void _resetSenseGroups() {
     _senseGroupResult = null;
@@ -249,63 +359,78 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final cachedAnalysis = ai?.getCachedAnalysis(widget.text);
     final cachedAnalysisText = cachedAnalysis?.toDisplayString();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 固定工具栏（监听 notifier 刷新）
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.m),
-          child: ListenableBuilder(
-            listenable: _toolbarNotifier,
-            builder: (context, _) {
-              final cardState = _cardKey.currentState;
-              if (cardState == null || !cardState.hasToolbarButtons) {
-                return const SizedBox.shrink();
-              }
-              return cardState.buildToolbar(context);
-            },
-          ),
-        ),
-        // 可滚动内容区
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: AppSpacing.l),
-            child: SentenceAnnotationCard(
-              key: _cardKey,
-              text: widget.text,
-              showToolbar: false,
-              onToolbarStateChanged: _toolbarNotifier.notify,
-              onRequestTranslation: ai != null
-                  ? () async {
-                      final result = await ai.getTranslation(widget.text);
-                      return result.translation;
-                    }
-                  : null,
-              onRequestAnalysis: ai != null
-                  ? () async {
-                      final result = await ai.getAnalysis(widget.text);
-                      return result.toDisplayString();
-                    }
-                  : null,
-              cachedTranslation: cachedTranslation,
-              cachedAnalysis: cachedAnalysisText,
-              audioItemId: widget.audioItemId,
-              sentenceIndex: widget.sentenceIndex,
-              sentenceStartMs: widget.sentenceStartMs,
-              sentenceEndMs: widget.sentenceEndMs,
-              senseGroupResult: _senseGroupResult,
-              senseGroupTimings: _senseGroupTimings,
-              onSenseGroupModeChanged: _handleModeChanged,
-              playingSenseGroupIndex: _playingSenseGroupIndex,
-              playedSenseGroupIndices: _playedSenseGroupIndices,
-              onTapSenseGroup: _handleTapSenseGroup,
-              onRequestSenseGroups: _requestSenseGroups,
-              hasWordTimestamps: _wordTimestamps != null,
-              highlightedSegments: widget.highlightedSegments,
+    // 局部 watch 已收藏意群文本集合，避免全局重建
+    final savedTextsAsync = ref.watch(savedSenseGroupTextsProvider);
+    final savedTexts = savedTextsAsync.valueOrNull ?? {};
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        // 滚动时关闭工具条
+        if (notification is ScrollStartNotification) {
+          _dismissActionBar();
+        }
+        return false;
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 固定工具栏（监听 notifier 刷新）
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.m),
+            child: ListenableBuilder(
+              listenable: _toolbarNotifier,
+              builder: (context, _) {
+                final cardState = _cardKey.currentState;
+                if (cardState == null || !cardState.hasToolbarButtons) {
+                  return const SizedBox.shrink();
+                }
+                return cardState.buildToolbar(context);
+              },
             ),
           ),
-        ),
-      ],
+          // 可滚动内容区
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: AppSpacing.l),
+              child: SentenceAnnotationCard(
+                key: _cardKey,
+                text: widget.text,
+                showToolbar: false,
+                onToolbarStateChanged: _toolbarNotifier.notify,
+                onRequestTranslation: ai != null
+                    ? () async {
+                        final result = await ai.getTranslation(widget.text);
+                        return result.translation;
+                      }
+                    : null,
+                onRequestAnalysis: ai != null
+                    ? () async {
+                        final result = await ai.getAnalysis(widget.text);
+                        return result.toDisplayString();
+                      }
+                    : null,
+                cachedTranslation: cachedTranslation,
+                cachedAnalysis: cachedAnalysisText,
+                audioItemId: widget.audioItemId,
+                sentenceIndex: widget.sentenceIndex,
+                sentenceStartMs: widget.sentenceStartMs,
+                sentenceEndMs: widget.sentenceEndMs,
+                senseGroupResult: _senseGroupResult,
+                senseGroupTimings: _senseGroupTimings,
+                onSenseGroupModeChanged: _handleModeChanged,
+                playingSenseGroupIndex: _playingSenseGroupIndex,
+                playedSenseGroupIndices: _playedSenseGroupIndices,
+                onTapSenseGroup: _handleTapSenseGroup,
+                onRequestSenseGroups: _requestSenseGroups,
+                hasWordTimestamps: _wordTimestamps != null,
+                highlightedSegments: widget.highlightedSegments,
+                savedGroupTexts: savedTexts,
+                onTapGroupWithRect: _showActionBar,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

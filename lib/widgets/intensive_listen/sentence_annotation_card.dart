@@ -92,6 +92,12 @@ class SentenceAnnotationCard extends StatefulWidget {
   /// 是否有词级时间戳（决定拆意群按钮是否可用）
   final bool hasWordTimestamps;
 
+  /// 已收藏的意群文本集合（归一化后，用于 badge 橙色高亮）
+  final Set<String> savedGroupTexts;
+
+  /// 点击意群回调（附带 badge 全局位置，用于显示工具条）
+  final void Function(int groupIndex, Rect globalRect)? onTapGroupWithRect;
+
   /// 是否在卡片内部渲染工具栏
   ///
   /// 设为 false 时，工具栏不会在卡片内渲染。外部可通过
@@ -128,6 +134,8 @@ class SentenceAnnotationCard extends StatefulWidget {
     this.hasWordTimestamps = false,
     this.showToolbar = true,
     this.onToolbarStateChanged,
+    this.savedGroupTexts = const {},
+    this.onTapGroupWithRect,
   });
 
   @override
@@ -559,6 +567,8 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
             playingGroupIndex: widget.playingSenseGroupIndex,
             playedGroupIndices: widget.playedSenseGroupIndices,
             onTapGroup: widget.onTapSenseGroup ?? (_) {},
+            savedGroupTexts: widget.savedGroupTexts,
+            onTapGroupWithRect: widget.onTapGroupWithRect,
           ),
         ] else
           GestureDetector(
