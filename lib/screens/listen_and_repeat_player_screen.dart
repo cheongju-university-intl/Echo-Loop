@@ -18,6 +18,11 @@ import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
 import '../database/enums.dart';
 import '../database/providers.dart';
+import '../models/audio_item.dart';
+import '../models/sense_group_result.dart';
+import '../models/sentence.dart';
+import '../models/word_timestamp.dart';
+import '../utils/sense_group_timing.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
@@ -27,6 +32,7 @@ import '../providers/listening_practice/bookmark_manager.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
+import '../services/transcription_api_client.dart';
 import '../theme/app_theme.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
@@ -75,6 +81,16 @@ class _ListenAndRepeatPlayerScreenState
   /// 用户在当前句手动停止过录音 → 本句不再自动录音/倒计时
   bool _manualStoppedThisSentence = false;
 
+  /// 词级时间戳（从后端获取，按音频缓存）
+  List<WordTimestamp>? _wordTimestamps;
+
+  /// 当前句子的意群拆分结果（双粒度）
+  SenseGroupResult? _senseGroupResult;
+
+  /// 当前句子的意群时间范围
+  List<SenseGroupTiming>? _senseGroupTimings;
+
+
   /// 录音回放服务
   final AudioPlaybackService _playbackService = AudioPlaybackService();
 
@@ -99,6 +115,7 @@ class _ListenAndRepeatPlayerScreenState
           .read(shadowingRecordingControllerProvider.notifier)
           .setManualMode(settings.isManualMode);
       ref.read(listenAndRepeatPlayerProvider.notifier).startPlaying();
+      _fetchWordTimestamps();
     });
   }
 
@@ -302,6 +319,115 @@ class _ListenAndRepeatPlayerScreenState
         dao: bookmarkDao,
       );
     }
+  }
+
+  /// 加载词级时间戳（DB 优先，未命中则从 API 拉取并保存）
+  Future<void> _fetchWordTimestamps() async {
+    final audioDao = ref.read(audioItemDaoProvider);
+    final audioItem = await audioDao.getById(widget.audioItemId);
+    if (audioItem == null) return;
+    if (audioItem.transcriptSource != TranscriptSource.ai.index) return;
+
+    final json = audioItem.wordTimestampsJson;
+    if (json != null) {
+      final words = decodeWordTimestamps(json);
+      if (words != null && words.isNotEmpty) {
+        if (mounted) setState(() => _wordTimestamps = words);
+        return;
+      }
+      await audioDao.updateWordTimestamps(widget.audioItemId, null);
+    }
+
+    final sha256 = audioItem.audioSha256;
+    final language = audioItem.transcriptLanguage;
+    if (sha256 == null || language == null) return;
+
+    try {
+      final api = ref.read(transcriptionApiClientProvider);
+      final result = await api.getTranscript(sha256, language);
+      if (result.words != null && result.words!.isNotEmpty) {
+        await audioDao.updateWordTimestamps(
+          widget.audioItemId,
+          encodeWordTimestamps(result.words!),
+        );
+        if (mounted) setState(() => _wordTimestamps = result.words);
+      }
+    } catch (e) {
+      debugPrint('获取词级时间戳失败: $e');
+    }
+  }
+
+  /// 请求 AI 拆分意群
+  Future<void> _requestSenseGroups() async {
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final sentence = player.currentSentence;
+    if (sentence == null) return;
+
+    final ai = ref.read(sentenceAiNotifierProvider);
+    try {
+      final result = await ai.getSenseGroups(sentence.text);
+      if (!mounted) return;
+
+      final sentenceIndex = ref
+          .read(listenAndRepeatPlayerProvider)
+          .currentSentenceIndex;
+      final timings = _wordTimestamps != null
+          ? _computeTimings(result.medium, sentence, sentenceIndex)
+          : null;
+
+      setState(() {
+        _senseGroupResult = result;
+        _senseGroupTimings = timings;
+      });
+    } catch (e) {
+      AppLogger.log('SenseGroup', '请求意群失败: $e');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n?.senseGroupLoadFailed ?? 'Failed to load sense groups',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  /// 计算意群时间范围
+  List<SenseGroupTiming> _computeTimings(
+    List<String> chunks,
+    Sentence sentence,
+    int sentenceIndex,
+  ) {
+    final words = _wordTimestamps!;
+    final startMs = sentence.startTime.inMilliseconds;
+    final endMs = sentence.endTime.inMilliseconds;
+
+    var startIdx = 0;
+    var endIdx = words.length - 1;
+
+    for (var i = 0; i < words.length; i++) {
+      if (words[i].startTime.inMilliseconds >= startMs - 100) {
+        startIdx = i;
+        break;
+      }
+    }
+    for (var i = words.length - 1; i >= 0; i--) {
+      if (words[i].endTime.inMilliseconds <= endMs + 100) {
+        endIdx = i;
+        break;
+      }
+    }
+
+    return mapSenseGroupTimings(
+      chunks: chunks,
+      words: words,
+      sentenceStart: sentence.startTime,
+      sentenceEnd: sentence.endTime,
+      sentenceStartWordIndex: startIdx,
+      sentenceEndWordIndex: endIdx,
+    );
   }
 
   /// 获取当前步骤的上下文信息
@@ -527,10 +653,12 @@ class _ListenAndRepeatPlayerScreenState
       prev,
       next,
     ) {
-      // 句子切换时清除上一句的录音结果，为下一句自动录音做准备
+      // 句子切换时清除上一句的录音结果和意群数据
       if (prev != null &&
           prev.currentSentenceIndex != next.currentSentenceIndex) {
         _manualStoppedThisSentence = false;
+        _senseGroupResult = null;
+        _senseGroupTimings = null;
         ref
             .read(shadowingRecordingControllerProvider.notifier)
             .clearRecording();
@@ -749,6 +877,26 @@ class _ListenAndRepeatPlayerScreenState
                                   sentenceIndex: player.currentIndex,
                                   highlightedSegments:
                                       currentAttempt?.referenceSegments,
+                                  senseGroupResult: _senseGroupResult,
+                                  senseGroupTimings: _senseGroupTimings,
+                                  onSenseGroupModeChanged: (chunks) {
+                                    if (chunks.isEmpty) {
+                                      setState(
+                                        () => _senseGroupTimings = null,
+                                      );
+                                    } else if (_wordTimestamps != null) {
+                                      final timings = _computeTimings(
+                                        chunks,
+                                        currentSentence,
+                                        player.currentIndex,
+                                      );
+                                      setState(
+                                        () => _senseGroupTimings = timings,
+                                      );
+                                    }
+                                  },
+                                  onRequestSenseGroups: _requestSenseGroups,
+                                  hasWordTimestamps: _wordTimestamps != null,
                                 ),
                               ),
                             ],
