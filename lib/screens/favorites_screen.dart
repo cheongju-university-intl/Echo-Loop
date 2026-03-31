@@ -69,16 +69,19 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       appBar: AppBar(
         title: Text(l10n.favorites),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.restore_from_trash_rounded),
-            tooltip: l10n.recycleBinTitle,
-            onPressed: () {
-              if (_currentView == _FavoritesView.sentences) {
-                showSentenceRecycleBinSheet(context: context);
-              } else {
-                showVocabularyRecycleBinSheet(context: context);
-              }
-            },
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.restore),
+              tooltip: l10n.recycleBinTitle,
+              onPressed: () {
+                if (_currentView == _FavoritesView.sentences) {
+                  showSentenceRecycleBinSheet(context: context);
+                } else {
+                  showVocabularyRecycleBinSheet(context: context);
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -1168,7 +1171,8 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
 
       /// 存储时间是否可信（最少 200ms）
       const minDurationMs = 200;
-      final storedDurationOk = hasStoredTiming &&
+      final storedDurationOk =
+          hasStoredTiming &&
           (word.sentenceEndMs! - word.sentenceStartMs!) >= minDurationMs;
 
       if (hasStoredTiming && storedDurationOk) {

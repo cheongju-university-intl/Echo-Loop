@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:universal_io/io.dart';
 import '../models/audio_item.dart';
+import '../utils/time_format.dart';
 import '../models/learning_progress.dart';
 import '../models/tag.dart';
 import '../providers/audio_library_provider.dart';
@@ -203,7 +204,7 @@ class AudioListTile extends ConsumerWidget {
     if (audioItem.hasTranscript && !isTranscribing) {
       metaParts.add(l10n.transcript);
     }
-    metaParts.add(l10n.addedOn(_formatDate(audioItem.addedDate)));
+    metaParts.add(l10n.addedOn(_formatDate(context, audioItem.addedDate)));
 
     final metaStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -472,8 +473,8 @@ class AudioListTile extends ConsumerWidget {
   }
 
   /// 格式化添加日期为 M/d/yyyy
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
+  String _formatDate(BuildContext context, DateTime date) {
+    return formatTimeAgo(context, date);
   }
 
   /// 格式化音频时长（秒 → mm:ss 或 h:mm:ss）

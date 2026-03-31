@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import '../../utils/time_format.dart';
 
 import '../../database/app_database.dart';
 import '../../database/daos/learned_word_form_dao.dart';
@@ -383,7 +383,6 @@ class _LearnedWordFormTile extends StatelessWidget {
   }
 
   String _formatDate(BuildContext context, DateTime dateTime) {
-    final locale = Localizations.localeOf(context).toString();
-    return DateFormat('yyyy-MM-dd HH:mm', locale).format(dateTime);
+    return formatTimeAgo(context, dateTime);
   }
 }

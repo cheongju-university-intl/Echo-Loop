@@ -4,12 +4,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../../utils/time_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../database/daos/bookmark_dao.dart';
 import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import '../dialogs/confirm_dialog.dart';
 import 'recycle_bin_sheet_base.dart';
 
 /// 打开句子回收站弹窗
@@ -81,24 +83,17 @@ class _SentenceRecycleBinSheetState
     setState(() => _items.remove(item));
   }
 
+  String _formatDeletedAt(DateTime dt) => formatTimeAgo(context, dt);
+
   Future<void> _onClearAll() async {
     final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.recycleBinClearAll),
-        content: Text(l10n.recycleBinClearAllConfirm(_items.length)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.recycleBinClearAll),
-          ),
-        ],
-      ),
+      title: l10n.recycleBinClearAll,
+      message: l10n.recycleBinClearAllConfirm(_items.length),
+      isDestructive: true,
+      confirmLabel: l10n.recycleBinClearAll,
+      cancelLabel: l10n.cancel,
     );
 
     if (confirmed != true || !mounted) return;
@@ -147,11 +142,24 @@ class _SentenceRecycleBinSheetState
                               style: theme.textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              item.audioName,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.audioName,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                if (item.bookmark.deletedAt != null)
+                                  Text(
+                                    _formatDeletedAt(item.bookmark.deletedAt!),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
