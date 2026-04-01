@@ -36,7 +36,7 @@ import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
 import '../widgets/retell/retell_settings_sheet.dart';
-import '../widgets/common/paragraph_bottom_controls.dart';
+import '../widgets/common/playback_controls.dart';
 import '../widgets/common/paragraph_progress_header.dart';
 import '../widgets/player_hotkey_scope.dart';
 
@@ -949,9 +949,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                 const SizedBox(height: AppSpacing.m),
 
                 // 播放控制栏
-                ParagraphBottomControls(
+                PlaybackControls(
                   canGoPrev: state.currentParagraphIndex > 0,
-                  isLastParagraph:
+                  isLast:
                       state.currentParagraphIndex >= state.totalParagraphs - 1,
                   centerIcon: state.phase == RetellPhase.listening
                       ? (state.isPlaying

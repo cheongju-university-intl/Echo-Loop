@@ -39,6 +39,7 @@ import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
+import '../widgets/common/playback_controls.dart';
 import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/practice/practice_progress_section.dart';
 
@@ -73,8 +74,8 @@ class _ListenAndRepeatPlayerScreenState
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
 
-  /// 用户在当前句手动停止过录音 → 本句不再自动录音/倒计时
-  bool _manualStoppedThisSentence = false;
+  /// 用户手动停止了录音（评估后倒计时 +2s）
+  bool _manualStoppedRecording = false;
 
   /// 录音回放服务
   final AudioPlaybackService _playbackService = AudioPlaybackService();
@@ -91,6 +92,8 @@ class _ListenAndRepeatPlayerScreenState
     _playbackSub = _playbackService.isPlayingStream.listen((isPlaying) {
       if (!isPlaying && mounted) {
         setState(() => _playingPromptId = null);
+        // 录音回放结束 → 恢复倒计时
+        ref.read(listenAndRepeatPlayerProvider.notifier).restartCountdown();
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -154,8 +157,8 @@ class _ListenAndRepeatPlayerScreenState
 
     final promptId = _currentPromptId();
     if (recState.isRecordingPrompt(promptId)) {
-      AppLogger.log('ShadowScreen', '手动停止录音 → 本句退出自动模式');
-      _manualStoppedThisSentence = true;
+      AppLogger.log('ShadowScreen', '手动停止录音 → 评估后倒计时 +2s');
+      _manualStoppedRecording = true;
       await controller.stopAndEvaluate(referenceText: currentSentence.text);
       return;
     }
@@ -183,17 +186,15 @@ class _ListenAndRepeatPlayerScreenState
       return;
     }
 
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     final playerState = ref.read(listenAndRepeatPlayerProvider);
     if (playerState.isPlaying) {
-      await ref.read(listenAndRepeatPlayerProvider.notifier).pause();
+      await player.pause();
     }
 
-    // 取消评估后倒计时（不推进到下一句）
-    ref.read(listenAndRepeatPlayerProvider.notifier).cancelPostEvalCountdown();
-
-    // 标记本句手动操作过 → 不再自动录音/倒计时
-    AppLogger.log('ShadowScreen', '播放录音 → 等待用户操作');
-    _manualStoppedThisSentence = true;
+    // 挂起倒计时（播放结束后重新开始）
+    AppLogger.log('ShadowScreen', '播放录音 → 挂起倒计时');
+    player.suspendCountdown();
 
     final recState = ref.read(shadowingRecordingControllerProvider);
     final attempt = recState.currentAttempt;
@@ -390,7 +391,7 @@ class _ListenAndRepeatPlayerScreenState
           await ref
               .read(shadowingRecordingControllerProvider.notifier)
               .fullReset();
-          _manualStoppedThisSentence = false;
+          // resetToStart() 会重置播放状态
           ref.read(listenAndRepeatPlayerProvider.notifier).resetToStart();
         },
         onExit: () async {
@@ -489,7 +490,7 @@ class _ListenAndRepeatPlayerScreenState
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    // 只监听非倒计时字段，排除 pauseRemaining，
+    // 只监听 phase 类型变化和非倒计时字段，
     // 避免倒计时每 100ms tick 导致整个页面重建
     ref.watch(
       listenAndRepeatPlayerProvider.select(
@@ -499,14 +500,9 @@ class _ListenAndRepeatPlayerScreenState
           s.currentPlayCount,
           s.targetPlayCount,
           s.settings,
-          s.isPlaying,
-          s.isPauseBetweenPlays,
-          s.isPauseBetweenSentences,
-          s.pauseDuration,
-          s.isCountdownPaused,
-          s.isCountdownFastForward,
-          s.isPostEvalCountdown,
+          s.phase.runtimeType, // phase 类型变化触发重建，倒计时 tick 不触发
           s.stepFinished,
+          s.isCountdownSuspended,
           s.bookmarkVersion,
         ),
       ),
@@ -530,7 +526,7 @@ class _ListenAndRepeatPlayerScreenState
       // 句子切换时清除上一句的录音结果
       if (prev != null &&
           prev.currentSentenceIndex != next.currentSentenceIndex) {
-        _manualStoppedThisSentence = false;
+        _manualStoppedRecording = false;
         final controller = ref.read(
           shadowingRecordingControllerProvider.notifier,
         );
@@ -558,11 +554,18 @@ class _ListenAndRepeatPlayerScreenState
         final latestState = ref.read(listenAndRepeatPlayerProvider);
         if (latestState.isPauseBetweenPlays &&
             !latestState.settings.isManualMode &&
-            !_manualStoppedThisSentence) {
-          AppLogger.log('ShadowScreen', '评估完成 → 启动 review countdown');
+            !latestState.isCountdownSuspended) {
+          final extra = _manualStoppedRecording
+              ? const Duration(seconds: 2)
+              : Duration.zero;
+          _manualStoppedRecording = false;
+          AppLogger.log(
+            'ShadowScreen',
+            '评估完成 → 启动 review countdown (extra=${extra.inSeconds}s)',
+          );
           ref
               .read(listenAndRepeatPlayerProvider.notifier)
-              .startPostEvaluationPause();
+              .startPostEvaluationPause(extraDuration: extra);
         }
       }
     });
@@ -590,12 +593,15 @@ class _ListenAndRepeatPlayerScreenState
 
     // 自动模式录音触发（对应复述页面的 !state.isRetellCountdown）：
     // 停顿中 + 未完成 + 非手动模式 + recording idle + 非倒计时中 + 本句未手动停止过
-    AppLogger.log('ShadowScreen', 'build 自动录音检查: pause=${playerState.isPauseBetweenPlays}, globalManual=${playerState.settings.isManualMode}, recPhase=${turnState.phase.name}, postEval=${playerState.isPostEvalCountdown}, manualStopped=$_manualStoppedThisSentence');
+    AppLogger.log(
+      'ShadowScreen',
+      'build 自动录音检查: pause=${playerState.isPauseBetweenPlays}, globalManual=${playerState.settings.isManualMode}, recPhase=${turnState.phase.name}, postEval=${playerState.isPostEvalCountdown}, suspended=${playerState.isCountdownSuspended}',
+    );
     if (playerState.isPauseBetweenPlays &&
         !playerState.settings.isManualMode &&
         turnState.phase == ListenAndRepeatTurnPhase.idle &&
         !playerState.isPostEvalCountdown &&
-        !_manualStoppedThisSentence) {
+        !playerState.isCountdownSuspended) {
       final currentSentence = player.currentSentence;
       if (currentSentence != null) {
         final promptId = _currentPromptId();
@@ -616,8 +622,8 @@ class _ListenAndRepeatPlayerScreenState
             AppLogger.log('ShadowScreen', '⏭ 自动录音跳过: 不在停顿中');
             return;
           }
-          if (_manualStoppedThisSentence) {
-            AppLogger.log('ShadowScreen', '⏭ 自动录音跳过: 本句已手动停止');
+          if (latestState.isCountdownSuspended) {
+            AppLogger.log('ShadowScreen', '⏭ 自动录音跳过: 倒计时已挂起');
             return;
           }
 
@@ -663,7 +669,10 @@ class _ListenAndRepeatPlayerScreenState
     return wakelockBody(
       child: LearningHotkeyScope(
         onPlayPause: () {
-          AppLogger.log('ShadowScreen', '播放按钮: isPause=${playerState.isPauseBetweenPlays}, manualStopped=$_manualStoppedThisSentence');
+          AppLogger.log(
+            'ShadowScreen',
+            '播放按钮: isPause=${playerState.isPauseBetweenPlays}, suspended=${playerState.isCountdownSuspended}',
+          );
           unawaited(_cancelRecordingAndPlayback());
           if (playerState.isPauseBetweenPlays) {
             ref
@@ -677,7 +686,6 @@ class _ListenAndRepeatPlayerScreenState
           }
         },
         onPrevious: () {
-          _manualStoppedThisSentence = false;
           unawaited(_cancelRecordingAndPlayback());
           ref
               .read(shadowingRecordingControllerProvider.notifier)
@@ -685,7 +693,6 @@ class _ListenAndRepeatPlayerScreenState
           unawaited(player.goToPrevious());
         },
         onNext: () {
-          _manualStoppedThisSentence = false;
           unawaited(_cancelRecordingAndPlayback());
           ref
               .read(shadowingRecordingControllerProvider.notifier)
@@ -757,39 +764,33 @@ class _ListenAndRepeatPlayerScreenState
                                   highlightedSegments:
                                       currentAttempt?.referenceSegments,
                                   onStopMainPlayer: () {
-                                    _manualStoppedThisSentence = true;
+                                    ref.read(
+                                        listenAndRepeatPlayerProvider.notifier,
+                                      )
+                                      ..suspendCountdown()
+                                      ..notifyExternalStop();
                                     ref
                                         .read(
-                                          listenAndRepeatPlayerProvider
+                                          shadowingRecordingControllerProvider
                                               .notifier,
                                         )
-                                        .notifyExternalStop();
-                                    final controller = ref.read(
-                                      shadowingRecordingControllerProvider
-                                          .notifier,
-                                    );
-                                    controller.setManualMode(true);
-                                    controller.cancelActiveRecording();
+                                        .cancelActiveRecording();
                                   },
                                   onToolbarButtonTapped: () {
-                                    if (_manualStoppedThisSentence) {
-                                      AppLogger.log('ShadowScreen', '工具栏点击: 已手动模式，跳过');
-                                      return;
-                                    }
-                                    _manualStoppedThisSentence = true;
-                                    AppLogger.log('ShadowScreen', '工具栏点击: 进入句子手动模式');
-                                    final player = ref.read(
+                                    AppLogger.log(
+                                      'ShadowScreen',
+                                      '工具栏点击: 挂起倒计时',
+                                    );
+                                    final p = ref.read(
                                       listenAndRepeatPlayerProvider.notifier,
                                     );
-                                    player.pauseCountdown();
-                                    // 取消评估后倒计时，防止手动模式下自动推进
-                                    player.cancelPostEvalCountdown();
-                                    final controller = ref.read(
-                                      shadowingRecordingControllerProvider
-                                          .notifier,
-                                    );
-                                    controller.setManualMode(true);
-                                    controller.cancelActiveRecording();
+                                    p.suspendCountdown();
+                                    ref
+                                        .read(
+                                          shadowingRecordingControllerProvider
+                                              .notifier,
+                                        )
+                                        .cancelActiveRecording();
                                   },
                                 ),
                               ),
@@ -818,15 +819,24 @@ class _ListenAndRepeatPlayerScreenState
                             bottom: AppSpacing.xs,
                           ),
                           child: Center(
-                            child: SpeechRatingBadge(
-                              l10n: l10n,
-                              attempt: currentAttempt,
-                              isPlaying: _playingPromptId == currentPromptId,
-                              onTap: currentAttempt.hasRecording
-                                  ? () => _handleAttemptPlaybackTap(
-                                      currentPromptId,
-                                    )
-                                  : null,
+                            child: StreamBuilder<bool>(
+                              stream: _playbackService.isPlayingStream,
+                              initialData: _playbackService.isPlaying,
+                              builder: (context, snapshot) {
+                                final isPlayingBack =
+                                    (snapshot.data ?? false) &&
+                                    _playingPromptId == currentPromptId;
+                                return SpeechRatingBadge(
+                                  l10n: l10n,
+                                  attempt: currentAttempt,
+                                  isPlaying: isPlayingBack,
+                                  onTap: currentAttempt.hasRecording
+                                      ? () => _handleAttemptPlaybackTap(
+                                          currentPromptId,
+                                        )
+                                      : null,
+                                );
+                              },
                             ),
                           ),
                         ),
@@ -834,22 +844,30 @@ class _ListenAndRepeatPlayerScreenState
                       // 固定高度，避免倒计时消失后 badge 位置跳动
                       SizedBox(
                         height: _kTurnAreaHeight,
-                        child: _isPostEvalCountdown(playerState)
-                            ? _PostEvalCountdown(
-                                playerState: playerState,
-                                onFastForward: () => ref
-                                    .read(
+                        child:
+                            playerState.isPostEvalCountdown &&
+                                !playerState.isCountdownSuspended
+                            ? Center(
+                                child: Consumer(
+                                  builder: (context, ref, _) {
+                                    final s = ref.watch(
+                                      listenAndRepeatPlayerProvider,
+                                    );
+                                    final p = ref.read(
                                       listenAndRepeatPlayerProvider.notifier,
-                                    )
-                                    .completePausedTurn(),
-                                onCountdownTap: () {
-                                  final p = ref.read(
-                                    listenAndRepeatPlayerProvider.notifier,
-                                  );
-                                  playerState.isCountdownPaused
-                                      ? p.resumePostEvalCountdown()
-                                      : p.pausePostEvalCountdown();
-                                },
+                                    );
+                                    return CountdownChip(
+                                      remaining: s.pauseRemaining,
+                                      total: s.pauseDuration,
+                                      isPaused: s.isCountdownPaused,
+                                      onTap: () => s.isCountdownPaused
+                                          ? p.resumeCountdown()
+                                          : p.pauseCountdown(),
+                                      onFastForward: () =>
+                                          p.completePausedTurn(),
+                                    );
+                                  },
+                                ),
                               )
                             : playerState.isPauseBetweenPlays
                             ? Padding(
@@ -867,10 +885,15 @@ class _ListenAndRepeatPlayerScreenState
                             : const SizedBox.shrink(),
                       ),
                       // 播放控制
-                      _PlaybackControls(
-                        playerState: playerState,
+                      PlaybackControls(
+                        canGoPrev: playerState.currentSentenceIndex > 0,
+                        isLast:
+                            playerState.currentSentenceIndex >=
+                            playerState.totalSentences - 1,
+                        centerIcon: playerState.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                         onPrevious: () {
-                          _manualStoppedThisSentence = false;
                           unawaited(_cancelRecordingAndPlayback());
                           ref
                               .read(
@@ -880,7 +903,6 @@ class _ListenAndRepeatPlayerScreenState
                           unawaited(player.goToPrevious());
                         },
                         onNext: () {
-                          _manualStoppedThisSentence = false;
                           unawaited(_cancelRecordingAndPlayback());
                           ref
                               .read(
@@ -898,7 +920,7 @@ class _ListenAndRepeatPlayerScreenState
                             unawaited(player.goToNext());
                           }
                         },
-                        onPlayPause: () {
+                        onCenter: () {
                           unawaited(_cancelRecordingAndPlayback());
                           if (playerState.isPauseBetweenPlays) {
                             ref
@@ -930,165 +952,6 @@ class _ListenAndRepeatPlayerScreenState
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 是否处于评估后倒计时状态（对应复述页面的 isRetellCountdown）
-bool _isPostEvalCountdown(ListenAndRepeatPlayerState playerState) {
-  return playerState.isPostEvalCountdown;
-}
-
-/// 评估后倒计时组件：CountdownChip + 快进按钮
-class _PostEvalCountdown extends StatelessWidget {
-  final ListenAndRepeatPlayerState playerState;
-  final VoidCallback onFastForward;
-  final VoidCallback onCountdownTap;
-
-  const _PostEvalCountdown({
-    required this.playerState,
-    required this.onFastForward,
-    required this.onCountdownTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(width: 32),
-            const SizedBox(width: 48),
-            // Consumer 隔离倒计时 tick，避免触发外层重建
-            Consumer(
-              builder: (context, ref, _) {
-                final s = ref.watch(listenAndRepeatPlayerProvider);
-                return CountdownChip(
-                  remaining: s.pauseRemaining,
-                  total: s.pauseDuration,
-                  isPaused: s.isCountdownPaused,
-                  onTap: onCountdownTap,
-                );
-              },
-            ),
-            const SizedBox(width: 48),
-            GestureDetector(
-              onTap: onFastForward,
-              child: Icon(
-                Icons.fast_forward_rounded,
-                size: 32,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.m),
-      ],
-    );
-  }
-}
-
-/// 底部播放控制
-///
-/// 布局：[上一句] --- [播放/暂停] --- [下一句]
-class _PlaybackControls extends StatelessWidget {
-  final ListenAndRepeatPlayerState playerState;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-  final VoidCallback onPlayPause;
-
-  const _PlaybackControls({
-    required this.playerState,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onPlayPause,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final canGoPrev = playerState.currentSentenceIndex > 0;
-    final isLastSentence =
-        playerState.currentSentenceIndex >= playerState.totalSentences - 1;
-    final canGoNext = true;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _NavButton(
-            icon: Icons.skip_previous_rounded,
-            enabled: canGoPrev,
-            onTap: canGoPrev ? onPrevious : null,
-          ),
-          const SizedBox(width: 48),
-
-          GestureDetector(
-            onTap: onPlayPause,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                playerState.isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                size: 28,
-                color: theme.colorScheme.onPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
-
-          _NavButton(
-            icon: isLastSentence
-                ? Icons.check_circle_rounded
-                : Icons.skip_next_rounded,
-            enabled: canGoNext,
-            onTap: onNext,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 导航按钮（上一句/下一句）
-class _NavButton extends StatelessWidget {
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback? onTap;
-
-  const _NavButton({required this.icon, required this.enabled, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedOpacity(
-        opacity: enabled ? 0.6 : 0.15,
-        duration: const Duration(milliseconds: 150),
-        child: Icon(
-          icon,
-          size: 32,
-          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );

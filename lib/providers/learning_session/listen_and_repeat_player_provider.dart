@@ -7,6 +7,9 @@
 /// - 取消难句收藏（从播放列表移除该句）
 /// - 手动上一句/下一句
 ///
+/// 使用 sealed class [PlaybackPhase] 状态机管理播放阶段，
+/// 替代布尔标志组合，使无效状态在类型层面不可表达。
+///
 /// 使用 SentencePlaybackEngine 的 sessionId 守护防止异步竞态。
 library;
 
@@ -27,8 +30,8 @@ import '../audio_engine/audio_engine_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../learning_progress_provider.dart';
 import '../listen_and_repeat_turn_controller_provider.dart';
-import 'countdown_controller.dart';
 import 'learning_session_provider.dart';
+import 'playback_phase.dart';
 import 'sentence_playback_engine.dart';
 
 part 'listen_and_repeat_player_provider.g.dart';
@@ -50,32 +53,12 @@ class ListenAndRepeatPlayerState {
   /// 跟读设置（循环次数 + 停顿模式）
   final IntensiveListenSettings settings;
 
-  /// 是否正在播放
-  final bool isPlaying;
-
-  /// 是否处于遍间停顿中（跟读时间）
-  final bool isPauseBetweenPlays;
-
-  /// 是否处于句间停顿中
-  final bool isPauseBetweenSentences;
-
-  /// 停顿剩余时间
-  final Duration pauseRemaining;
-
-  /// 停顿总时长
-  final Duration pauseDuration;
-
-  /// 倒计时是否暂停中
-  final bool isCountdownPaused;
-
-  /// 倒计时是否快进中（10 倍速）
-  final bool isCountdownFastForward;
-
-  /// 是否处于评估后倒计时中（对应复述页面的 isRetellCountdown）
-  final bool isPostEvalCountdown;
-
-  /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
-  final bool stepFinished;
+  /// 播放阶段状态机
+  ///
+  /// 替代原来的 isPlaying / isPauseBetweenPlays / isPauseBetweenSentences /
+  /// isCountdownPaused / isCountdownFastForward / isPostEvalCountdown /
+  /// pauseRemaining / pauseDuration 等 8 个字段。
+  final PlaybackPhase phase;
 
   /// 收藏标记版本号（每次 toggle 递增，用于触发 select 监听的 rebuild）
   final int bookmarkVersion;
@@ -86,15 +69,7 @@ class ListenAndRepeatPlayerState {
     this.currentPlayCount = 1,
     this.targetPlayCount = 3,
     this.settings = const IntensiveListenSettings(),
-    this.isPlaying = false,
-    this.isPauseBetweenPlays = false,
-    this.isPauseBetweenSentences = false,
-    this.pauseRemaining = Duration.zero,
-    this.pauseDuration = Duration.zero,
-    this.isCountdownPaused = false,
-    this.isCountdownFastForward = false,
-    this.isPostEvalCountdown = false,
-    this.stepFinished = false,
+    this.phase = const IdlePhase(),
     this.bookmarkVersion = 0,
   });
 
@@ -104,15 +79,7 @@ class ListenAndRepeatPlayerState {
     int? currentPlayCount,
     int? targetPlayCount,
     IntensiveListenSettings? settings,
-    bool? isPlaying,
-    bool? isPauseBetweenPlays,
-    bool? isPauseBetweenSentences,
-    Duration? pauseRemaining,
-    Duration? pauseDuration,
-    bool? isCountdownPaused,
-    bool? isCountdownFastForward,
-    bool? isPostEvalCountdown,
-    bool? stepFinished,
+    PlaybackPhase? phase,
     int? bookmarkVersion,
   }) {
     return ListenAndRepeatPlayerState(
@@ -121,20 +88,57 @@ class ListenAndRepeatPlayerState {
       currentPlayCount: currentPlayCount ?? this.currentPlayCount,
       targetPlayCount: targetPlayCount ?? this.targetPlayCount,
       settings: settings ?? this.settings,
-      isPlaying: isPlaying ?? this.isPlaying,
-      isPauseBetweenPlays: isPauseBetweenPlays ?? this.isPauseBetweenPlays,
-      isPauseBetweenSentences:
-          isPauseBetweenSentences ?? this.isPauseBetweenSentences,
-      pauseRemaining: pauseRemaining ?? this.pauseRemaining,
-      pauseDuration: pauseDuration ?? this.pauseDuration,
-      isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
-      isCountdownFastForward:
-          isCountdownFastForward ?? this.isCountdownFastForward,
-      isPostEvalCountdown: isPostEvalCountdown ?? this.isPostEvalCountdown,
-      stepFinished: stepFinished ?? this.stepFinished,
+      phase: phase ?? this.phase,
       bookmarkVersion: bookmarkVersion ?? this.bookmarkVersion,
     );
   }
+
+  // ========== 便捷 getter（向后兼容 + Screen 层简化访问） ==========
+
+  /// 是否正在播放音频
+  bool get isPlaying => phase is PlayingPhase;
+
+  /// 是否处于任意停顿中（遍间 / 句间 / 评估后）
+  bool get isPauseBetweenPlays =>
+      phase is RepeatPausePhase ||
+      phase is AdvancePausePhase ||
+      phase is PostEvalPausePhase;
+
+  /// 是否处于句间停顿中
+  bool get isPauseBetweenSentences =>
+      phase is AdvancePausePhase ||
+      (phase is PostEvalPausePhase &&
+          (phase as PostEvalPausePhase).isSentencePause);
+
+  /// 是否处于评估后倒计时中
+  bool get isPostEvalCountdown => phase is PostEvalPausePhase;
+
+  /// 当前步骤是否自然完成
+  bool get stepFinished =>
+      phase is IdlePhase && (phase as IdlePhase).stepFinished;
+
+  /// 停顿剩余时间
+  Duration get pauseRemaining => _activeCountdown?.remaining ?? Duration.zero;
+
+  /// 停顿总时长
+  Duration get pauseDuration => _activeCountdown?.total ?? Duration.zero;
+
+  /// 倒计时是否暂停中
+  bool get isCountdownPaused => _activeCountdown?.isPaused ?? false;
+
+  /// 倒计时是否快进中
+  bool get isCountdownFastForward => _activeCountdown?.isFastForward ?? false;
+
+  /// 倒计时是否因用户交互临时挂起
+  bool get isCountdownSuspended => _activeCountdown?.isSuspended ?? false;
+
+  /// 获取当前活跃的倒计时状态（如有）
+  CountdownState? get _activeCountdown => switch (phase) {
+    RepeatPausePhase(:final countdown) => countdown,
+    AdvancePausePhase(:final countdown) => countdown,
+    PostEvalPausePhase(:final countdown) => countdown,
+    _ => null,
+  };
 }
 
 /// 跟读专用播放器 Provider
@@ -149,14 +153,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   /// 学习事件记录器
   late StudyEventRecorder _recorder;
 
-  /// 播放引擎
+  /// 播放引擎（统一管理所有倒计时：遍间/句间/评估后）
   late SentencePlaybackEngine _engine;
-
-  /// 评估后倒计时控制器
-  final CountdownController _countdown = CountdownController();
-
-  /// 倒计时运行 ID（用于使过期倒计时失效）
-  int _countdownRunId = 0;
 
   @override
   ListenAndRepeatPlayerState build() {
@@ -178,7 +176,6 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     );
     ref.onDispose(() {
       _engine.cleanup();
-      _countdown.cancel();
     });
     return const ListenAndRepeatPlayerState();
   }
@@ -254,26 +251,71 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
 
   /// 外部中断播放通知（如意群播放）
   ///
-  /// 只更新 isPlaying 状态，不影响 isPauseBetweenPlays 等其他状态，
+  /// 只更新播放状态，不影响停顿等其他状态，
   /// 避免录音面板等 UI 意外消失。
   void notifyExternalStop() {
     if (state.isPlaying) {
-      state = state.copyWith(isPlaying: false);
+      state = state.copyWith(phase: const IdlePhase());
+    }
+  }
+
+  /// 挂起倒计时（用户交互时调用：播放录音、查词典、打开设置等）
+  ///
+  /// 取消引擎倒计时并标记 isSuspended，UI 隐藏倒计时。
+  /// 如果倒计时已被用户主动暂停（isPaused），则不干预。
+  void suspendCountdown() {
+    final countdown = state._activeCountdown;
+    if (countdown == null || countdown.isSuspended) return;
+    _engine.invalidateSession();
+    // 保留 isPaused 状态，restart 时恢复
+    _updateCountdown(countdown.copyWith(isSuspended: true));
+  }
+
+  /// 恢复倒计时（用户交互结束时调用：录音播放结束、弹窗关闭等）
+  ///
+  /// 如果挂起前倒计时是暂停的，恢复为暂停状态（不自动开始）。
+  /// 否则用保存的 total 时长重新开始倒计时。
+  void restartCountdown() {
+    final countdown = state._activeCountdown;
+    if (countdown == null || !countdown.isSuspended) return;
+
+    final wasPaused = countdown.isPaused;
+    final total = countdown.total;
+
+    _updateCountdown(
+      countdown.copyWith(
+        isSuspended: false,
+        remaining: total,
+        isPaused: wasPaused,
+        isFastForward: false,
+      ),
+    );
+
+    // 始终启动 engine countdown（即使 isPaused，也需要 engine 有活跃的 timer）
+    _engine.autoAdvance(
+      pauseDuration: total,
+      onPauseStarted: (_) {},
+      onTick: (remaining) {
+        final cd = state._activeCountdown;
+        if (cd != null && !cd.isSuspended) {
+          _updateCountdown(cd.copyWith(remaining: remaining));
+        }
+      },
+      onAdvance: () async {
+        completePausedTurn();
+      },
+    );
+
+    // 挂起前是暂停的 → 立即暂停新启动的 engine countdown
+    if (wasPaused) {
+      _engine.pauseCountdown();
     }
   }
 
   /// 暂停播放
   Future<void> pause() async {
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
-    state = state.copyWith(
-      isPlaying: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-    );
+    state = state.copyWith(phase: const IdlePhase());
   }
 
   /// 恢复播放（从当前句子重新开始播放循环）
@@ -286,16 +328,11 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
 
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
 
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex + 1,
       currentPlayCount: 1,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
+      phase: const IdlePhase(),
     );
 
     await _startSentence();
@@ -306,16 +343,11 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     if (state.currentSentenceIndex <= 0) return;
 
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
 
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex - 1,
       currentPlayCount: 1,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
+      phase: const IdlePhase(),
     );
 
     await _startSentence();
@@ -335,12 +367,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     _sentences.removeAt(removedIndex);
 
     if (_sentences.isEmpty) {
-      state = state.copyWith(
-        isPlaying: false,
-        totalSentences: 0,
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-      );
+      state = state.copyWith(totalSentences: 0, phase: const IdlePhase());
       return removed;
     }
 
@@ -353,9 +380,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       currentSentenceIndex: newIndex,
       totalSentences: _sentences.length,
       currentPlayCount: 1,
-      isPlaying: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
+      phase: const IdlePhase(),
     );
 
     return removed;
@@ -394,13 +419,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     // 自动↔手动切换时，停在当前句子，取消一切异步操作
     if (modeChanged) {
       _engine.invalidateSession();
-      state = state.copyWith(
-        isPlaying: false,
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-      );
+      state = state.copyWith(phase: const IdlePhase());
       return;
     }
 
@@ -411,80 +430,89 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     }
   }
 
-  /// 暂停倒计时
+  /// 暂停倒计时（统一走 Engine）
   void pauseCountdown() {
+    final countdown = state._activeCountdown;
+    if (countdown == null || countdown.isPaused) return;
     _engine.pauseCountdown();
-    state = state.copyWith(isCountdownPaused: true);
+    _updateCountdown(countdown.copyWith(isPaused: true));
   }
 
-  /// 恢复倒计时
+  /// 恢复倒计时（统一走 Engine）
   void resumeCountdown() {
+    final countdown = state._activeCountdown;
+    if (countdown == null || !countdown.isPaused) return;
     _engine.resumeCountdown();
-    state = state.copyWith(isCountdownPaused: false);
+    _updateCountdown(countdown.copyWith(isPaused: false));
   }
 
   /// 切换倒计时快进（10 倍速/正常速）
   ///
   /// 如果当前暂停中，快进会同时恢复倒计时。
   void toggleCountdownFastForward() {
-    final isFF = !state.isCountdownFastForward;
+    final countdown = state._activeCountdown;
+    if (countdown == null) return;
+    final isFF = !countdown.isFastForward;
     _engine.setCountdownSpeed(isFF ? 10.0 : 1.0);
-    if (state.isCountdownPaused) {
-      _engine.resumeCountdown();
-    }
-    state = state.copyWith(
-      isCountdownFastForward: isFF,
-      isCountdownPaused: false,
-    );
+    if (countdown.isPaused) _engine.resumeCountdown();
+    _updateCountdown(countdown.copyWith(isFastForward: isFF, isPaused: false));
+  }
+
+  /// 更新当前 phase 内的 CountdownState
+  void _updateCountdown(CountdownState countdown) {
+    final phase = state.phase;
+    final newPhase = switch (phase) {
+      RepeatPausePhase() => phase.copyWith(countdown: countdown),
+      AdvancePausePhase() => phase.copyWith(countdown: countdown),
+      PostEvalPausePhase() => phase.copyWith(countdown: countdown),
+      _ => phase,
+    };
+    state = state.copyWith(phase: newPhase);
   }
 
   /// 倒计时期间重播当前句子
   Future<void> replayDuringCountdown() async {
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
-    state = state.copyWith(
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-    );
+    state = state.copyWith(phase: const IdlePhase());
     await _startSentence(startPlayCount: state.currentPlayCount);
   }
 
   /// 立即完成当前停顿回合，继续后续播放流程。
   Future<void> completePausedTurn() async {
+    final phase = state.phase;
+
+    // 判断停顿类型
+    final bool isAdvancing;
+    switch (phase) {
+      case RepeatPausePhase():
+        isAdvancing = false;
+      case AdvancePausePhase():
+        isAdvancing = true;
+      case PostEvalPausePhase(:final isSentencePause):
+        isAdvancing = isSentencePause;
+      default:
+        AppLogger.log('Player', 'completePausedTurn 跳过：不在停顿中');
+        return;
+    }
+
     AppLogger.log(
       'Player',
       'completePausedTurn: '
-          'isPause=${state.isPauseBetweenPlays}, '
-          'isSentencePause=${state.isPauseBetweenSentences}, '
+          'phase=${phase.runtimeType}, '
+          'isAdvancing=$isAdvancing, '
           'play=${state.currentPlayCount}/${state.settings.repeatCount}, '
           'sentence=${state.currentSentenceIndex + 1}/${state.totalSentences}',
     );
-    if (!state.isPauseBetweenPlays) {
-      AppLogger.log('Player', 'completePausedTurn 跳过：不在停顿中');
-      return;
-    }
 
-    final isSentencePause = state.isPauseBetweenSentences;
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
-    state = state.copyWith(
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      pauseRemaining: Duration.zero,
-    );
+    state = state.copyWith(phase: const IdlePhase());
 
-    if (isSentencePause) {
+    if (isAdvancing) {
       final isLastSentence =
           state.currentSentenceIndex >= state.totalSentences - 1;
       if (isLastSentence) {
         AppLogger.log('Player', '→ 完成（最后一句）');
-        state = state.copyWith(isPlaying: false, stepFinished: true);
+        state = state.copyWith(phase: const IdlePhase(stepFinished: true));
         _trackShadowingComplete();
         return;
       }
@@ -514,70 +542,66 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
 
   /// 录音评估完成后启动 review 倒计时（5s）。
   ///
-  /// 倒计时结束后自动调用 completePausedTurn() 推进到下一句。
+  /// 通过 Engine 的 autoAdvance 统一管理倒计时，
+  /// 先 invalidate 旧 session（使遍间停顿的 await 安全退出），
+  /// 再启动新的 5 秒倒计时。
+  /// [extraDuration] 额外时长（如用户手动停止录音时加 2 秒）。
   /// 手动模式下直接 return，由用户手动推进。
-  void startPostEvaluationPause() {
+  void startPostEvaluationPause({Duration extraDuration = Duration.zero}) {
     if (!state.isPauseBetweenPlays) return;
     if (state.settings.isManualMode) return;
 
-    const pauseDuration = Duration(seconds: 5);
-    final runId = ++_countdownRunId;
+    final reviewDuration = const Duration(seconds: 5) + extraDuration;
+    final isSentencePause = state.isPauseBetweenSentences;
+
+    // 杀掉旧 session（遍间停顿的 engine 循环安全退出）
+    _engine.invalidateSession();
 
     state = state.copyWith(
-      isPostEvalCountdown: true,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      pauseDuration: pauseDuration,
-      pauseRemaining: pauseDuration,
+      phase: PostEvalPausePhase(
+        isSentencePause: isSentencePause,
+        countdown: CountdownState(
+          remaining: reviewDuration,
+          total: reviewDuration,
+        ),
+      ),
     );
 
-    _countdown
-        .start(pauseDuration, (remaining) {
-          state = state.copyWith(pauseRemaining: remaining);
-        })
-        .then((_) {
-          if (runId == _countdownRunId && state.isPauseBetweenPlays) {
-            completePausedTurn();
-          }
-        });
-  }
-
-  /// 暂停评估后倒计时
-  void pausePostEvalCountdown() {
-    if (!_countdown.isActive || _countdown.isPaused) return;
-    _countdown.pause();
-    state = state.copyWith(isCountdownPaused: true);
-  }
-
-  /// 恢复评估后倒计时
-  void resumePostEvalCountdown() {
-    if (!_countdown.isActive || !_countdown.isPaused) return;
-    _countdown.resume();
-    state = state.copyWith(isCountdownPaused: false);
+    // 通过 engine 的 autoAdvance 启动新的 5 秒倒计时
+    _engine.autoAdvance(
+      pauseDuration: reviewDuration,
+      onPauseStarted: (_) {
+        // phase 已在上面设置，此处无需操作
+      },
+      onTick: (remaining) {
+        final phase = state.phase;
+        if (phase is PostEvalPausePhase) {
+          state = state.copyWith(
+            phase: phase.copyWith(
+              countdown: phase.countdown.copyWith(remaining: remaining),
+            ),
+          );
+        }
+      },
+      onAdvance: () async {
+        if (state.phase is PostEvalPausePhase) {
+          completePausedTurn();
+        }
+      },
+    );
   }
 
   /// 取消评估后倒计时（不推进到下一句）
   void cancelPostEvalCountdown() {
-    _invalidatePostEvalCountdown();
+    if (state.phase is! PostEvalPausePhase) return;
+    _engine.invalidateSession();
+    // 回到遍间停顿状态（保留 completedPlayCount）
     state = state.copyWith(
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      pauseRemaining: Duration.zero,
+      phase: RepeatPausePhase(
+        completedPlayCount: state.currentPlayCount,
+        countdown: const CountdownState(),
+      ),
     );
-  }
-
-  /// 使当前评估后倒计时失效，同时清除 state 中的倒计时标志
-  ///
-  /// 将 timer 取消和 state 清除合并在一起，避免调用点遗漏 copyWith。
-  void _invalidatePostEvalCountdown() {
-    _countdownRunId += 1;
-    _countdown.cancel();
-    if (state.isPostEvalCountdown) {
-      state = state.copyWith(
-        isPostEvalCountdown: false,
-        isCountdownPaused: false,
-      );
-    }
   }
 
   /// 停止播放（用户在最后一句主动点击完成按钮时调用）
@@ -585,12 +609,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   /// 仅停止播放，弹窗由 screen 层直接调用。
   void stopPlayback() {
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
-    state = state.copyWith(
-      isPlaying: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-    );
+    state = state.copyWith(phase: const IdlePhase());
   }
 
   /// 释放资源
@@ -623,11 +642,8 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     }
 
     state = state.copyWith(
-      isPlaying: true,
       currentPlayCount: startPlayCount,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      stepFinished: false,
+      phase: PlayingPhase(playCount: startPlayCount),
     );
     _persistCurrentSentenceIndexAsync();
 
@@ -645,29 +661,34 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       startPlayCount: startPlayCount,
       pauseCalculator: _buildPauseCalculator(),
       onPlayCountChanged: (playCount) {
-        state = state.copyWith(currentPlayCount: playCount, isPlaying: true);
+        state = state.copyWith(
+          currentPlayCount: playCount,
+          phase: PlayingPhase(playCount: playCount),
+        );
       },
       onPauseStarted: (pauseDur) {
         // 停顿开始 = 用户跟读 = 输出
         session.addOutputWords(wordCount);
         state = state.copyWith(
-          isPauseBetweenPlays: true,
-          isPlaying: false,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-          pauseDuration: pauseDur,
-          pauseRemaining: pauseDur,
+          phase: RepeatPausePhase(
+            completedPlayCount: state.currentPlayCount,
+            countdown: CountdownState(remaining: pauseDur, total: pauseDur),
+          ),
         );
       },
       onPauseEnded: () {
-        state = state.copyWith(
-          isPauseBetweenPlays: false,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-        );
+        // engine 循环会紧接着调用 onPlayCountChanged 设置 PlayingPhase，
+        // 此处无需额外操作。
       },
       onTick: (remaining) {
-        state = state.copyWith(pauseRemaining: remaining);
+        final phase = state.phase;
+        if (phase is RepeatPausePhase) {
+          state = state.copyWith(
+            phase: phase.copyWith(
+              countdown: phase.countdown.copyWith(remaining: remaining),
+            ),
+          );
+        }
       },
       onAllPlaysCompleted: () async {
         await _autoAdvance();
@@ -691,37 +712,34 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       pauseDuration: pauseDur,
       onPauseStarted: (dur) {
         state = state.copyWith(
-          isPlaying: false,
-          isPauseBetweenPlays: true,
-          isPauseBetweenSentences: true,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-          pauseDuration: dur,
-          pauseRemaining: dur,
+          phase: AdvancePausePhase(
+            countdown: CountdownState(remaining: dur, total: dur),
+          ),
         );
       },
       onTick: (remaining) {
-        state = state.copyWith(pauseRemaining: remaining);
+        final phase = state.phase;
+        if (phase is AdvancePausePhase) {
+          state = state.copyWith(
+            phase: phase.copyWith(
+              countdown: phase.countdown.copyWith(remaining: remaining),
+            ),
+          );
+        }
       },
       onAdvance: () async {
         if (isLastSentence) {
           // 最后一句停顿结束 → 发出完成信号
-          state = state.copyWith(
-            isPlaying: false,
-            isPauseBetweenPlays: false,
-            isPauseBetweenSentences: false,
-            stepFinished: true,
-          );
+          state = state.copyWith(phase: const IdlePhase(stepFinished: true));
           _trackShadowingComplete();
         } else {
           // 非最后一句 → 推进到下一句
           state = state.copyWith(
             currentSentenceIndex: state.currentSentenceIndex + 1,
             currentPlayCount: 1,
-            isPauseBetweenPlays: false,
-            isPauseBetweenSentences: false,
+            phase: const IdlePhase(),
           );
-          _startSentence();
+          await _startSentence();
         }
       },
     );
@@ -730,15 +748,10 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   /// 重置到第一句并重新开始播放（供"再来一遍"使用）
   Future<void> resetToStart() async {
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
     state = state.copyWith(
       currentSentenceIndex: 0,
       currentPlayCount: 1,
-      isPlaying: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
+      phase: const IdlePhase(),
     );
     await startPlaying();
   }

@@ -28,7 +28,7 @@ import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/countdown_chip.dart';
-import '../widgets/common/tappable_wrapper.dart';
+import '../widgets/common/playback_controls.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
 import '../widgets/practice/practice_play_count_label.dart';
@@ -686,8 +686,14 @@ class _IntensiveListenPlayerScreenState
                         ),
 
                       // === 通用：播放控制 ===
-                      _PlaybackControls(
-                        playerState: playerState,
+                      PlaybackControls(
+                        canGoPrev: playerState.currentSentenceIndex > 0,
+                        isLast:
+                            playerState.currentSentenceIndex >=
+                            playerState.totalSentences - 1,
+                        centerIcon: playerState.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                         onPrevious: () => player.goToPrevious(),
                         onNext: () {
                           final isLast =
@@ -700,7 +706,7 @@ class _IntensiveListenPlayerScreenState
                             player.goToNext();
                           }
                         },
-                        onPlayPause: () {
+                        onCenter: () {
                           AppLogger.log('PlayPause2', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode}');
                           if (playerState.isPlaying) {
                             player.pause();
@@ -824,118 +830,6 @@ class _AnnotationWithBookmark extends StatelessWidget {
           const SizedBox(height: AppSpacing.m),
           Expanded(child: child),
         ],
-      ),
-    );
-  }
-}
-
-/// 底部播放控制
-///
-/// 布局：[上一句] --- [播放/暂停] --- [下一句]
-class _PlaybackControls extends StatelessWidget {
-  final IntensiveListenState playerState;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-  final VoidCallback onPlayPause;
-
-  const _PlaybackControls({
-    required this.playerState,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onPlayPause,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final canGoPrev = playerState.currentSentenceIndex > 0;
-    final isLastSentence =
-        playerState.currentSentenceIndex >= playerState.totalSentences - 1;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _NavButton(
-            icon: Icons.skip_previous_rounded,
-            enabled: canGoPrev,
-            onTap: canGoPrev ? onPrevious : null,
-          ),
-          const SizedBox(width: 48),
-
-          // 播放/暂停
-          TappableWrapper(
-            onTap: onPlayPause,
-            feedbackType: TapFeedback.scale,
-            scaleDown: 0.92,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                playerState.isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                size: 28,
-                color: theme.colorScheme.onPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
-
-          _NavButton(
-            icon: isLastSentence
-                ? Icons.check_circle_rounded
-                : Icons.skip_next_rounded,
-            enabled: true,
-            onTap: onNext,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 导航按钮（上一句/下一句）
-///
-/// 无背景图标，禁用态降低透明度。
-class _NavButton extends StatelessWidget {
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback? onTap;
-
-  const _NavButton({required this.icon, required this.enabled, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    if (!enabled) {
-      return AnimatedOpacity(
-        opacity: 0.15,
-        duration: const Duration(milliseconds: 150),
-        child: Icon(icon, size: 32, color: theme.colorScheme.onSurface),
-      );
-    }
-    return TappableWrapper(
-      onTap: onTap,
-      feedbackType: TapFeedback.opacityAndScale,
-      pressedOpacity: 0.4,
-      scaleDown: 0.85,
-      child: Opacity(
-        opacity: 0.6,
-        child: Icon(icon, size: 32, color: theme.colorScheme.onSurface),
       ),
     );
   }

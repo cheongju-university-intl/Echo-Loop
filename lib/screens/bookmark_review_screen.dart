@@ -39,7 +39,7 @@ import '../widgets/common/countdown_chip.dart';
 import '../widgets/practice/annotation_with_recording.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/practice_play_count_label.dart';
-import '../widgets/practice/practice_playback_controls.dart';
+import '../widgets/common/playback_controls.dart';
 import '../widgets/practice/practice_progress_section.dart';
 
 /// 收藏句子复习页面
@@ -574,8 +574,14 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                 ),
 
                 // 底部播放控制
-                PracticePlaybackControls(
-                  playerState: playerState,
+                PlaybackControls(
+                  canGoPrev: playerState.currentSentenceIndex > 0,
+                  isLast:
+                      playerState.currentSentenceIndex >=
+                      playerState.totalSentences - 1,
+                  centerIcon: playerState.isPlaying
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
                   onPrevious: () {
                     unawaited(_cancelRecordingAndPlayback());
                     ref
@@ -598,7 +604,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                       unawaited(player.goToNext());
                     }
                   },
-                  onPlayPause: () {
+                  onCenter: () {
                     unawaited(_cancelRecordingAndPlayback());
                     if (playerState.isPauseBetweenPlays) {
                       ref

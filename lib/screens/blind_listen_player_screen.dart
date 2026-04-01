@@ -25,7 +25,7 @@ import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/blind_listen_settings_sheet.dart';
 import '../widgets/common/countdown_chip.dart';
-import '../widgets/common/paragraph_bottom_controls.dart';
+import '../widgets/common/playback_controls.dart';
 import '../widgets/common/paragraph_progress_header.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/practice/practice_play_count_label.dart';
@@ -552,9 +552,9 @@ class _BlindListenPlayerScreenState
               const SizedBox(height: AppSpacing.m),
 
               // 底部控制栏
-              ParagraphBottomControls(
+              PlaybackControls(
                 canGoPrev: playerState.currentParagraphIndex > 0,
-                isLastParagraph:
+                isLast:
                     playerState.currentParagraphIndex >=
                     playerState.totalParagraphs - 1,
                 centerIcon: playerState.isPlaying
