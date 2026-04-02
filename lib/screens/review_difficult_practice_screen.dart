@@ -86,6 +86,7 @@ class _ReviewDifficultPracticeScreenState
   @override
   void initState() {
     super.initState();
+    // TODO: 迁移到新架构后改用 play() 返回的 Future，删除 isPlayingStream
     _playbackSub = _playbackService.isPlayingStream.listen((isPlaying) {
       if (!isPlaying && mounted) {
         setState(() => _playingPromptId = null);

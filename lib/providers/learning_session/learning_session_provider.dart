@@ -465,7 +465,9 @@ class LearningSession extends _$LearningSession {
     _trackSessionStart();
   }
 
-  /// 进入难句跟读模式
+  // TODO: 跟读页已迁移到 ListenAndRepeatController.initialize()，此方法不再被调用。
+  // 等所有 enterXxxMode 都迁移到各自 Controller 后，删除整个 LearningSessionProvider。
+  /// 进入难句跟读模式（已废弃，保留供参考）
   ///
   /// 1. 保存当前用户播放设置
   /// 2. 暂停 LP 的 stream 监听
