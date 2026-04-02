@@ -38,14 +38,9 @@ import '../widgets/difficult_practice/difficult_practice_settings_sheet.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../models/speech_practice_models.dart';
-import '../providers/repeat_flow/repeat_flow_engine.dart';
 import '../providers/repeat_flow/repeat_flow_phase.dart';
 import '../widgets/common/countdown_chip.dart';
-import '../widgets/common/recording_button.dart'
-    show RecordingButton, RecordingButtonMode;
-import '../widgets/common/processing_indicator.dart';
 import '../widgets/common/speech_rating_badge.dart';
-import '../widgets/common/status_label.dart';
 import '../widgets/common/repeat_practice_panel.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/practice_play_count_label.dart';
@@ -691,15 +686,35 @@ class _ReviewDifficultPracticeScreenState
                   : null,
             )
           : null,
-      centerContent: _buildRepeatCenterContent(
-        showCountdown: showCountdown,
-        isInPause: isInPause,
-        turnState: turnState,
-        engine: engine,
-        isRecordingCurrent: isRecordingCurrent,
-        currentAttempt: currentAttempt,
-        l10n: l10n,
-      ),
+      showCountdown: showCountdown,
+      isInPause: isInPause,
+      turnState: turnState,
+      currentPromptId: engine.currentPromptId,
+      currentAttempt: currentAttempt,
+      onRecordTap: () => engine.onRecordButtonTapped(),
+      countdownWidget: showCountdown
+          ? Center(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final phase = ref.watch(
+                    reviewDifficultPracticeProvider.select(
+                      (s) => s.repeatFlowState?.phase,
+                    ),
+                  );
+                  if (phase is! WaitingInterval) {
+                    return const SizedBox.shrink();
+                  }
+                  return CountdownChip(
+                    remaining: phase.remaining,
+                    total: phase.total,
+                    isPaused: phase.isPaused,
+                    onPause: engine.pauseInterval,
+                    onResume: engine.resumeInterval,
+                  );
+                },
+              ),
+            )
+          : null,
       fastForwardButton: showCountdown
           ? Consumer(
               builder: (context, ref, _) {
@@ -759,95 +774,6 @@ class _ReviewDifficultPracticeScreenState
     );
   }
 
-  /// 跟读模式中间区域（倒计时 / 录音按钮 / 加载动画）
-  Widget _buildRepeatCenterContent({
-    required bool showCountdown,
-    required bool isInPause,
-    required SpeechRecordingState turnState,
-    required RepeatFlowEngine engine,
-    required bool isRecordingCurrent,
-    required SpeechPracticeAttempt? currentAttempt,
-    required AppLocalizations l10n,
-  }) {
-    if (showCountdown) {
-      return Center(
-        child: Consumer(
-          builder: (context, ref, _) {
-            final phase = ref.watch(
-              reviewDifficultPracticeProvider.select(
-                (s) => s.repeatFlowState?.phase,
-              ),
-            );
-            if (phase is! WaitingInterval) {
-              return const SizedBox.shrink();
-            }
-            return CountdownChip(
-              remaining: phase.remaining,
-              total: phase.total,
-              isPaused: phase.isPaused,
-              onPause: engine.pauseInterval,
-              onResume: engine.resumeInterval,
-            );
-          },
-        ),
-      );
-    }
-
-    if (isInPause) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.m),
-        child: Builder(
-          builder: (context) {
-            final currentPromptId = engine.currentPromptId;
-            final isProcessing =
-                turnState.promptId == currentPromptId &&
-                turnState.phase == SpeechRecordingPhase.processing;
-
-            if (isProcessing) {
-              return ProcessingIndicator(text: l10n.listenAndRepeatAnalyzing);
-            }
-
-            final mode = isRecordingCurrent
-                ? switch (turnState.phase) {
-                    SpeechRecordingPhase.awaitingSpeech ||
-                    SpeechRecordingPhase.speaking =>
-                      RecordingButtonMode.recording,
-                    _ => RecordingButtonMode.idle,
-                  }
-                : RecordingButtonMode.idle;
-
-            final hasError = currentAttempt?.errorMessage != null;
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                StatusLabel(
-                  text: hasError
-                      ? currentAttempt!.errorMessage
-                      : switch (mode) {
-                          RecordingButtonMode.idle =>
-                            l10n.listenAndRepeatTapToRecord,
-                          RecordingButtonMode.recording =>
-                            l10n.listenAndRepeatRecordingInProgress,
-                          RecordingButtonMode.disabled => null,
-                        },
-                  color: hasError ? Theme.of(context).colorScheme.error : null,
-                  bold: hasError,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                RecordingButton(
-                  mode: mode,
-                  onTap: () => engine.onRecordButtonTapped(),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
 }
 
 /// 子步骤本地化名称

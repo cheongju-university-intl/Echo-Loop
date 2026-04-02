@@ -19,7 +19,6 @@ import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
-import '../models/speech_practice_models.dart';
 import '../providers/speech/speech_recording_controller.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_controller.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_phase.dart';
@@ -31,11 +30,7 @@ import '../providers/sentence_ai_provider.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
-import '../widgets/common/recording_button.dart'
-    show RecordingButton, RecordingButtonMode;
-import '../widgets/common/processing_indicator.dart';
 import '../widgets/common/speech_rating_badge.dart';
-import '../widgets/common/status_label.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
@@ -294,96 +289,6 @@ class _ListenAndRepeatPlayerScreenState
     GoRouter.of(context).push(route);
   }
 
-  /// 构建中间区域内容（倒计时 / 录音按钮+状态标签 / 加载动画）
-  Widget _buildCenterContent({
-    required bool showCountdown,
-    required bool isInPause,
-    required SpeechRecordingState turnState,
-    required String currentPromptId,
-    required bool isRecordingCurrent,
-    required SpeechPracticeAttempt? currentAttempt,
-    required AppLocalizations l10n,
-  }) {
-    if (showCountdown) {
-      return Center(
-        child: Consumer(
-          builder: (context, ref, _) {
-            final phase = ref.watch(
-              listenAndRepeatControllerProvider.select((s) => s.phase),
-            );
-            if (phase is! WaitingInterval) {
-              return const SizedBox.shrink();
-            }
-            final ctrl = ref.read(listenAndRepeatControllerProvider.notifier);
-            return CountdownChip(
-              remaining: phase.remaining,
-              total: phase.total,
-              isPaused: phase.isPaused,
-              onPause: ctrl.pauseInterval,
-              onResume: ctrl.resumeInterval,
-            );
-          },
-        ),
-      );
-    }
-
-    if (isInPause) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.m),
-        child: Builder(
-          builder: (context) {
-            final isProcessing =
-                turnState.promptId == currentPromptId &&
-                turnState.phase == SpeechRecordingPhase.processing;
-
-            if (isProcessing) {
-              return ProcessingIndicator(text: l10n.listenAndRepeatAnalyzing);
-            }
-
-            final mode = isRecordingCurrent
-                ? switch (turnState.phase) {
-                    SpeechRecordingPhase.awaitingSpeech ||
-                    SpeechRecordingPhase.speaking =>
-                      RecordingButtonMode.recording,
-                    _ => RecordingButtonMode.idle,
-                  }
-                : RecordingButtonMode.idle;
-
-            final hasError = currentAttempt?.errorMessage != null;
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                StatusLabel(
-                  text: hasError
-                      ? currentAttempt!.errorMessage
-                      : switch (mode) {
-                          RecordingButtonMode.idle =>
-                            l10n.listenAndRepeatTapToRecord,
-                          RecordingButtonMode.recording =>
-                            l10n.listenAndRepeatRecordingInProgress,
-                          RecordingButtonMode.disabled => null,
-                        },
-                  color: hasError ? Theme.of(context).colorScheme.error : null,
-                  bold: hasError,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                RecordingButton(
-                  mode: mode,
-                  onTap: () => ref
-                      .read(listenAndRepeatControllerProvider.notifier)
-                      .onRecordButtonTapped(),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -433,8 +338,6 @@ class _ListenAndRepeatPlayerScreenState
     final currentSentence = ctrl.currentSentence;
     final currentPromptId = ctrl.currentPromptId;
     final currentAttempt = turnState.currentAttempt;
-    final isRecordingCurrent = turnState.isRecordingPrompt(currentPromptId);
-
     final isPlaying = ctrlState.phase is PlayingPrompt;
     final isInPause = ctrlState.isInPause;
     final showCountdown = ctrlState.isCountingDown;
@@ -586,15 +489,34 @@ class _ListenAndRepeatPlayerScreenState
                               : null,
                         )
                       : null,
-                  centerContent: _buildCenterContent(
-                    showCountdown: showCountdown,
-                    isInPause: isInPause,
-                    turnState: turnState,
-                    currentPromptId: currentPromptId,
-                    isRecordingCurrent: isRecordingCurrent,
-                    currentAttempt: currentAttempt,
-                    l10n: l10n,
-                  ),
+                  showCountdown: showCountdown,
+                  isInPause: isInPause,
+                  turnState: turnState,
+                  currentPromptId: currentPromptId,
+                  currentAttempt: currentAttempt,
+                  onRecordTap: () => ctrl.onRecordButtonTapped(),
+                  countdownWidget: showCountdown
+                      ? Center(
+                          child: Consumer(
+                            builder: (context, ref, _) {
+                              final phase = ref.watch(
+                                listenAndRepeatControllerProvider
+                                    .select((s) => s.phase),
+                              );
+                              if (phase is! WaitingInterval) {
+                                return const SizedBox.shrink();
+                              }
+                              return CountdownChip(
+                                remaining: phase.remaining,
+                                total: phase.total,
+                                isPaused: phase.isPaused,
+                                onPause: ctrl.pauseInterval,
+                                onResume: ctrl.resumeInterval,
+                              );
+                            },
+                          ),
+                        )
+                      : null,
                   fastForwardButton: showCountdown
                       ? Consumer(
                           builder: (context, ref, _) {
