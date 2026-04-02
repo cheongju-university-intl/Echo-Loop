@@ -22,6 +22,7 @@ import '../services/learned_vocabulary_tracker.dart';
 import '../services/study_event_recorder.dart';
 import 'audio_engine/audio_engine_provider.dart';
 import 'daily_study_time_provider.dart';
+import 'study_stats_provider.dart';
 import 'learned_vocabulary_tracker_provider.dart';
 import 'listening_practice/listening_practice_provider.dart';
 import 'speech/speech_recording_controller.dart';
@@ -135,6 +136,7 @@ mixin StudyTaskControllerMixin {
 
     // 刷新统计 UI
     ref.invalidate(dailyStudyTimeProvider);
+    ref.read(studyStatsNotifierProvider.notifier).refresh();
 
     // 清理 recorder 注入
     ref.read(audioEngineProvider.notifier).setRecorder(null);
