@@ -569,6 +569,7 @@ class _ListenAndRepeatPlayerScreenState
                 RepeatPracticePanel(
                   l10n: l10n,
                   theme: theme,
+                  hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
                   ratingBadge:
                       (currentAttempt != null && currentAttempt.score != null)
                       ? SpeechRatingBadge(

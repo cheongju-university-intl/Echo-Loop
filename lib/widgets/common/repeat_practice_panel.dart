@@ -57,6 +57,9 @@ class RepeatPracticePanel extends StatelessWidget {
   /// 播放/暂停回调
   final VoidCallback onCenter;
 
+  /// 提示文本（如 "先听再跟读"，播放中显示在中间区域上方）
+  final String? hintText;
+
   /// 预格式化的遍数文本（如 "第 1/3 遍"）
   final String playCountText;
 
@@ -74,6 +77,7 @@ class RepeatPracticePanel extends StatelessWidget {
     this.ratingBadge,
     required this.centerContent,
     this.fastForwardButton,
+    this.hintText,
     required this.canGoPrev,
     required this.isLast,
     required this.centerIcon,
@@ -110,9 +114,30 @@ class RepeatPracticePanel extends StatelessWidget {
           // 中间区域（固定高度，避免布局跳动）
           SizedBox(
             height: kTurnAreaHeight,
-            child: fastForwardButton != null
-                ? _buildCenterWithFastForward()
-                : centerContent,
+            child: hintText != null
+                ? Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.headphones_rounded,
+                          size: 20,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          hintText!,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : fastForwardButton != null
+                    ? _buildCenterWithFastForward()
+                    : centerContent,
           ),
 
           // 播放控制栏
@@ -124,6 +149,8 @@ class RepeatPracticePanel extends StatelessWidget {
             onNext: onNext,
             onCenter: onCenter,
           ),
+
+          const SizedBox(height: AppSpacing.s),
 
           // 遍数 + 模式标签
           PracticePlayCountLabel(
