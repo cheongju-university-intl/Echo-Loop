@@ -16,8 +16,7 @@ class AudioPlaybackService {
   AudioPlayer? _player;
   StreamSubscription<PlayerState>? _playerStateSub;
   String? _currentFilePath;
-  final StreamController<bool> _isPlayingController =
-      StreamController<bool>.broadcast();
+  Completer<void>? _playCompleter;
 
   /// 当前是否正在播放。
   bool get isPlaying => _player?.playing ?? false;
@@ -25,35 +24,36 @@ class AudioPlaybackService {
   /// 当前播放的文件路径。
   String? get currentFilePath => _currentFilePath;
 
-  /// 播放状态流。
-  Stream<bool> get isPlayingStream => _isPlayingController.stream;
-
-  /// 播放音频文件。
-  ///
-  /// 如果当前正在播放，先停止再播放新文件。
+  /// 播放音频文件，返回 Future 在播放完成或被停止时 complete。
   Future<void> play(String filePath) async {
     // 停止当前播放
     if (_player != null) {
       await _player!.stop();
     }
+    _playCompleter?.complete();
+    _playCompleter = Completer<void>();
 
     final player = await _ensurePlayer();
     _currentFilePath = filePath;
-    _isPlayingController.add(true);
     await player.setFilePath(filePath);
     await player.play();
+
+    // 返回 Future，播放完成或 stop 时 complete
+    return _playCompleter!.future;
   }
 
   /// 停止播放。
   Future<void> stop() async {
     if (_player == null) {
       _currentFilePath = null;
-      _isPlayingController.add(false);
+      _playCompleter?.complete();
+      _playCompleter = null;
       return;
     }
     await _player!.stop();
     _currentFilePath = null;
-    _isPlayingController.add(false);
+    _playCompleter?.complete();
+    _playCompleter = null;
   }
 
   /// 释放资源。
@@ -65,7 +65,8 @@ class AudioPlaybackService {
       _player = null;
     }
     _currentFilePath = null;
-    await _isPlayingController.close();
+    _playCompleter?.complete();
+    _playCompleter = null;
   }
 
   /// 懒初始化播放器。
@@ -74,15 +75,11 @@ class AudioPlaybackService {
 
     final player = AudioPlayer();
     _player = player;
-    // 仅监听自然播完（completed），不监听 idle。
-    // 原因：play() 内部先 stop() 再 play()，stop() 会触发 idle，
-    // 导致 isPlayingStream 先发 false 再发 true，造成 UI 状态闪烁，
-    // 使用户无法在播放中点击停止。
-    // 显式调用 stop() 已直接发送 false，无需依赖 idle。
     _playerStateSub = player.playerStateStream.listen((playerState) {
       if (playerState.processingState == ProcessingState.completed) {
         _currentFilePath = null;
-        _isPlayingController.add(false);
+        _playCompleter?.complete();
+        _playCompleter = null;
       }
     });
     return player;

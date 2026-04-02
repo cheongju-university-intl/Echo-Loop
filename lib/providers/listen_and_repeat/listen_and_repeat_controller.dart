@@ -350,10 +350,8 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     final token = state.flowToken;
     AppLogger.log('L&R', '播放录音回放: $path');
 
+    // play 返回的 Future 在播放完成或 stop 时 complete
     await _playbackService.play(path);
-
-    // 等待播放结束（监听 stream 的 false 事件）
-    await _playbackService.isPlayingStream.firstWhere((playing) => !playing);
 
     // 校验 token + phase，防止播放期间用户已切句/停止
     if (token != state.flowToken) return;
