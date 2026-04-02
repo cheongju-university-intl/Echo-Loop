@@ -235,18 +235,27 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     ref.read(audioEngineProvider.notifier).setRecorder(_recorder);
   }
 
-  /// 更新设置
-  void updateSettings(DifficultPracticeSettings newSettings) {
+  /// 更新设置并重新开始当前句
+  Future<void> updateSettings(DifficultPracticeSettings newSettings) async {
+    final wasAnnotation = state.isAnnotationMode;
     _engine.invalidateSession();
     _exitAnnotationMode();
     state = state.copyWith(
       settings: newSettings,
+      currentPlayCount: 1,
       isPlaying: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
+      clearRepeatFlowState: true,
     );
+    // 重新开始当前句（跟读模式→重新进入跟读，盲听模式→重新盲听）
+    if (wasAnnotation) {
+      _startRepeatFlow();
+    } else {
+      await _startSentence();
+    }
   }
 
   /// 当前句进入手动模式
@@ -504,6 +513,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     _repeatEngine ??= RepeatFlowEngine(
       onStateChanged: _onRepeatFlowStateChanged,
       callbacks: RepeatFlowCallbacks(
+        pauseAudio: () => ref.read(audioEngineProvider.notifier).pause(),
         playSentence: _playSentenceForRepeat,
         startRecording: _startRecordingForRepeat,
         cancelRecording: _cancelRecordingForRepeat,
@@ -558,8 +568,10 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
         isAnnotationMode: false,
         isPlaying: false,
         isPauseBetweenPlays: false,
+        clearRepeatFlowState: true,
       );
-      _autoAdvance();
+      AppLogger.log('RDP', '跟读完成 → autoAdvance');
+      unawaited(_autoAdvance());
     }
   }
 

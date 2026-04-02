@@ -45,6 +45,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     _engine = RepeatFlowEngine(
       onStateChanged: _onEngineStateChanged,
       callbacks: RepeatFlowCallbacks(
+        pauseAudio: () => ref.read(audioEngineProvider.notifier).pause(),
         playSentence: _playSentence,
         startRecording: _startRecording,
         cancelRecording: _cancelRecording,
@@ -239,11 +240,13 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     ref.read(speechRecordingControllerProvider.notifier).fullReset();
   }
 
-  /// 用户关闭设置弹窗 → 同步设置变更
-  void onSettingsClosed() {
+  /// 用户关闭设置弹窗 → 同步设置变更并重新开始当前句
+  Future<void> onSettingsClosed() async {
     ref
         .read(speechRecordingControllerProvider.notifier)
         .setManualMode(_engine.config.isManualMode());
+    // 设置可能改变了遍数/停顿时长，从第一遍重新开始
+    await _engine.restartCurrentSentence();
   }
 
   /// 暂停学习计时（完成弹窗显示时调用）

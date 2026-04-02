@@ -432,27 +432,38 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     );
 
     if (!result.isSuccess) {
-      final attempt = SpeechPracticeAttempt(promptId: promptId).copyWith(
-        filePath: result.filePath,
-        status: _statusFromError(result.errorCode),
-        errorMessage: result.errorMessage,
-      );
-      AppLogger.log('SpeechRec', '✗ 录音失败: ${result.errorCode}');
-      state = state.copyWith(
-        phase: SpeechRecordingPhase.idle,
-        currentAttempt: attempt,
-        clearLiveTranscript: true,
-        hasDetectedSpeech: false,
-        silenceDuration: Duration.zero,
-      );
-      return;
+      // Final transcript 失败但有 live transcript → 用 live transcript 做评估
+      final fallbackTranscript = _lastKnownTranscript;
+      if (fallbackTranscript != null && fallbackTranscript.isNotEmpty) {
+        AppLogger.log(
+          'SpeechRec',
+          '⚠ final transcript 失败 (${result.errorCode})，'
+              '用 live transcript 评估: "$fallbackTranscript"',
+        );
+      } else {
+        final attempt = SpeechPracticeAttempt(promptId: promptId).copyWith(
+          filePath: result.filePath,
+          status: _statusFromError(result.errorCode),
+          errorMessage: result.errorMessage,
+        );
+        AppLogger.log('SpeechRec', '✗ 录音失败: ${result.errorCode}');
+        state = state.copyWith(
+          phase: SpeechRecordingPhase.idle,
+          currentAttempt: attempt,
+          clearLiveTranscript: true,
+          hasDetectedSpeech: false,
+          silenceDuration: Duration.zero,
+        );
+        return;
+      }
     }
 
-    // 评估：仅覆盖率
+    // 评估：仅覆盖率（优先用 final transcript，fallback 用 live transcript）
+    final transcript = result.finalTranscript ?? _lastKnownTranscript ?? '';
     final matcher = ref.read(speechTranscriptMatcherProvider);
     final matchResult = matcher.evaluate(
       referenceText: referenceText,
-      transcript: result.finalTranscript!,
+      transcript: transcript,
     );
 
     final attempt = SpeechPracticeAttempt(promptId: promptId).copyWith(

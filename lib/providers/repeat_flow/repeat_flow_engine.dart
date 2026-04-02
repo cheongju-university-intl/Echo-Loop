@@ -75,6 +75,9 @@ class RepeatFlowConfig {
 
 /// 跟读流程引擎回调
 class RepeatFlowCallbacks {
+  /// 暂停音频播放（enterWaitingForUser 时调用）
+  final void Function() pauseAudio;
+
   /// 播放句子音频
   final Future<void> Function(Sentence sentence, int flowToken) playSentence;
 
@@ -101,6 +104,7 @@ class RepeatFlowCallbacks {
   final bool Function() hasDetectedSpeech;
 
   const RepeatFlowCallbacks({
+    required this.pauseAudio,
     required this.playSentence,
     required this.startRecording,
     required this.cancelRecording,
@@ -358,6 +362,27 @@ class RepeatFlowEngine {
     await _playCurrentSentence();
   }
 
+  /// 重新开始当前句子（设置变更后调用，从第一遍开始）
+  Future<void> restartCurrentSentence() async {
+    final sentence = currentSentence;
+    if (sentence == null) return;
+
+    _atomicReset();
+    callbacks.clearRecording();
+
+    _updateState(_state.copyWith(
+      phase: const Idle(),
+      repeatIndex: 0,
+      totalRepeats: _config.getRepeatCount(sentence),
+      intervalDuration: _config.getIntervalDuration(sentence),
+      recordingPath: null,
+      recordingScore: null,
+      flowToken: _state.flowToken + 1,
+    ));
+
+    await _playCurrentSentence();
+  }
+
   /// 停止会话
   void stopSession() {
     _atomicReset();
@@ -585,6 +610,7 @@ class RepeatFlowEngine {
   }
 
   void _stopActiveResources() {
+    callbacks.pauseAudio();
     _countdown.cancel();
     callbacks.cancelRecording();
     _playbackService.stop();
