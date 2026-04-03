@@ -93,11 +93,7 @@ class ParagraphPracticeScaffold extends StatelessWidget {
             ),
           if (practiceControls != null)
             Padding(
-              padding: const EdgeInsets.only(
-                left: AppSpacing.m,
-                right: AppSpacing.m,
-                top: AppSpacing.s,
-              ),
+              padding: const EdgeInsets.only(top: AppSpacing.s),
               child: practiceControls!,
             ),
           const SizedBox(height: AppSpacing.m),

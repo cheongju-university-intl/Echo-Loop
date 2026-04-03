@@ -31,7 +31,6 @@ import '../providers/sentence_ai_provider.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
-import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
@@ -501,28 +500,14 @@ class _ListenAndRepeatPlayerScreenState
                 RepeatPracticePanel(
                   l10n: l10n,
                   theme: theme,
-                  hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
-                  ratingBadge:
-                      (currentAttempt != null && currentAttempt.score != null)
-                      ? SpeechRatingBadge(
-                          l10n: l10n,
-                          attempt: currentAttempt,
-                          onBeforePlayback: currentAttempt.hasRecording
-                              ? () => ref
-                                    .read(
-                                      listenAndRepeatControllerProvider
-                                          .notifier,
-                                    )
-                                    .prepareForPlayback()
-                              : null,
-                        )
-                      : null,
-                  showCountdown: showCountdown,
-                  isInPause: isInPause,
                   turnState: turnState,
                   currentPromptId: currentPromptId,
                   currentAttempt: currentAttempt,
-                  onRecordTap: () => ctrl.onRecordButtonTapped(),
+                  hintText: isPlaying
+                      ? l10n.listenAndRepeatListenHint
+                      : null,
+                  showCountdown: showCountdown,
+                  isInPause: isInPause,
                   countdownWidget: showCountdown
                       ? Center(
                           child: Consumer(
@@ -546,34 +531,15 @@ class _ListenAndRepeatPlayerScreenState
                           ),
                         )
                       : null,
-                  fastForwardButton: showCountdown
-                      ? Consumer(
-                          builder: (context, ref, _) {
-                            final phase = ref.watch(
-                              listenAndRepeatControllerProvider.select(
-                                (s) => s.phase,
-                              ),
-                            );
-                            if (phase is! WaitingInterval || phase.isPaused) {
-                              return const SizedBox.shrink();
-                            }
-                            return GestureDetector(
-                              onTap: ref
-                                  .read(
-                                    listenAndRepeatControllerProvider.notifier,
-                                  )
-                                  .fastForwardInterval,
-                              child: Icon(
-                                Icons.fast_forward_rounded,
-                                size: 32,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.6,
-                                ),
-                              ),
-                            );
-                          },
-                        )
+                  onRecordTap: () => ctrl.onRecordButtonTapped(),
+                  onFastForward: showCountdown
+                      ? ctrl.fastForwardInterval
                       : null,
+                  onBeforePlayback: () => ref
+                      .read(
+                        listenAndRepeatControllerProvider.notifier,
+                      )
+                      .prepareForPlayback(),
                 ),
                 PracticePlaybackFooter(
                   canGoPrev: !ctrlState.isFirstSentence,

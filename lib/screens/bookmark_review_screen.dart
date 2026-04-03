@@ -41,7 +41,6 @@ import '../widgets/practice/annotation_content_view.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/practice_playback_footer.dart';
 import '../widgets/common/repeat_practice_panel.dart';
-import '../widgets/common/speech_rating_badge.dart';
 import '../providers/repeat_flow/repeat_flow_phase.dart';
 
 /// 收藏句子复习页面
@@ -419,28 +418,12 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     return RepeatPracticePanel(
       l10n: l10n,
       theme: theme,
-      hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
-      ratingBadge: (currentAttempt != null && currentAttempt.score != null)
-          ? SpeechRatingBadge(
-              l10n: l10n,
-              attempt: currentAttempt,
-              onBeforePlayback: currentAttempt.hasRecording
-                  ? () {
-                      if (engine == null) return;
-                      engine.prepareForPlayback();
-                    }
-                  : null,
-            )
-          : null,
-      showCountdown: showCountdown,
-      isInPause: isInPause,
       turnState: turnState,
       currentPromptId: currentPromptId,
       currentAttempt: currentAttempt,
-      onRecordTap: () {
-        if (engine == null) return;
-        unawaited(engine.onRecordButtonTapped());
-      },
+      hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
+      showCountdown: showCountdown,
+      isInPause: isInPause,
       countdownWidget: showCountdown
           ? Center(
               child: Consumer(
@@ -464,27 +447,15 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
               ),
             )
           : null,
-      fastForwardButton: showCountdown
-          ? Consumer(
-              builder: (context, ref, _) {
-                final phase = ref.watch(
-                  bookmarkReviewProvider.select(
-                    (s) => s.repeatFlowState?.phase,
-                  ),
-                );
-                if (phase is! WaitingInterval || phase.isPaused) {
-                  return const SizedBox.shrink();
-                }
-                return GestureDetector(
-                  onTap: engine?.fastForwardInterval ?? noop,
-                  child: Icon(
-                    Icons.fast_forward_rounded,
-                    size: 32,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                );
-              },
-            )
+      onRecordTap: () {
+        if (engine == null) return;
+        unawaited(engine.onRecordButtonTapped());
+      },
+      onFastForward: showCountdown
+          ? (engine?.fastForwardInterval ?? noop)
+          : null,
+      onBeforePlayback: engine != null
+          ? () => engine.prepareForPlayback()
           : null,
     );
   }

@@ -39,7 +39,6 @@ import '../models/speech_practice_models.dart';
 import '../providers/repeat_flow/repeat_flow_phase.dart';
 import '../providers/repeat_flow/repeat_flow_state.dart';
 import '../widgets/common/countdown_chip.dart';
-import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/common/repeat_practice_panel.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/annotation_content_view.dart';
@@ -621,31 +620,17 @@ class _ReviewDifficultPracticeScreenState
     final isInPause = flowState.isInPause;
     final showCountdown = flowState.isCountingDown;
 
+    final effectivePromptId = engine?.currentPromptId ?? currentPromptId;
+
     return RepeatPracticePanel(
       l10n: l10n,
       theme: theme,
+      turnState: turnState,
+      currentPromptId: effectivePromptId,
+      currentAttempt: currentAttempt,
       hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
-      ratingBadge: (currentAttempt != null && currentAttempt.score != null)
-          ? SpeechRatingBadge(
-              l10n: l10n,
-              attempt: currentAttempt,
-              onBeforePlayback: currentAttempt.hasRecording
-                  ? () {
-                      if (engine == null) return;
-                      engine.prepareForPlayback();
-                    }
-                  : null,
-            )
-          : null,
       showCountdown: showCountdown,
       isInPause: isInPause,
-      turnState: turnState,
-      currentPromptId: engine?.currentPromptId ?? currentPromptId,
-      currentAttempt: currentAttempt,
-      onRecordTap: () {
-        if (engine == null) return;
-        unawaited(engine.onRecordButtonTapped());
-      },
       countdownWidget: showCountdown
           ? Center(
               child: Consumer(
@@ -669,27 +654,15 @@ class _ReviewDifficultPracticeScreenState
               ),
             )
           : null,
-      fastForwardButton: showCountdown
-          ? Consumer(
-              builder: (context, ref, _) {
-                final fs = ref.watch(
-                  reviewDifficultPracticeProvider.select(
-                    (s) => s.repeatFlowState?.phase,
-                  ),
-                );
-                if (fs is! WaitingInterval || fs.isPaused) {
-                  return const SizedBox.shrink();
-                }
-                return GestureDetector(
-                  onTap: engine?.fastForwardInterval ?? noop,
-                  child: Icon(
-                    Icons.fast_forward_rounded,
-                    size: 32,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                );
-              },
-            )
+      onRecordTap: () {
+        if (engine == null) return;
+        unawaited(engine.onRecordButtonTapped());
+      },
+      onFastForward: showCountdown
+          ? (engine?.fastForwardInterval ?? noop)
+          : null,
+      onBeforePlayback: engine != null
+          ? () => engine.prepareForPlayback()
           : null,
     );
   }
