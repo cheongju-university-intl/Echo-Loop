@@ -15,7 +15,8 @@ import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
 import 'package:fluency/providers/sentence_ai_provider.dart';
-import 'package:fluency/database/app_database.dart' show Bookmark;
+import 'package:fluency/database/app_database.dart' show AudioItem, Bookmark;
+import 'package:fluency/database/daos/audio_item_dao.dart';
 import 'package:fluency/database/daos/bookmark_dao.dart';
 import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/providers.dart';
@@ -47,6 +48,17 @@ class _TestBookmarkDao implements BookmarkDao {
   dynamic noSuchMethod(Invocation invocation) {
     return Future<void>.value();
   }
+}
+
+class _TestAudioItemDao implements AudioItemDao {
+  @override
+  Future<AudioItem?> getById(String id) async => null;
+
+  @override
+  Future<void> updateWordTimestamps(String audioItemId, String? json) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }
 
 /// 启动后定位到最后一句（等用户点"下一句"触发完成弹窗）
@@ -95,6 +107,14 @@ class _RecordingIntensiveListenPlayer extends TestIntensiveListenPlayer {
   Future<void> replayDuringCountdown() async {
     replayDuringCountdownCalls += 1;
     await super.replayDuringCountdown();
+  }
+}
+
+class _MutableIntensiveListenPlayer extends TestIntensiveListenPlayer {
+  _MutableIntensiveListenPlayer(super.initialState, super.testSentences);
+
+  void emit(IntensiveListenState nextState) {
+    state = nextState;
   }
 }
 
@@ -207,6 +227,7 @@ void main() {
         bookmarkDaoProvider.overrideWithValue(
           bookmarkDao ?? _TestBookmarkDao(),
         ),
+        audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
         sentenceAiNotifierProvider.overrideWithValue(
           SentenceAiNotifier(
             cacheDao: _MockCacheDao(),
@@ -275,7 +296,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Play 1/1'), findsOneWidget);
+      expect(find.text('Auto · Play 1/1'), findsOneWidget);
     });
 
     testWidgets('自定义遍数正确显示', (tester) async {
@@ -289,7 +310,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Play 2/3'), findsOneWidget);
+      expect(find.text('Auto · Play 2/3'), findsOneWidget);
     });
 
     testWidgets('详情模式显示继续按钮', (tester) async {
@@ -366,6 +387,43 @@ void main() {
       expect(find.byType(SentenceAnnotationCard), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
       expect(find.text('Continue'), findsNothing);
+    });
+
+    testWidgets('详情页倒计时剩余时间变化时数字和进度会刷新', (tester) async {
+      late _MutableIntensiveListenPlayer player;
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isAnnotationMode: true,
+            isPauseBetweenPlays: true,
+            isPauseBetweenSentences: true,
+            isPlaying: false,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 5),
+          ),
+          playerFactory: (state, sentences) {
+            player = _MutableIntensiveListenPlayer(state, sentences);
+            return player;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('3'), findsOneWidget);
+
+      player.emit(
+        createPlayerState(
+          isAnnotationMode: true,
+          isPauseBetweenPlays: true,
+          isPauseBetweenSentences: true,
+          isPlaying: false,
+          pauseRemaining: const Duration(seconds: 2),
+          pauseDuration: const Duration(seconds: 5),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('2'), findsOneWidget);
     });
 
     testWidgets('显示播放/暂停和上下句按钮', (tester) async {

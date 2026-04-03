@@ -836,6 +836,20 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
   }
 
   @override
+  void enterWaitingForUserInBlindMode() {
+    state = state.copyWith(
+      isPlaying: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+    );
+  }
+
+  @override
+  void onAnnotationUserInteraction() {
+    state = state.copyWith(isPlaying: false);
+  }
+
+  @override
   Future<void> startPlaying() async {
     state = state.copyWith(isPlaying: true);
   }
@@ -963,6 +977,18 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
   @override
   void disposePlayer() {
     state = const IntensiveListenState();
+  }
+
+  @override
+  void stopPlayback() {
+    state = state.copyWith(
+      isPlaying: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isAnnotationReplay: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
+    );
   }
 }
 

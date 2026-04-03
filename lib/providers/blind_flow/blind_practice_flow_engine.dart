@@ -31,12 +31,16 @@ class BlindPracticeFlowConfig {
   /// 每成功播放一遍后的回调
   final void Function(Sentence sentence)? onSentencePlayed;
 
+  /// 是否为手动模式。手动模式下当前句播完后直接进入等待态。
+  final bool Function()? isManualMode;
+
   const BlindPracticeFlowConfig({
     required this.getRepeatCount,
     required this.getRepeatIntervalDuration,
     required this.getSentenceIntervalDuration,
     this.onBeforeSentenceStart,
     this.onSentencePlayed,
+    this.isManualMode,
   });
 }
 
@@ -89,6 +93,8 @@ class BlindPracticeFlowEngine {
     required BlindPracticeFlowConfig config,
     int startIndex = 0,
   }) {
+    _waitAfterCurrentPrompt = false;
+    _stopActiveResources();
     _sentences = sentences.map((s) => s.copyWith()).toList();
     _config = config;
 
@@ -103,7 +109,7 @@ class BlindPracticeFlowEngine {
         sentenceIndex: safeIndex,
         totalSentences: _sentences.length,
         totalRepeats: sentence != null ? config.getRepeatCount(sentence) : 1,
-        flowToken: 1,
+        flowToken: _state.flowToken + 1,
       ),
     );
   }
@@ -217,7 +223,12 @@ class BlindPracticeFlowEngine {
     if (_disposed) return;
     _waitAfterCurrentPrompt = false;
     _stopActiveResources();
-    _updateState(_state.copyWith(phase: const BlindIdle()));
+    _updateState(
+      _state.copyWith(
+        phase: const BlindIdle(),
+        flowToken: _state.flowToken + 1,
+      ),
+    );
   }
 
   void dispose() {
@@ -276,6 +287,17 @@ class BlindPracticeFlowEngine {
 
     if (_waitAfterCurrentPrompt) {
       _waitAfterCurrentPrompt = false;
+      _updateState(
+        _state.copyWith(
+          repeatIndex: 0,
+          totalRepeats: _config.getRepeatCount(sentence),
+          phase: const BlindWaitingForUser(BlindWaitingReason.userInteraction),
+        ),
+      );
+      return;
+    }
+
+    if (_config.isManualMode?.call() ?? false) {
       _updateState(
         _state.copyWith(
           repeatIndex: 0,

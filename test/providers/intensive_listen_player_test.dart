@@ -1,4 +1,6 @@
 // 精听播放器状态测试
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +31,34 @@ class _ReplayTestAudioEngine extends TestAudioEngine {
   Future<void> playClipOnce(Sentence sentence, int sessionId) async {
     if (!isActiveSession(sessionId)) return;
     await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
+class _DeferredBlindAudioEngine extends TestAudioEngine {
+  int _sessionId = 0;
+  final Map<int, Completer<void>> _sentenceCompletions = {};
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> playClipOnce(Sentence sentence, int sessionId) {
+    final completer =
+        _sentenceCompletions[sentence.index] ??= Completer<void>();
+    return completer.future;
+  }
+
+  void completeSentence(int index) {
+    final completer = _sentenceCompletions[index];
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
   }
 }
 
@@ -334,6 +364,48 @@ void main() {
 
       final state = container.read(intensiveListenPlayerProvider);
       expect(state.difficultSentences, {0, 1, 2});
+    });
+  });
+
+  group('快速切句时旧盲听回调不会污染新句状态', () {
+    test('上一句播放完成回调不会让新句一开始就进入倒计时', () async {
+      final audioEngine = _DeferredBlindAudioEngine();
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          learningSessionProvider.overrideWith(() => TestLearningSession()),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(createTestSentences(count: 3));
+
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(Duration.zero);
+
+      unawaited(notifier.goToNext());
+      await Future<void>.delayed(Duration.zero);
+
+      audioEngine.completeSentence(0);
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      final stateAfterOldCallback = container.read(intensiveListenPlayerProvider);
+      expect(stateAfterOldCallback.currentSentenceIndex, 1);
+      expect(stateAfterOldCallback.isPlaying, true);
+      expect(stateAfterOldCallback.isPauseBetweenPlays, false);
+      expect(stateAfterOldCallback.isPauseBetweenSentences, false);
+
+      audioEngine.completeSentence(1);
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      final stateAfterCurrentCallback = container.read(
+        intensiveListenPlayerProvider,
+      );
+      expect(stateAfterCurrentCallback.currentSentenceIndex, 1);
+      expect(stateAfterCurrentCallback.isPauseBetweenSentences, true);
     });
   });
 

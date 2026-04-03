@@ -1,44 +1,37 @@
 /// 精听专用播放器 Provider
 ///
-/// 逐句精听播放器，与 BlindListenPlayer 同层级，直接操作 AudioEngine。
-/// 核心功能：
-/// - 逐句播放（可配置遍数，遍间停顿）
-/// - 看不懂详情模式（听不懂 → 暂停 → 揭示文本 → 标记难句）
-/// - 详情模式退出时在当前页带字幕重播一遍再推进
-/// - 偷看字幕（不暂停、不标记、切句时重置）
-/// - 手动上一句/下一句
-/// - 三种停顿模式（智能/固定/倍数）
-/// - 倒计时控制（暂停/快进/重播）
-///
-/// 使用 sessionId 守护防止异步竞态。
+/// 盲听部分复用 [BlindPracticeFlowEngine]，
+/// “看不懂后”的详情部分使用精听专用 annotation phase 状态机。
 library;
 
 import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../../models/study_stage.dart';
+import '../../services/app_logger.dart';
 import '../../services/learned_vocabulary_tracker.dart';
 import '../../services/study_event_recorder.dart';
-import '../learned_vocabulary_tracker_provider.dart';
-import '../../services/app_logger.dart';
-import '../learning_progress_provider.dart';
-import '../audio_engine/audio_engine_provider.dart';
 import '../../utils/sense_group_timing.dart';
+import '../audio_engine/audio_engine_provider.dart';
+import '../blind_flow/blind_practice_flow_engine.dart';
+import '../blind_flow/blind_practice_flow_phase.dart';
+import '../blind_flow/blind_practice_flow_state.dart';
+import '../intensive_annotation/intensive_annotation_phase.dart';
+import '../intensive_annotation/intensive_annotation_state.dart';
+import '../learned_vocabulary_tracker_provider.dart';
+import '../learning_progress_provider.dart';
 import 'countdown_controller.dart';
 import 'learning_session_provider.dart';
 
 part 'intensive_listen_player_provider.g.dart';
 
 /// 计算停顿时长（纯函数）
-///
-/// 根据句子时长和精听设置计算停顿时间。
-/// - smart：clamp(1秒 + 0.6 × 句子时长, 2秒, 20秒)
-/// - fixed：固定秒数
-/// - multiplier：句子时长 × 倍数
 Duration calculatePauseDuration(
   Duration sentenceDuration,
   IntensiveListenSettings settings,
@@ -58,72 +51,29 @@ Duration calculatePauseDuration(
 
 /// 精听播放器状态
 class IntensiveListenState {
-  /// 当前句子索引（0-based）
   final int currentSentenceIndex;
-
-  /// 句子总数
   final int totalSentences;
-
-  /// 当前遍数（1-based，"第N遍"）
   final int currentPlayCount;
-
-  /// 精听设置（循环次数、停顿模式等）
   final IntensiveListenSettings settings;
-
-  /// 是否正在播放
   final bool isPlaying;
-
-  /// 是否处于遍间停顿中
   final bool isPauseBetweenPlays;
-
-  /// 是否处于句间停顿中（用于 UI 区分文案）
   final bool isPauseBetweenSentences;
-
-  /// 停顿剩余时间
   final Duration pauseRemaining;
-
-  /// 停顿总时长
   final Duration pauseDuration;
-
-  /// 当前句详情重播剩余时间
   final Duration annotationReplayRemaining;
-
-  /// 当前句详情重播总时长
   final Duration annotationReplayDuration;
-
-  /// 是否处于“听不懂”后的详情模式
   final bool isAnnotationMode;
-
-  /// 是否处于当前页内的详情重播状态（带字幕重播一遍）
   final bool isAnnotationReplay;
-
-  /// 是否偷看字幕
   final bool isTextRevealed;
-
-  /// 本次标记的难句索引集合
   final Set<int> difficultSentences;
-
-  /// 当前句是否由”看不懂”动作自动标记为难句
-  ///
-  /// 仅用于标注模式下的文案分支：
-  /// - true：显示”已自动标记为难句”
-  /// - false：显示”已标记为难句”
   final bool isCurrentSentenceAutoMarked;
-
-  /// 倒计时是否暂停中
   final bool isCountdownPaused;
-
-  /// 倒计时是否快进中（10 倍速）
   final bool isCountdownFastForward;
-
-  /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
   final bool stepFinished;
-
-  /// 当前正在播放的意群索引（null 表示无播放）
   final int? playingSenseGroupIndex;
-
-  /// 已播放过的意群索引集合
   final Set<int> playedSenseGroupIndices;
+  final BlindPracticeFlowState? blindFlowState;
+  final IntensiveAnnotationState? annotationState;
 
   const IntensiveListenState({
     this.currentSentenceIndex = 0,
@@ -147,10 +97,13 @@ class IntensiveListenState {
     this.stepFinished = false,
     this.playingSenseGroupIndex,
     this.playedSenseGroupIndices = const {},
+    this.blindFlowState,
+    this.annotationState,
   });
 
-  // 使用 sentinel 值来区分"未传参"与"显式传 null"
   static const _sentinel = Object();
+
+  bool get isManualMode => settings.isManualMode;
 
   IntensiveListenState copyWith({
     int? currentSentenceIndex,
@@ -174,6 +127,8 @@ class IntensiveListenState {
     bool? stepFinished,
     Object? playingSenseGroupIndex = _sentinel,
     Set<int>? playedSenseGroupIndices,
+    Object? blindFlowState = _sentinel,
+    Object? annotationState = _sentinel,
   }) {
     return IntensiveListenState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -205,27 +160,37 @@ class IntensiveListenState {
           : playingSenseGroupIndex as int?,
       playedSenseGroupIndices:
           playedSenseGroupIndices ?? this.playedSenseGroupIndices,
+      blindFlowState: blindFlowState == _sentinel
+          ? this.blindFlowState
+          : blindFlowState as BlindPracticeFlowState?,
+      annotationState: annotationState == _sentinel
+          ? this.annotationState
+          : annotationState as IntensiveAnnotationState?,
     );
   }
 }
 
-/// 精听专用播放器 Provider
-///
-/// 直接操作 AudioEngine 的 playClipOnce 基元，实现逐句播放循环。
-/// 使用 engine 的 sessionId 防止异步竞态。
 @Riverpod(keepAlive: true)
 class IntensiveListenPlayer extends _$IntensiveListenPlayer {
-  /// 深拷贝的句子列表（避免与 LP 共享可变状态）
   List<Sentence> _sentences = [];
-
-  /// 学习事件记录器
   late StudyEventRecorder _recorder;
+  late BlindPracticeFlowEngine _blindEngine;
+  final CountdownController _annotationCountdown = CountdownController();
 
-  /// 可控倒计时控制器
-  final CountdownController _countdown = CountdownController();
-
-  /// 当前播放循环的 sessionId
   int _currentSessionId = -1;
+  bool _refreshBlindConfigWhenWaiting = false;
+  bool _annotationWaitAfterCurrentPlayback = false;
+
+  BlindPracticeFlowEngine _createBlindEngine() {
+    return BlindPracticeFlowEngine(
+      onStateChanged: _onBlindFlowStateChanged,
+      callbacks: BlindPracticeFlowCallbacks(
+        pauseAudio: () => ref.read(audioEngineProvider.notifier).pause(),
+        playSentence: _playSentenceForBlind,
+      ),
+      logTag: 'IntensiveBlind',
+    );
+  }
 
   @override
   IntensiveListenState build() {
@@ -240,28 +205,28 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       vocabTracker: vocabTracker,
       stage: StudyStage.intensiveListen,
     );
+    _blindEngine = _createBlindEngine();
 
-    ref.onDispose(_cleanup);
+    ref.onDispose(() {
+      _blindEngine.dispose();
+      _annotationCountdown.cancel();
+      _currentSessionId = -1;
+    });
     return const IntensiveListenState();
   }
 
-  /// 初始化精听播放器
-  ///
-  /// [sentences] 句子列表（会深拷贝）
-  /// [startIndex] 起始句子索引（断点续学）
-  /// 设置使用默认值，不从持久化存储加载（设置仅会话内临时生效）
   Future<void> initialize(
     List<Sentence> sentences, {
     int startIndex = 0,
   }) async {
-    _cleanup();
+    _blindEngine.dispose();
+    _blindEngine = _createBlindEngine();
+    _cleanupAnnotationSession();
 
-    // 深拷贝句子列表，避免与 LP 共享可变 isBookmarked 状态
     _sentences = sentences.map((s) => s.copyWith()).toList();
-
-    final safeIndex = startIndex.clamp(0, sentences.length - 1);
-
-    // 从句子的 isBookmarked 字段预填历史难句
+    final safeIndex = _sentences.isEmpty
+        ? 0
+        : startIndex.clamp(0, _sentences.length - 1);
     final preBookmarked = <int>{
       for (final (i, s) in _sentences.indexed)
         if (s.isBookmarked) i,
@@ -269,117 +234,74 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
 
     state = IntensiveListenState(
       currentSentenceIndex: safeIndex,
-      totalSentences: sentences.length,
+      totalSentences: _sentences.length,
       difficultSentences: preBookmarked,
     );
+    _prepareBlindFlow(startIndex: safeIndex);
     ref.read(analyticsServiceProvider).track(Events.intensiveListenStart, {
       EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
-      EventParams.totalSentences: sentences.length,
+      EventParams.totalSentences: _sentences.length,
     });
   }
 
-  /// 获取当前句子
   Sentence? get currentSentence =>
       _sentences.isNotEmpty && state.currentSentenceIndex < _sentences.length
       ? _sentences[state.currentSentenceIndex]
       : null;
 
-  /// 获取句子列表（只读）
   List<Sentence> get sentences => List.unmodifiable(_sentences);
 
-  /// 开始播放当前句子
+  int get currentIndex => state.currentSentenceIndex;
+
   Future<void> startPlaying() async {
     if (_sentences.isEmpty) return;
-    await _startSentence();
+    await _startBlindFlow();
   }
 
-  /// 暂停播放
   Future<void> pause() async {
-    final engine = ref.read(audioEngineProvider.notifier);
-    engine.pause();
-    _countdown.cancel();
+    if (state.annotationState != null) {
+      _cleanupAnnotationSession();
+      _setAnnotationPhase(const WaitingAnnotationUser());
+      return;
+    }
+
+    _blindEngine.enterWaitingForUser();
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
-      playingSenseGroupIndex: null,
     );
   }
 
-  /// 恢复播放（从当前句子重新开始播放循环）
   Future<void> resume() async {
-    if (state.isAnnotationReplay) {
-      await _startInlineAnnotationReplay();
+    if (state.annotationState != null) {
+      if (state.annotationState?.phase is ReplayingWithSubtitle) {
+        await _startInlineAnnotationReplay();
+      }
       return;
     }
-    await _startSentence(startPlayCount: state.currentPlayCount);
+    await _blindEngine.replayCurrentSentence();
   }
 
-  /// 跳转到下一句
   Future<void> goToNext() async {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
-
-    _invalidateSession();
-
-    state = state.copyWith(
-      currentSentenceIndex: state.currentSentenceIndex + 1,
-      currentPlayCount: 1,
-      isAnnotationMode: false,
-      isAnnotationReplay: false,
-      isTextRevealed: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      annotationReplayRemaining: Duration.zero,
-      annotationReplayDuration: Duration.zero,
-      isCurrentSentenceAutoMarked: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      playingSenseGroupIndex: null,
-      playedSenseGroupIndices: const {},
-    );
-
-    await _startSentence();
+    await _goToSentence(state.currentSentenceIndex + 1);
   }
 
-  /// 跳转到上一句
   Future<void> goToPrevious() async {
     if (state.currentSentenceIndex <= 0) return;
-
-    _invalidateSession();
-
-    state = state.copyWith(
-      currentSentenceIndex: state.currentSentenceIndex - 1,
-      currentPlayCount: 1,
-      isAnnotationMode: false,
-      isAnnotationReplay: false,
-      isTextRevealed: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      annotationReplayRemaining: Duration.zero,
-      annotationReplayDuration: Duration.zero,
-      isCurrentSentenceAutoMarked: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      playingSenseGroupIndex: null,
-      playedSenseGroupIndices: const {},
-    );
-
-    await _startSentence();
+    await _goToSentence(state.currentSentenceIndex - 1);
   }
 
-  /// 进入详情模式（听不懂）
-  ///
-  /// 暂停音频 → 揭示文本 → 标记为难句
   void enterAnnotationMode() {
-    if (state.isAnnotationMode) return;
+    if (state.annotationState != null) return;
 
-    _invalidateSession();
+    _blindEngine.stopSession();
+    _cleanupAnnotationSession();
+    ref.read(audioEngineProvider.notifier).pause();
 
-    final engine = ref.read(audioEngineProvider.notifier);
-    engine.pause();
-
-    // 标记当前句子为难句
     final newDifficult = Set<int>.from(state.difficultSentences);
     final wasAlreadyDifficult = newDifficult.contains(
       state.currentSentenceIndex,
@@ -387,82 +309,58 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     newDifficult.add(state.currentSentenceIndex);
 
     state = state.copyWith(
-      isAnnotationMode: true,
-      isPlaying: false,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isTextRevealed: false,
-      pauseRemaining: Duration.zero,
-      pauseDuration: Duration.zero,
-      annotationReplayRemaining: Duration.zero,
-      annotationReplayDuration: Duration.zero,
       difficultSentences: newDifficult,
       isCurrentSentenceAutoMarked: !wasAlreadyDifficult,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
+      isTextRevealed: false,
       playingSenseGroupIndex: null,
       playedSenseGroupIndices: const {},
     );
+    _setAnnotationPhase(const InspectingAnnotation());
   }
 
-  /// 退出详情模式（点击”继续”）
-  ///
-  /// 停止意群播放，带字幕重播当前句一遍，播完后按正常流程倒计时推进。
   Future<void> exitAnnotationMode() async {
-    // 停止意群播放
-    if (state.playingSenseGroupIndex != null) {
-      _invalidateSession();
-      state = state.copyWith(playingSenseGroupIndex: null, isPlaying: false);
-    }
+    if (state.annotationState == null) return;
+    stopSenseGroupPlayback();
     await _startInlineAnnotationReplay();
   }
 
-  /// 在当前页内启动详情重播
-  Future<void> _startInlineAnnotationReplay() async {
-    final sentence = currentSentence;
-    if (sentence == null || sentence.duration <= Duration.zero) {
-      await _finishAnnotationReplay();
-      return;
-    }
-
-    state = state.copyWith(
-      isAnnotationMode: true,
-      isAnnotationReplay: true,
-      isPlaying: true,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isCurrentSentenceAutoMarked: false,
-      annotationReplayRemaining: sentence.duration,
-      annotationReplayDuration: sentence.duration,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-    );
-
-    final engine = ref.read(audioEngineProvider.notifier);
-    _currentSessionId = engine.newSession();
-    final sessionId = _currentSessionId;
-
-    await engine.playClipOnce(sentence, sessionId);
-
-    if (!engine.isActiveSession(sessionId)) {
-      state = state.copyWith(isPlaying: false);
-      return;
-    }
-
-    // 详情重播也计入听力统计
-    _recorder.onSentencePlayed(sentence);
-
-    await _finishAnnotationReplay();
+  /// 盲听模式下用户接管流程。
+  void enterWaitingForUserInBlindMode() {
+    if (state.annotationState != null) return;
+    _blindEngine.enterWaitingForUser(afterCurrentPrompt: true);
   }
 
-  /// 标注模式下重播当前句子一遍
-  ///
-  /// 仅在标注模式下可用，播放当前句子一遍后停止，
-  /// 不推进、不退出标注模式。
+  /// 详情模式下用户接管流程。
+  void onAnnotationUserInteraction() {
+    if (state.annotationState == null) return;
+
+    if (state.playingSenseGroupIndex != null) {
+      stopSenseGroupPlayback();
+      _setAnnotationPhase(const WaitingAnnotationUser());
+      return;
+    }
+
+    final phase = state.annotationState!.phase;
+    if (phase is ReplayingWithSubtitle) {
+      _annotationWaitAfterCurrentPlayback = true;
+      AppLogger.log('IntensiveAnnotation', '-> WaitingForUser (after replay)');
+      return;
+    }
+    if (phase is WaitingAnnotationInterval) {
+      _annotationCountdown.cancel();
+      _setAnnotationPhase(const WaitingAnnotationUser());
+      return;
+    }
+    _setAnnotationPhase(const WaitingAnnotationUser());
+  }
+
   Future<void> replayInAnnotationMode() async {
-    if (!state.isAnnotationMode) return;
+    if (state.annotationState == null) return;
     final sentence = currentSentence;
     if (sentence == null || sentence.duration <= Duration.zero) return;
+
+    stopSenseGroupPlayback();
+    _cleanupAnnotationSession();
 
     final engine = ref.read(audioEngineProvider.notifier);
     _currentSessionId = engine.newSession();
@@ -470,22 +368,16 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     state = state.copyWith(isPlaying: true);
 
     await engine.playClipOnce(sentence, sessionId);
-
     if (!engine.isActiveSession(sessionId)) {
-      // 被意群播放等外部操作中断，更新播放状态
       state = state.copyWith(isPlaying: false);
       return;
     }
 
-    // 标注模式重播也计入听力统计
     _recorder.onSentencePlayed(sentence);
-
     state = state.copyWith(isPlaying: false);
+    _setAnnotationPhase(const InspectingAnnotation());
   }
 
-  /// 切换当前句子的难句标记
-  ///
-  /// 仅在标注模式下可用，允许用户取消或重新标记难句。
   void toggleDifficultSentence() {
     final idx = state.currentSentenceIndex;
     final newSet = Set<int>.from(state.difficultSentences);
@@ -500,23 +392,18 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     );
   }
 
-  /// 播放指定意群的音频片段
-  ///
-  /// 停止当前播放，播放意群对应的时间范围。
   Future<void> playSenseGroup(
     Duration start,
     Duration end,
     int groupIndex,
   ) async {
-    // 直接创建新 session 使旧 session 失效，避免 _invalidateSession 中
-    // 的 engine.pause() 异步递增 sessionId 导致新 session 被意外作废
+    if (state.annotationState == null) return;
     final engine = ref.read(audioEngineProvider.notifier);
     _currentSessionId = engine.newSession();
     final sessionId = _currentSessionId;
-    _countdown.cancel();
+    _annotationCountdown.cancel();
 
-    final played = Set<int>.from(state.playedSenseGroupIndices)
-      ..add(groupIndex);
+    final played = Set<int>.from(state.playedSenseGroupIndices)..add(groupIndex);
     state = state.copyWith(
       playingSenseGroupIndex: groupIndex,
       playedSenseGroupIndices: played,
@@ -524,35 +411,25 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     );
 
     await engine.playRangeOnce(start, end, sessionId);
-
     if (!engine.isActiveSession(sessionId)) return;
 
     state = state.copyWith(playingSenseGroupIndex: null, isPlaying: false);
   }
 
-  /// 停止意群播放
   void stopSenseGroupPlayback() {
-    if (state.playingSenseGroupIndex != null) {
-      _invalidateSession();
-      state = state.copyWith(playingSenseGroupIndex: null, isPlaying: false);
-    }
+    if (state.playingSenseGroupIndex == null) return;
+    _cleanupAnnotationSession();
+    state = state.copyWith(playingSenseGroupIndex: null, isPlaying: false);
   }
 
-  /// 逐个播放所有意群，意群之间暂停 1 秒
-  ///
-  /// 按顺序播放每个意群的音频片段，播放中高亮当前意群。
-  /// 通过 sessionId 机制支持取消：暂停、点击单个意群、切句等操作
-  /// 都会使 session 失效从而中断循环。
   Future<void> playAllSenseGroups(List<SenseGroupTiming> timings) async {
-    if (timings.isEmpty) return;
-
+    if (state.annotationState == null || timings.isEmpty) return;
     final engine = ref.read(audioEngineProvider.notifier);
     _currentSessionId = engine.newSession();
     final sessionId = _currentSessionId;
-    _countdown.cancel();
+    _annotationCountdown.cancel();
 
     state = state.copyWith(isPlaying: true);
-
     for (var i = 0; i < timings.length; i++) {
       if (!engine.isActiveSession(sessionId)) return;
 
@@ -564,10 +441,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       );
 
       await engine.playRangeOnce(timing.start, timing.end, sessionId);
-
       if (!engine.isActiveSession(sessionId)) return;
 
-      // 最后一个意群播完不需要暂停
       if (i < timings.length - 1) {
         state = state.copyWith(playingSenseGroupIndex: null);
         await Future<void>.delayed(const Duration(seconds: 1));
@@ -575,35 +450,57 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     }
 
     if (!engine.isActiveSession(sessionId)) return;
-
     state = state.copyWith(playingSenseGroupIndex: null, isPlaying: false);
   }
 
-  /// 设置偷看字幕状态（按住显示，松开隐藏）
   void setTextRevealed(bool revealed) {
     state = state.copyWith(isTextRevealed: revealed);
   }
 
-  /// 暂停倒计时
   void pauseCountdown() {
-    _countdown.pause();
-    state = state.copyWith(isCountdownPaused: true);
+    if (state.annotationState != null) {
+      final phase = state.annotationState?.phase;
+      if (phase is WaitingAnnotationInterval) {
+        _annotationCountdown.pause();
+        _setAnnotationPhase(phase.copyWith(isPaused: true));
+      }
+      return;
+    }
+    _blindEngine.pauseInterval();
   }
 
-  /// 恢复倒计时
   void resumeCountdown() {
-    _countdown.resume();
-    state = state.copyWith(isCountdownPaused: false);
+    if (state.annotationState != null) {
+      final phase = state.annotationState?.phase;
+      if (phase is WaitingAnnotationInterval) {
+        _annotationCountdown.resume();
+        _setAnnotationPhase(phase.copyWith(isPaused: false));
+      }
+      return;
+    }
+    _blindEngine.resumeInterval();
   }
 
-  /// 切换倒计时快进（10 倍速/正常速）
-  ///
-  /// 如果当前暂停中，快进会同时恢复倒计时。
   void toggleCountdownFastForward() {
+    if (state.annotationState != null) {
+      final phase = state.annotationState?.phase;
+      if (phase is! WaitingAnnotationInterval) return;
+      final isFF = !state.isCountdownFastForward;
+      _annotationCountdown.setSpeed(isFF ? 10.0 : 1.0);
+      if (phase.isPaused) {
+        _annotationCountdown.resume();
+      }
+      state = state.copyWith(
+        isCountdownFastForward: isFF,
+        isCountdownPaused: false,
+      );
+      return;
+    }
+
     final isFF = !state.isCountdownFastForward;
-    _countdown.setSpeed(isFF ? 10.0 : 1.0);
+    _blindEngine.setIntervalSpeed(isFF ? kBlindFastForwardSpeed : 1.0);
     if (state.isCountdownPaused) {
-      _countdown.resume();
+      _blindEngine.resumeInterval();
     }
     state = state.copyWith(
       isCountdownFastForward: isFF,
@@ -611,266 +508,61 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     );
   }
 
-  /// 倒计时期间重播当前句子
-  ///
-  /// 取消倒计时，重新播放当前句子的循环。
   Future<void> replayDuringCountdown() async {
-    _invalidateSession();
-    state = state.copyWith(
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      annotationReplayRemaining: Duration.zero,
-      annotationReplayDuration: Duration.zero,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-    );
-
-    /// 详情页里的倒计时重播，需要回到”带字幕重播中”而不是普通模式。
-    if (state.isAnnotationMode) {
+    if (state.annotationState != null) {
+      _cleanupAnnotationSession();
+      state = state.copyWith(
+        isPauseBetweenPlays: false,
+        isPauseBetweenSentences: false,
+        annotationReplayRemaining: Duration.zero,
+        annotationReplayDuration: Duration.zero,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+      );
       await _startInlineAnnotationReplay();
       return;
     }
 
-    await _startSentence(startPlayCount: state.currentPlayCount);
+    await _blindEngine.replayCurrentSentence();
   }
 
-  /// 更新精听设置（仅会话内生效，不持久化）
-  ///
-  /// 当 repeatCount 调小时，clamp currentPlayCount 避免越界显示（如"第3/1遍"），
-  /// 并中断当前播放循环、以新设置重新开始当前句子。
   void updateSettings(IntensiveListenSettings newSettings) {
     var clampedPlayCount = state.currentPlayCount;
     if (clampedPlayCount > newSettings.repeatCount) {
       clampedPlayCount = newSettings.repeatCount;
     }
 
-    final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
-    final repeatCountChanged =
-        newSettings.repeatCount != state.settings.repeatCount;
-
+    final oldSettings = state.settings;
     state = state.copyWith(
       settings: newSettings,
       currentPlayCount: clampedPlayCount,
     );
 
-    // 自动↔手动切换时，停在当前句子，取消一切异步操作
-    if (modeChanged) {
-      _invalidateSession();
-      state = state.copyWith(
-        isPlaying: false,
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-      );
+    if (state.annotationState != null) {
       return;
     }
 
-    // repeatCount 变化时中断当前循环，以新设置重新开始
-    if (repeatCountChanged && state.isPlaying) {
-      _invalidateSession();
-      _startSentence();
-    }
-  }
-
-  /// 释放资源
-  void disposePlayer() {
-    _cleanup();
-    _sentences = [];
-    state = const IntensiveListenState();
-  }
-
-  /// 获取当前句子索引（供外部保存断点用）
-  int get currentIndex => state.currentSentenceIndex;
-
-  // ========== 内部方法 ==========
-
-  /// 开始播放当前句子的循环
-  Future<void> _startSentence({int startPlayCount = 1}) async {
-    final sentence = currentSentence;
-    if (sentence == null) return;
-
-    // 跳过零时长句子
-    if (sentence.duration <= Duration.zero) {
-      await _autoAdvance();
+    if (_blindEngine.willEnterWaitingAfterCurrentPrompt) {
+      _refreshBlindConfigWhenWaiting = true;
       return;
     }
 
-    state = state.copyWith(
-      isPlaying: true,
-      currentPlayCount: startPlayCount,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      stepFinished: false,
-      annotationReplayRemaining: Duration.zero,
-      annotationReplayDuration: Duration.zero,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-    );
-
-    _persistCurrentSentenceIndexAsync();
-
-    final engine = ref.read(audioEngineProvider.notifier);
-    _currentSessionId = engine.newSession();
-    final sessionId = _currentSessionId;
-
-    await _playSentenceLoop(sentence, sessionId, startPlayCount);
-  }
-
-  /// 句子播放循环：播放 repeatCount 遍，遍间停顿
-  ///
-  /// 手动模式下仅播放一遍后停止，等待用户操作。
-  Future<void> _playSentenceLoop(
-    Sentence sentence,
-    int sessionId, [
-    int startPlayCount = 1,
-  ]) async {
-    final engine = ref.read(audioEngineProvider.notifier);
-    final isManual = state.settings.isManualMode;
-    final repeatCount = isManual ? 1 : state.settings.repeatCount;
-
-    for (
-      int playCount = startPlayCount;
-      playCount <= repeatCount;
-      playCount++
-    ) {
-      if (!engine.isActiveSession(sessionId)) return;
-
-      state = state.copyWith(currentPlayCount: playCount, isPlaying: true);
-
-      await engine.playClipOnce(sentence, sessionId);
-
-      if (!engine.isActiveSession(sessionId)) return;
-
-      // 每遍播完通过 recorder 记录听力时长、输入词数、已学词形
-      _recorder.onSentencePlayed(sentence);
-
-      // 手动模式：播完一遍即停止，等待用户操作
-      if (isManual) {
-        state = state.copyWith(isPlaying: false);
-        return;
-      }
-
-      // 遍间停顿（最后一遍不停顿）
-      if (playCount < repeatCount) {
-        final pauseDur = calculatePauseDuration(
-          sentence.duration,
-          state.settings,
-        );
-
-        state = state.copyWith(
-          isPauseBetweenPlays: true,
-          isPlaying: false,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-          pauseDuration: pauseDur,
-          pauseRemaining: pauseDur,
-        );
-
-        await _countdown.start(pauseDur, (remaining) {
-          state = state.copyWith(pauseRemaining: remaining);
-        });
-
-        if (!engine.isActiveSession(sessionId)) return;
-
-        state = state.copyWith(
-          isPauseBetweenPlays: false,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-        );
-      }
+    if (state.blindFlowState?.phase is BlindWaitingForUser) {
+      unawaited(_refreshBlindFlowWaitingState());
+      return;
     }
 
-    // 所有遍数播完 → 自动推进
-    if (engine.isActiveSession(sessionId)) {
-      await _autoAdvance();
+    final modeChanged = newSettings.isManualMode != oldSettings.isManualMode;
+    final repeatChanged = newSettings.repeatCount != oldSettings.repeatCount;
+    if (modeChanged || repeatChanged) {
+      _blindEngine.stopSession();
+      unawaited(_startBlindFlow());
     }
   }
 
-  /// 自动推进到下一句（最后一句也走停顿流程）
-  ///
-  /// 推进前先停顿，停顿时长由设置决定。
-  Future<void> _autoAdvance() async {
-    final isLastSentence =
-        state.currentSentenceIndex >= state.totalSentences - 1;
-
-    // 所有句子（包括最后一句）都走停顿
-    final sentence = currentSentence;
-    final pauseDur = sentence != null
-        ? calculatePauseDuration(sentence.duration, state.settings)
-        : const Duration(seconds: 1);
-
-    final engine = ref.read(audioEngineProvider.notifier);
-    _currentSessionId = engine.newSession();
-    final sessionId = _currentSessionId;
-
-    state = state.copyWith(
-      isPlaying: false,
-      isPauseBetweenPlays: true,
-      isPauseBetweenSentences: true,
-      annotationReplayRemaining: Duration.zero,
-      annotationReplayDuration: Duration.zero,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      pauseDuration: pauseDur,
-      pauseRemaining: pauseDur,
-    );
-
-    await _countdown.start(pauseDur, (remaining) {
-      state = state.copyWith(pauseRemaining: remaining);
-    });
-
-    // 停顿期间用户可能暂停/切句，检查 session 是否仍有效
-    if (!engine.isActiveSession(sessionId)) return;
-
-    if (isLastSentence) {
-      // 最后一句停顿结束 → 发出完成信号（screen listener 检测 stepFinished 触发弹窗）
-      state = state.copyWith(
-        isPlaying: false,
-        isAnnotationMode: false,
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-        isCurrentSentenceAutoMarked: false,
-        stepFinished: true,
-        playingSenseGroupIndex: null,
-        playedSenseGroupIndices: const {},
-      );
-      ref.read(analyticsServiceProvider).track(Events.intensiveListenComplete, {
-        EventParams.audioId:
-            ref.read(learningSessionProvider).audioItemId ?? '',
-        EventParams.totalSentences: state.totalSentences,
-        EventParams.difficultCount: state.difficultSentences.length,
-      });
-    } else {
-      // 非最后一句 → 推进到下一句
-      state = state.copyWith(
-        currentSentenceIndex: state.currentSentenceIndex + 1,
-        currentPlayCount: 1,
-        isTextRevealed: false,
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isAnnotationMode: false,
-        isAnnotationReplay: false,
-        annotationReplayRemaining: Duration.zero,
-        annotationReplayDuration: Duration.zero,
-        isCurrentSentenceAutoMarked: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-        playingSenseGroupIndex: null,
-        playedSenseGroupIndices: const {},
-      );
-
-      await _startSentence();
-    }
-  }
-
-  /// 停止播放（用户在最后一句主动点击完成按钮时调用）
-  ///
-  /// 仅停止播放，弹窗由 screen 层直接调用。
   void stopPlayback() {
-    _invalidateSession();
+    _blindEngine.stopSession();
+    _cleanupAnnotationSession();
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
@@ -879,12 +571,17 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationReplay: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
+      stepFinished: false,
+      blindFlowState: null,
+      annotationState: null,
+      playingSenseGroupIndex: null,
+      playedSenseGroupIndices: const {},
     );
   }
 
-  /// 重置到第一句并重新开始播放（供"再来一遍"使用）
   Future<void> resetToStart() async {
-    _invalidateSession();
+    _blindEngine.stopSession();
+    _cleanupAnnotationSession();
     state = state.copyWith(
       currentSentenceIndex: 0,
       currentPlayCount: 1,
@@ -899,33 +596,258 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isCurrentSentenceAutoMarked: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
+      stepFinished: false,
+      blindFlowState: null,
+      annotationState: null,
+      playingSenseGroupIndex: null,
+      playedSenseGroupIndices: const {},
     );
-    await startPlaying();
+    await _startBlindFlow();
   }
 
-  /// 当前页内的详情重播完成后推进
-  ///
-  /// 手动模式下重播完成后停止等待，不自动推进。
-  Future<void> _finishAnnotationReplay() async {
+  void disposePlayer() {
+    _blindEngine.stopSession();
+    _cleanupAnnotationSession();
+    _sentences = [];
+    state = const IntensiveListenState();
+  }
+
+  void _prepareBlindFlow({int? startIndex}) {
+    _blindEngine.prepare(
+      sentences: _sentences,
+      startIndex: startIndex ?? state.currentSentenceIndex,
+      config: BlindPracticeFlowConfig(
+        getRepeatCount: (_) => state.settings.isManualMode
+            ? 1
+            : state.settings.repeatCount,
+        getRepeatIntervalDuration: (sentence) =>
+            calculatePauseDuration(sentence.duration, state.settings),
+        getSentenceIntervalDuration: (sentence) =>
+            calculatePauseDuration(sentence.duration, state.settings),
+        onSentencePlayed: _recorder.onSentencePlayed,
+        isManualMode: () => state.settings.isManualMode,
+      ),
+    );
+  }
+
+  Future<void> _startBlindFlow({bool autoplay = true}) async {
+    if (_sentences.isEmpty) return;
+    _prepareBlindFlow();
+    if (autoplay) {
+      await _blindEngine.startPlaying();
+      return;
+    }
+    await _blindEngine.restartCurrentSentence(autoplay: false);
+  }
+
+  Future<void> _refreshBlindFlowWaitingState() async {
+    if (_sentences.isEmpty) return;
+    _prepareBlindFlow(startIndex: state.currentSentenceIndex);
+    await _blindEngine.restartCurrentSentence(autoplay: false);
+  }
+
+  void _onBlindFlowStateChanged(BlindPracticeFlowState flowState) {
+    final phase = flowState.phase;
+    final interval = phase is BlindWaitingInterval ? phase : null;
+
     state = state.copyWith(
+      blindFlowState: flowState,
+      currentSentenceIndex: flowState.sentenceIndex,
+      currentPlayCount: flowState.repeatIndex + 1,
+      isPlaying: phase is BlindPlayingPrompt,
+      isPauseBetweenPlays: interval != null,
+      isPauseBetweenSentences: interval?.isBetweenSentences ?? false,
+      pauseDuration: interval?.total ?? Duration.zero,
+      pauseRemaining: interval?.remaining ?? Duration.zero,
+      isCountdownPaused: interval?.isPaused ?? false,
+      isCountdownFastForward: interval == null
+          ? false
+          : state.isCountdownFastForward,
+      isAnnotationMode: false,
       isAnnotationReplay: false,
-      isPlaying: false,
       annotationReplayRemaining: Duration.zero,
       annotationReplayDuration: Duration.zero,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
+      annotationState: null,
+      stepFinished: phase is BlindSessionCompleted,
+      playingSenseGroupIndex: null,
+      playedSenseGroupIndices: const {},
     );
 
-    // 手动模式：重播完成后退出标注模式，停止等待用户操作
-    if (state.settings.isManualMode) {
-      state = state.copyWith(isAnnotationMode: false);
+    if (phase is BlindWaitingForUser && _refreshBlindConfigWhenWaiting) {
+      _refreshBlindConfigWhenWaiting = false;
+      unawaited(_refreshBlindFlowWaitingState());
       return;
     }
 
-    await _autoAdvance();
+    if (phase is BlindSessionCompleted) {
+      ref.read(analyticsServiceProvider).track(Events.intensiveListenComplete, {
+        EventParams.audioId:
+            ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.totalSentences: state.totalSentences,
+        EventParams.difficultCount: state.difficultSentences.length,
+      });
+    }
   }
 
-  /// 每次开始播放一句时异步保存断点，避免依赖页面退出时机。
+  Future<bool> _playSentenceForBlind(Sentence sentence, int flowToken) async {
+    if (sentence.duration <= Duration.zero) return false;
+    _persistCurrentSentenceIndexAsync();
+    final engine = ref.read(audioEngineProvider.notifier);
+    final sessionId = engine.newSession();
+    await engine.playClipOnce(sentence, sessionId);
+    return true;
+  }
+
+  Future<void> _goToSentence(int sentenceIndex) async {
+    _blindEngine.stopSession();
+    _cleanupAnnotationSession();
+
+    state = state.copyWith(
+      currentSentenceIndex: sentenceIndex,
+      currentPlayCount: 1,
+      isTextRevealed: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
+      isAnnotationMode: false,
+      isAnnotationReplay: false,
+      isCurrentSentenceAutoMarked: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      blindFlowState: null,
+      annotationState: null,
+      playingSenseGroupIndex: null,
+      playedSenseGroupIndices: const {},
+      stepFinished: false,
+    );
+
+    await _startBlindFlow();
+  }
+
+  Future<void> _startInlineAnnotationReplay() async {
+    final sentence = currentSentence;
+    if (sentence == null || sentence.duration <= Duration.zero) {
+      await _finishAnnotationReplay();
+      return;
+    }
+
+    stopSenseGroupPlayback();
+    _cleanupAnnotationSession();
+    _annotationWaitAfterCurrentPlayback = false;
+    _setAnnotationPhase(
+      ReplayingWithSubtitle(
+        remaining: sentence.duration,
+        total: sentence.duration,
+      ),
+    );
+
+    final engine = ref.read(audioEngineProvider.notifier);
+    _currentSessionId = engine.newSession();
+    final sessionId = _currentSessionId;
+
+    await engine.playClipOnce(sentence, sessionId);
+    if (!engine.isActiveSession(sessionId)) {
+      state = state.copyWith(isPlaying: false);
+      return;
+    }
+
+    _recorder.onSentencePlayed(sentence);
+    await _finishAnnotationReplay();
+  }
+
+  Future<void> _finishAnnotationReplay() async {
+    if (_annotationWaitAfterCurrentPlayback) {
+      _annotationWaitAfterCurrentPlayback = false;
+      _setAnnotationPhase(const WaitingAnnotationUser());
+      return;
+    }
+
+    if (state.settings.isManualMode) {
+      state = state.copyWith(
+        isAnnotationMode: false,
+        isAnnotationReplay: false,
+        isPlaying: false,
+        annotationReplayRemaining: Duration.zero,
+        annotationReplayDuration: Duration.zero,
+        annotationState: null,
+      );
+      return;
+    }
+
+    final sentence = currentSentence;
+    final pauseDur = sentence != null
+        ? calculatePauseDuration(sentence.duration, state.settings)
+        : const Duration(seconds: 1);
+    final engine = ref.read(audioEngineProvider.notifier);
+    _currentSessionId = engine.newSession();
+    final sessionId = _currentSessionId;
+
+    _setAnnotationPhase(
+      WaitingAnnotationInterval(
+        remaining: pauseDur,
+        total: pauseDur,
+      ),
+    );
+
+    await _annotationCountdown.start(pauseDur, (remaining) {
+      final phase = state.annotationState?.phase;
+      if (phase is! WaitingAnnotationInterval) return;
+      _setAnnotationPhase(phase.copyWith(remaining: remaining));
+    });
+
+    if (!engine.isActiveSession(sessionId)) return;
+
+    final isLastSentence =
+        state.currentSentenceIndex >= state.totalSentences - 1;
+    if (isLastSentence) {
+      state = state.copyWith(
+        isPlaying: false,
+        isPauseBetweenPlays: false,
+        isPauseBetweenSentences: false,
+        isAnnotationMode: false,
+        isAnnotationReplay: false,
+        annotationReplayRemaining: Duration.zero,
+        annotationReplayDuration: Duration.zero,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+        stepFinished: true,
+        annotationState: null,
+        playingSenseGroupIndex: null,
+        playedSenseGroupIndices: const {},
+      );
+      ref.read(analyticsServiceProvider).track(Events.intensiveListenComplete, {
+        EventParams.audioId:
+            ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.totalSentences: state.totalSentences,
+        EventParams.difficultCount: state.difficultSentences.length,
+      });
+      return;
+    }
+
+    state = state.copyWith(
+      currentSentenceIndex: state.currentSentenceIndex + 1,
+      currentPlayCount: 1,
+      isTextRevealed: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      pauseRemaining: Duration.zero,
+      pauseDuration: Duration.zero,
+      isCurrentSentenceAutoMarked: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      annotationState: null,
+      isAnnotationMode: false,
+      isAnnotationReplay: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
+      stepFinished: false,
+      playingSenseGroupIndex: null,
+      playedSenseGroupIndices: const {},
+    );
+    unawaited(_startBlindFlow());
+  }
+
   void _persistCurrentSentenceIndexAsync() {
     final session = ref.read(learningSessionProvider);
     final audioItemId = session.audioItemId;
@@ -942,17 +864,35 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     );
   }
 
-  /// 使当前 session 失效
-  void _invalidateSession() {
-    final engine = ref.read(audioEngineProvider.notifier);
-    engine.pause();
+  void _cleanupAnnotationSession() {
+    _annotationCountdown.cancel();
     _currentSessionId = -1;
-    _countdown.cancel();
+    _annotationWaitAfterCurrentPlayback = false;
+    ref.read(audioEngineProvider.notifier).pause();
   }
 
-  /// 清理资源
-  void _cleanup() {
-    _countdown.cancel();
-    _currentSessionId = -1;
+  void _setAnnotationPhase(IntensiveAnnotationPhase phase) {
+    final waitingInterval = phase is WaitingAnnotationInterval ? phase : null;
+    final replaying = phase is ReplayingWithSubtitle ? phase : null;
+    final isSenseGroupPlaying = state.playingSenseGroupIndex != null;
+
+    state = state.copyWith(
+      annotationState: IntensiveAnnotationState(phase: phase),
+      isAnnotationMode: true,
+      isAnnotationReplay: replaying != null,
+      isPlaying: replaying != null || isSenseGroupPlaying,
+      isPauseBetweenPlays: waitingInterval != null,
+      isPauseBetweenSentences: waitingInterval != null,
+      pauseDuration: waitingInterval?.total ?? Duration.zero,
+      pauseRemaining: waitingInterval?.remaining ?? Duration.zero,
+      annotationReplayRemaining: replaying?.remaining ?? Duration.zero,
+      annotationReplayDuration: replaying?.total ?? Duration.zero,
+      isCountdownPaused: waitingInterval?.isPaused ?? false,
+      isCountdownFastForward: waitingInterval == null
+          ? false
+          : state.isCountdownFastForward,
+      blindFlowState: null,
+      stepFinished: false,
+    );
   }
 }

@@ -1,6 +1,6 @@
 # Fluency 项目规划
 
-> 最后更新：2026-03-12
+> 最后更新：2026-04-03
 > 当前焦点：录音+识别功能
 
 ---
@@ -65,6 +65,7 @@
 - 已完成难句跟读复用边界收敛：3 个页面将 `build()` 内监听下沉到 `initState`，难句/收藏标记持久化回收至 provider，`BookmarkReview` 去掉 `dynamic` 音频加载入口，并补齐跟读主页面 Widget 测试
 - 已完成难句补练/收藏复习单底部控制重构：`RepeatPracticePanel` 收敛为跟读中间区，三页共享 `PracticePlaybackFooter`，`BookmarkReview` annotation mode 切换到 `RepeatFlowEngine`
 - 已完成难句补练/收藏复习盲听等待态状态机化：两页 blind mode 接入 `BlindPracticeFlowEngine`，设置/偷看字幕/查词统一进入 `WaitingForUser`，并修复 dispose 异步竞态
+- 已完成逐句精听页面按难句补练模式重构：blind mode 接入 `BlindPracticeFlowEngine`，新增 `IntensiveAnnotationState` 管理“看不懂后”的详情流程，页面收敛为“顶部进度 + 中间内容切换 + 单一 footer”
 - 段落复述页面尚未接入 UI，仅保留复用接口
 
 ---
