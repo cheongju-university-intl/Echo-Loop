@@ -2534,11 +2534,17 @@ abstract class AppLocalizations {
   /// **'Deleting the subtitle will also remove all bookmarked sentences for this audio.'**
   String get deleteSubtitleWarning;
 
-  /// No description provided for @languageMulti.
+  /// No description provided for @languageAutoDetect.
   ///
   /// In en, this message translates to:
-  /// **'Mixed Languages'**
-  String get languageMulti;
+  /// **'Auto Detect'**
+  String get languageAutoDetect;
+
+  /// No description provided for @mixedLanguageNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Mixed language audio is not supported yet'**
+  String get mixedLanguageNotSupported;
 
   /// No description provided for @selectLanguage.
   ///

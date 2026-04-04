@@ -1353,7 +1353,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteSubtitleWarning => '删除字幕将同时删除该音频的所有收藏句子。';
 
   @override
-  String get languageMulti => '混合语言';
+  String get languageAutoDetect => '自动检测';
+
+  @override
+  String get mixedLanguageNotSupported => '暂不支持混合语言音频';
 
   @override
   String get selectLanguage => '选择语言';

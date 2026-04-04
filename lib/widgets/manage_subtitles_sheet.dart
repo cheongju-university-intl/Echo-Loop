@@ -36,20 +36,24 @@ class ManageSubtitlesSheet extends ConsumerStatefulWidget {
 
 class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
   _SubtitleAction _selectedAction = _SubtitleAction.localUpload;
-  String _selectedLanguage = 'en';
+  String _selectedLanguage = 'auto';
 
   @override
   void initState() {
     super.initState();
     // 打开弹窗时清除之前的失败状态，避免残留错误阻塞操作
-    final taskState = ref.read(
-      transcriptionTaskManagerProvider,
-    )[widget.audioItem.id];
-    if (taskState is TranscriptionFailed) {
-      ref
-          .read(transcriptionTaskManagerProvider.notifier)
-          .clearState(widget.audioItem.id);
-    }
+    // 使用 addPostFrameCallback 避免在 widget tree 构建期间修改 provider 状态
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final taskState = ref.read(
+        transcriptionTaskManagerProvider,
+      )[widget.audioItem.id];
+      if (taskState is TranscriptionFailed) {
+        ref
+            .read(transcriptionTaskManagerProvider.notifier)
+            .clearState(widget.audioItem.id);
+      }
+    });
   }
 
   @override
@@ -411,12 +415,13 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<String>(
+                showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: 'en', label: Text(l10n.languageEnglish)),
                   ButtonSegment(
-                    value: 'multi',
-                    label: Text(l10n.languageMulti),
+                    value: 'auto',
+                    label: Text(l10n.languageAutoDetect),
                   ),
+                  ButtonSegment(value: 'en', label: Text(l10n.languageEnglish)),
                 ],
                 selected: {_selectedLanguage},
                 onSelectionChanged: (selected) {
@@ -424,16 +429,17 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                 },
               ),
             ),
-            if (_isAiDisabled(audioItem))
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  l10n.alreadyTranscribedWithOption,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _isAiDisabled(audioItem)
+                    ? l10n.alreadyTranscribedWithOption
+                    : l10n.mixedLanguageNotSupported,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+            ),
           ],
         ),
       ),

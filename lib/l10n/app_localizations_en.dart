@@ -1397,7 +1397,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Deleting the subtitle will also remove all bookmarked sentences for this audio.';
 
   @override
-  String get languageMulti => 'Mixed Languages';
+  String get languageAutoDetect => 'Auto Detect';
+
+  @override
+  String get mixedLanguageNotSupported =>
+      'Mixed language audio is not supported yet';
 
   @override
   String get selectLanguage => 'Select Language';
