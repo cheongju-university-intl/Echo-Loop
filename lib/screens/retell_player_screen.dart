@@ -709,9 +709,6 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     final sentences = player.currentParagraphSentences;
     final paragraphDuration = player.currentParagraphDuration;
     final keywords = player.keywordsMap;
-    final progress = (state.totalParagraphs > 0)
-        ? (state.currentParagraphIndex + 1) / state.totalParagraphs
-        : 0.0;
 
     // 录音结果（从 controller state 获取）
     final currentAttempt = retellRecState.currentAttempt;
@@ -739,10 +736,15 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
               title: l10n.retellTitle,
               onClose: _handleExit,
               onOpenSettings: _openSettings,
-              progress: progress,
-              currentIndex: state.currentParagraphIndex,
-              totalParagraphs: state.totalParagraphs,
-              paragraphDuration: paragraphDuration,
+              current: state.currentParagraphIndex + 1,
+              total: state.totalParagraphs,
+              progressText: l10n.retellParagraphProgress(
+                state.currentParagraphIndex + 1,
+                state.totalParagraphs,
+              ),
+              durationText: l10n.retellParagraphDuration(
+                '${paragraphDuration.inSeconds}s',
+              ),
               paragraphContent: ParagraphSentenceListCard(
                 sentences: sentences,
                 displayMode:

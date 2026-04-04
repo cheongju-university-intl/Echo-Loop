@@ -427,9 +427,6 @@ class _BlindListenPlayerScreenState
 
     final sentences = player.currentParagraphSentences;
     final paragraphDuration = player.currentParagraphDuration;
-    final progress = (playerState.totalParagraphs > 0)
-        ? (playerState.currentParagraphIndex + 1) / playerState.totalParagraphs
-        : 0.0;
 
     return LearningHotkeyScope(
       onPlayPause: () {
@@ -462,10 +459,15 @@ class _BlindListenPlayerScreenState
           title: l10n.blindListenAppBarTitle,
           onClose: _handleExit,
           onOpenSettings: _openSettings,
-          progress: progress,
-          currentIndex: playerState.currentParagraphIndex,
-          totalParagraphs: playerState.totalParagraphs,
-          paragraphDuration: paragraphDuration,
+          current: playerState.currentParagraphIndex + 1,
+          total: playerState.totalParagraphs,
+          progressText: l10n.retellParagraphProgress(
+            playerState.currentParagraphIndex + 1,
+            playerState.totalParagraphs,
+          ),
+          durationText: l10n.retellParagraphDuration(
+            '${paragraphDuration.inSeconds}s',
+          ),
           paragraphContent: ParagraphSentenceListCard(
             sentences: sentences,
             displayMode: playerState.displayMode == BlindListenDisplayMode.showAll

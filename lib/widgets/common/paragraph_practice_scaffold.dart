@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
-import 'paragraph_progress_header.dart';
+import '../practice/practice_progress_section.dart';
 import 'practice_playback_footer.dart';
 
 /// 段落练习页共享骨架
@@ -15,10 +15,19 @@ class ParagraphPracticeScaffold extends StatelessWidget {
   final String title;
   final VoidCallback onClose;
   final VoidCallback onOpenSettings;
-  final double progress;
-  final int currentIndex;
-  final int totalParagraphs;
-  final Duration paragraphDuration;
+
+  /// 当前段落序号（1-based）
+  final int current;
+
+  /// 总段落数
+  final int total;
+
+  /// 进度文本（如 "段落 3/5"），由调用方通过 l10n 生成
+  final String progressText;
+
+  /// 段落时长文本（如 "32s"）
+  final String? durationText;
+
   final Widget paragraphContent;
   final Widget? contentControls;
   final Widget? practiceControls;
@@ -38,10 +47,10 @@ class ParagraphPracticeScaffold extends StatelessWidget {
     required this.title,
     required this.onClose,
     required this.onOpenSettings,
-    required this.progress,
-    required this.currentIndex,
-    required this.totalParagraphs,
-    required this.paragraphDuration,
+    required this.current,
+    required this.total,
+    required this.progressText,
+    this.durationText,
     required this.paragraphContent,
     this.contentControls,
     this.practiceControls,
@@ -75,11 +84,11 @@ class ParagraphPracticeScaffold extends StatelessWidget {
       ),
       body: Column(
         children: [
-          LinearProgressIndicator(value: progress),
-          ParagraphProgressHeader(
-            currentIndex: currentIndex,
-            totalParagraphs: totalParagraphs,
-            paragraphDuration: paragraphDuration,
+          PracticeProgressSection(
+            current: current,
+            total: total,
+            progressText: progressText,
+            durationText: durationText,
           ),
           Expanded(child: paragraphContent),
           if (contentControls != null)
