@@ -324,14 +324,11 @@ class _CollectionListTile extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.transparent,
-          child: Icon(
-            collection.isStarred ? Icons.folder_special : Icons.folder,
-            color: collection.isStarred
-                ? AppTheme.bookmarkColor
-                : Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
+        leading: Icon(
+          collection.isStarred ? Icons.folder_special : Icons.folder,
+          color: collection.isStarred
+              ? AppTheme.bookmarkColor
+              : Theme.of(context).colorScheme.onPrimaryContainer,
         ),
         title: Text(
           collection.name,
