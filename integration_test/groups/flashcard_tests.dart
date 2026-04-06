@@ -8,7 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/main.dart';
 import 'package:fluency/database/app_database.dart' show SavedWord;
+import 'package:fluency/models/flashcard_item.dart';
 import 'package:fluency/providers/flashcard/flashcard_provider.dart';
+import 'package:fluency/providers/flashcard/flashcard_flow_phase.dart';
 import 'package:fluency/models/flashcard_settings.dart';
 import 'package:fluency/router/app_router.dart';
 import 'package:fluency/screens/flashcard_screen.dart';
@@ -260,9 +262,9 @@ void flashcardTests() {
       expect(state.currentIndex, 0);
     });
 
-    // ========== 暂停/恢复 ==========
+    // ========== 倒计时状态 ==========
 
-    testWidgets('倒计时模式下暂停和恢复', (tester) async {
+    testWidgets('Countdown phase 时显示倒计时', (tester) async {
       await tester.pumpWidget(createTestApp());
       await tester.pumpAndSettle();
 
@@ -280,29 +282,23 @@ void flashcardTests() {
             timerMode: FlashcardTimerMode.fixed,
             fixedTimerSeconds: 8,
           ),
-          countdownRemaining: const Duration(seconds: 5),
-          countdownTotal: const Duration(seconds: 8),
+          phase: const FlashcardCountdown(
+            remaining: Duration(seconds: 5),
+            total: Duration(seconds: 8),
+          ),
         ),
       );
 
       container.read(appRouterProvider).push(AppRoutes.flashcard);
       await tester.pumpAndSettle();
 
-      // 应显示暂停按钮（pause_rounded 图标）
-      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
-
-      // 点击暂停
-      await tester.tap(find.byIcon(Icons.pause_rounded));
-      await tester.pumpAndSettle();
-
-      // 暂停后显示播放按钮
-      final state = container.read(flashcardNotifierProvider);
-      expect(state.isPaused, true);
+      // CountdownChip 应该可见
+      expect(find.text('5'), findsOneWidget);
     });
 
     // ========== 退出清理 ==========
 
-    testWidgets('点击返回按钮退出 Flashcard 页面', (tester) async {
+    testWidgets('点击关闭按钮退出 Flashcard 页面', (tester) async {
       await tester.pumpWidget(createTestApp());
       await tester.pumpAndSettle();
 
@@ -322,8 +318,8 @@ void flashcardTests() {
       // 验证在 Flashcard 页
       expect(find.byType(FlashcardScreen), findsOneWidget);
 
-      // 点击返回按钮
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      // 点击关闭按钮
+      await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
 
       // 验证已退出

@@ -11,8 +11,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:fluency/l10n/app_localizations.dart';
 import 'package:fluency/screens/flashcard_screen.dart';
 import 'package:fluency/providers/flashcard/flashcard_provider.dart';
+import 'package:fluency/providers/flashcard/flashcard_flow_phase.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
-import 'package:fluency/models/flashcard_settings.dart';
+import 'package:fluency/models/flashcard_item.dart';
 import 'package:fluency/database/app_database.dart' show SavedWord;
 import 'package:fluency/theme/app_theme.dart';
 
@@ -30,18 +31,16 @@ class _TestFlashcardNotifier extends FlashcardNotifier {
   FlashcardState build() => _initialState;
 
   @override
-  Future<void> initialize(List<SavedWord> words) async {
-    // 测试中不做真实初始化
-  }
+  Future<void> initialize(List<FlashcardItem> items) async {}
 
   @override
-  void flipCard() {
+  Future<void> userFlipCard() async {
     if (state.isCompleted || state.words.isEmpty) return;
     state = state.copyWith(isShowingBack: !state.isShowingBack);
   }
 
   @override
-  void nextCard() {
+  Future<void> userNextCard() async {
     if (state.currentIndex >= state.words.length - 1) {
       state = state.copyWith(isCompleted: true);
       return;
@@ -53,7 +52,7 @@ class _TestFlashcardNotifier extends FlashcardNotifier {
   }
 
   @override
-  void previousCard() {
+  Future<void> userPreviousCard() async {
     if (state.currentIndex <= 0) return;
     state = state.copyWith(
       currentIndex: state.currentIndex - 1,
@@ -62,19 +61,28 @@ class _TestFlashcardNotifier extends FlashcardNotifier {
   }
 
   @override
-  void pause() {
-    state = state.copyWith(isPaused: true);
+  void onAppBackgrounded() {
+    state = state.copyWith(
+      phase: const FlashcardWaitingForUser(
+        FlashcardWaitingReason.appBackgrounded,
+      ),
+    );
   }
 
   @override
-  void resume() {
-    state = state.copyWith(isPaused: false);
+  void onSettingsOpened() {
+    state = state.copyWith(
+      phase: const FlashcardWaitingForUser(
+        FlashcardWaitingReason.userOpenedSettings,
+      ),
+    );
   }
 
   @override
-  void togglePause() {
-    state = state.copyWith(isPaused: !state.isPaused);
-  }
+  Future<void> userPlayWord() async {}
+
+  @override
+  Future<void> userPlaySentence() async {}
 
   @override
   Future<void> disposePlayer() async {
@@ -190,14 +198,14 @@ void main() {
       expect(find.byIcon(Icons.tune), findsOneWidget);
     });
 
-    testWidgets('AppBar 包含返回按钮', (tester) async {
+    testWidgets('AppBar 包含关闭按钮', (tester) async {
       final items = _createWordItems(1);
       await tester.pumpWidget(
         _createTestWidget(initialState: FlashcardState(words: items)),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
     });
   });
 
@@ -214,7 +222,6 @@ void main() {
       await tester.pumpAndSettle();
 
       // 翻转后 isShowingBack=true，会重建卡片
-      // 无法直接验证背面内容（需要 DictEntry），但状态已改变
     });
   });
 
@@ -232,7 +239,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 完成视图包含"再来一遍"和"完成"按钮
       expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
     });
 
@@ -245,32 +251,53 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 应有 OutlinedButton（再来一遍）和 FilledButton（完成）
       expect(find.byType(OutlinedButton), findsOneWidget);
       expect(find.byType(FilledButton), findsOneWidget);
     });
   });
 
-  group('FlashcardScreen — 暂停状态', () {
-    testWidgets('倒计时显示时有暂停/恢复按钮', (tester) async {
+  group('FlashcardScreen — 倒计时显示', () {
+    testWidgets('Countdown phase 时显示倒计时', (tester) async {
       final items = _createWordItems(2);
       await tester.pumpWidget(
         _createTestWidget(
           initialState: FlashcardState(
             words: items,
-            settings: const FlashcardSettings(
-              timerMode: FlashcardTimerMode.fixed,
-              fixedTimerSeconds: 8,
+            phase: const FlashcardCountdown(
+              remaining: Duration(seconds: 5),
+              total: Duration(seconds: 8),
             ),
-            countdownRemaining: const Duration(seconds: 5),
-            countdownTotal: const Duration(seconds: 8),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      // 暂停按钮（pause_rounded 图标）
-      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+      // CountdownChip 应该可见（包含秒数文本）
+      expect(find.text('5'), findsOneWidget);
+    });
+
+    testWidgets('WaitingForUser phase 时不显示倒计时', (tester) async {
+      final items = _createWordItems(2);
+      await tester.pumpWidget(
+        _createTestWidget(
+          initialState: FlashcardState(
+            words: items,
+            phase: const FlashcardWaitingForUser(
+              FlashcardWaitingReason.userFlippedCard,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 不应该有 CountdownChip
+      // 占位 SizedBox 应该存在
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is SizedBox && w.width == 56 && w.height == 56,
+        ),
+        findsOneWidget,
+      );
     });
   });
 

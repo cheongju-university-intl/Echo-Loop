@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/providers/flashcard/flashcard_provider.dart';
+import 'package:fluency/models/flashcard_item.dart';
 import 'package:fluency/models/flashcard_settings.dart';
 import 'package:fluency/database/app_database.dart' show SavedWord;
 
@@ -52,7 +53,6 @@ void main() {
       expect(state.currentIndex, 0);
       expect(state.isShowingBack, false);
       expect(state.isCompleted, false);
-      expect(state.isPaused, false);
       expect(state.removedCount, 0);
       expect(state.countdownRemaining, Duration.zero);
       expect(state.countdownTotal, Duration.zero);
@@ -66,7 +66,7 @@ void main() {
         currentIndex: 0,
       );
       expect(state.currentWord, isNotNull);
-      expect(state.currentWord!.savedWord.word, 'hello');
+      expect(state.currentWord!.displayText, 'hello');
     });
 
     test('currentWord 索引越界时返回 null', () {
@@ -83,12 +83,10 @@ void main() {
       final updated = state.copyWith(
         currentIndex: 3,
         isShowingBack: true,
-        isPaused: true,
         removedCount: 2,
       );
       expect(updated.currentIndex, 3);
       expect(updated.isShowingBack, true);
-      expect(updated.isPaused, true);
       expect(updated.removedCount, 2);
       // 未指定字段保留原值
       expect(updated.isCompleted, false);
@@ -119,11 +117,11 @@ void main() {
       expect(item.dictEntry, isNull);
     });
 
-    test('copyWith 更新 dictLoaded', () {
+    test('withDictEntry 更新 dictLoaded', () {
       final item = FlashcardWordItem(
         savedWord: _createWord(id: 1, word: 'test'),
       );
-      final updated = item.copyWith(dictLoaded: true);
+      final updated = item.withDictEntry(null);
       expect(updated.dictLoaded, true);
       expect(updated.savedWord.word, 'test');
     });
@@ -133,20 +131,28 @@ void main() {
 
   group('背面倒计时额外秒数', () {
     // 直接测试 FlashcardSettings.calculateSmartSeconds 算法
-    test('智能倒计时：短词 + 首次练习 → maxTime(4s)', () {
+    // 算法：ratio = clamp((len-4)/8, 0, 1)
+    //       maxTime = 3 + ratio*3 (3→6)
+    //       minTime = 2 + ratio*2 (2→4)
+    //       decay = clamp(practiceCount/5, 0, 1)
+    //       result = round(maxTime - decay*(maxTime-minTime))
+
+    test('智能倒计时：短词 + 首次练习 → maxTime(3s)', () {
       final seconds = FlashcardSettings.calculateSmartSeconds(
         wordLength: 3,
         practiceCount: 0,
       );
-      expect(seconds, 4);
+      // ratio=0, maxTime=3, decay=0 → 3
+      expect(seconds, 3);
     });
 
-    test('智能倒计时：长词 + 首次练习 → maxTime(8s)', () {
+    test('智能倒计时：长词 + 首次练习 → maxTime(6s)', () {
       final seconds = FlashcardSettings.calculateSmartSeconds(
         wordLength: 14,
         practiceCount: 0,
       );
-      expect(seconds, 8);
+      // ratio=1, maxTime=6, decay=0 → 6
+      expect(seconds, 6);
     });
 
     test('智能倒计时：短词 + 5 次练习 → minTime(2s)', () {
@@ -154,15 +160,17 @@ void main() {
         wordLength: 3,
         practiceCount: 5,
       );
+      // ratio=0, maxTime=3, minTime=2, decay=1 → 3-1=2
       expect(seconds, 2);
     });
 
-    test('智能倒计时：长词 + 5 次练习 → minTime(5s)', () {
+    test('智能倒计时：长词 + 5 次练习 → minTime(4s)', () {
       final seconds = FlashcardSettings.calculateSmartSeconds(
         wordLength: 14,
         practiceCount: 5,
       );
-      expect(seconds, 5);
+      // ratio=1, maxTime=6, minTime=4, decay=1 → 6-2=4
+      expect(seconds, 4);
     });
 
     test('智能倒计时：中等长度(8) + 2 次练习', () {
@@ -170,9 +178,9 @@ void main() {
         wordLength: 8,
         practiceCount: 2,
       );
-      // ratio = (8-4)/(12-4) = 0.5, maxTime=6.0, minTime=3.5
-      // decay = 2/5 = 0.4, result = 6.0 - 0.4*2.5 = 5.0 → 5
-      expect(seconds, 5);
+      // ratio=0.5, maxTime=4.5, minTime=3.0
+      // decay=0.4, result=4.5-0.4*1.5=4.5-0.6=3.9 → 4
+      expect(seconds, 4);
     });
   });
 

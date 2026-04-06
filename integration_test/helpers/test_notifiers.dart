@@ -56,6 +56,8 @@ import 'package:fluency/providers/sentence_ai_provider.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/providers/saved_word_provider.dart';
 import 'package:fluency/providers/flashcard/flashcard_provider.dart';
+import 'package:fluency/providers/flashcard/flashcard_flow_phase.dart';
+import 'package:fluency/models/flashcard_item.dart';
 import 'package:fluency/models/flashcard_settings.dart';
 
 /// 测试用 SavedWordList（返回空列表，不依赖数据库）
@@ -1583,19 +1585,18 @@ class TestFlashcardNotifier extends FlashcardNotifier {
   FlashcardState build() => const FlashcardState();
 
   @override
-  Future<void> initialize(List<SavedWord> words) async {
-    final items = words.map((w) => FlashcardWordItem(savedWord: w)).toList();
+  Future<void> initialize(List<FlashcardItem> items) async {
     state = FlashcardState(words: items, currentIndex: 0);
   }
 
   @override
-  void flipCard() {
+  Future<void> userFlipCard() async {
     if (state.isCompleted || state.words.isEmpty) return;
     state = state.copyWith(isShowingBack: !state.isShowingBack);
   }
 
   @override
-  void nextCard() {
+  Future<void> userNextCard() async {
     if (state.currentIndex >= state.words.length - 1) {
       state = state.copyWith(isCompleted: true);
       return;
@@ -1607,7 +1608,7 @@ class TestFlashcardNotifier extends FlashcardNotifier {
   }
 
   @override
-  void previousCard() {
+  Future<void> userPreviousCard() async {
     if (state.currentIndex <= 0) return;
     state = state.copyWith(
       currentIndex: state.currentIndex - 1,
@@ -1616,13 +1617,28 @@ class TestFlashcardNotifier extends FlashcardNotifier {
   }
 
   @override
-  void pause() => state = state.copyWith(isPaused: true);
+  void onAppBackgrounded() {
+    state = state.copyWith(
+      phase: const FlashcardWaitingForUser(
+        FlashcardWaitingReason.appBackgrounded,
+      ),
+    );
+  }
 
   @override
-  void resume() => state = state.copyWith(isPaused: false);
+  void onSettingsOpened() {
+    state = state.copyWith(
+      phase: const FlashcardWaitingForUser(
+        FlashcardWaitingReason.userOpenedSettings,
+      ),
+    );
+  }
 
   @override
-  void togglePause() => state = state.copyWith(isPaused: !state.isPaused);
+  Future<void> userPlayWord() async {}
+
+  @override
+  Future<void> userPlaySentence() async {}
 
   @override
   Future<void> disposePlayer() async => state = const FlashcardState();
@@ -1634,9 +1650,9 @@ class TestFlashcardNotifier extends FlashcardNotifier {
   }
 
   @override
-  Future<void> unsaveCurrentWord() async {
+  Future<void> toggleCurrentWordSave() async {
     if (state.words.isEmpty) return;
-    final newWords = List<FlashcardWordItem>.from(state.words)
+    final newWords = List<FlashcardItem>.from(state.words)
       ..removeAt(state.currentIndex);
     final newIndex =
         state.currentIndex >= newWords.length && newWords.isNotEmpty
@@ -1662,9 +1678,6 @@ class TestFlashcardNotifier extends FlashcardNotifier {
   Future<void> updateSettings(FlashcardSettings newSettings) async {
     state = state.copyWith(settings: newSettings);
   }
-
-  @override
-  void speakCurrentWord() {}
 
   @override
   Future<void> onWordPlayed() async {}
