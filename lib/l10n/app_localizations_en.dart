@@ -1865,6 +1865,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearCacheSuccess => 'Cache cleared';
 
   @override
+  String clearCacheSuccessWithSize(String size) {
+    return 'Cache cleared, freed $size';
+  }
+
+  @override
   String get clearCacheEmpty => 'Cache is already empty';
 
   @override

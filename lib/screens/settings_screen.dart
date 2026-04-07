@@ -26,6 +26,8 @@ import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
 import '../services/backup/backup_manifest.dart';
 import '../services/backup/backup_service.dart';
+import '../services/temp_cleanup_service.dart';
+import '../utils/file_size.dart';
 import '../services/demo_data_seeder.dart';
 import '../models/dict_entry.dart';
 import '../services/dictionary_service.dart';
@@ -179,7 +181,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// 清空 AI 缓存（翻译 + 解析 + 单词解析）
+  /// 清空缓存：AI 分析缓存 + 临时目录（录音残留、导出/导入临时文件）
   Future<void> _clearAiCache(
     BuildContext context,
     WidgetRef ref,
@@ -204,22 +206,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (confirmed != true || !context.mounted) return;
 
-    // 清空 SQLite 缓存（词级时间戳属于字幕数据，不在此清除）
+    // 1. 清空 SQLite 缓存（词级时间戳属于字幕数据，不在此清除）
     final dao = ref.read(sentenceAiCacheDaoProvider);
     final deleted = await dao.deleteAll();
 
-    // 清空内存缓存
+    // 2. 清空内存缓存
     ref.read(sentenceAiNotifierProvider).clearMemoryCache();
     ref.read(wordAiNotifierProvider).clearMemoryCache();
 
+    // 3. 清理临时目录（录音 .caf 残留、导出/导入临时文件 + Library/Caches）
+    final result = await cleanupAllTempFiles();
+
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          deleted > 0 ? l10n.clearCacheSuccess : l10n.clearCacheEmpty,
-        ),
-      ),
-    );
+    final String message;
+    if (deleted == 0 && result.freedBytes == 0) {
+      message = l10n.clearCacheEmpty;
+    } else if (result.freedBytes > 0) {
+      message = l10n.clearCacheSuccessWithSize(formatBytes(result.freedBytes));
+    } else {
+      message = l10n.clearCacheSuccess;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// 构建关于信息区域
@@ -286,9 +295,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
               child: Text(
-                kReleaseMode
-                    ? 'Version $version'
-                    : 'Version $version (Debug)',
+                kReleaseMode ? 'Version $version' : 'Version $version (Debug)',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -325,9 +332,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ref.read(showDeveloperOptionsProvider.notifier).setEnabled(true);
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(content: Text(l10n.developerOptionsEnabled)),
-        );
+        ..showSnackBar(SnackBar(content: Text(l10n.developerOptionsEnabled)));
     }
   }
 
@@ -379,17 +384,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       children: [
         // 关闭开发者选项的开关（所有构建模式下均可见）
         SwitchListTile(
-            secondary: _emojiIcon('🛠️'),
-            title: Text(l10n.developerOptionsDisable),
-            value: true,
-            onChanged: (value) {
-              if (!value) {
-                ref
-                    .read(showDeveloperOptionsProvider.notifier)
-                    .setEnabled(false);
-              }
-            },
-          ),
+          secondary: _emojiIcon('🛠️'),
+          title: Text(l10n.developerOptionsDisable),
+          value: true,
+          onChanged: (value) {
+            if (!value) {
+              ref.read(showDeveloperOptionsProvider.notifier).setEnabled(false);
+            }
+          },
+        ),
         ListTile(
           leading: _emojiIcon('🔧'),
           title: Text(l10n.timeMachine),
@@ -1281,10 +1284,7 @@ class _DictionaryLookupDialogState extends State<_DictionaryLookupDialog> {
     if (_result == null) {
       return const Padding(
         padding: EdgeInsets.all(16),
-        child: Text(
-          '未收录',
-          style: TextStyle(color: Colors.red, fontSize: 16),
-        ),
+        child: Text('未收录', style: TextStyle(color: Colors.red, fontSize: 16)),
       );
     }
 
@@ -1320,7 +1320,10 @@ class _DictionaryLookupDialogState extends State<_DictionaryLookupDialog> {
                   children: entry.examTags
                       .map(
                         (tag) => Chip(
-                          label: Text(tag, style: const TextStyle(fontSize: 12)),
+                          label: Text(
+                            tag,
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           visualDensity: VisualDensity.compact,
                         ),
                       )

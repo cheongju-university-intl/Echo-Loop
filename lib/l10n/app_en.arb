@@ -1005,6 +1005,14 @@
   "clearCache": "Clear Cache",
   "clearCacheConfirm": "This will clear all cached data such as AI translations and analyses. They will be re-fetched when needed. Continue?",
   "clearCacheSuccess": "Cache cleared",
+  "clearCacheSuccessWithSize": "Cache cleared, freed {size}",
+  "@clearCacheSuccessWithSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "clearCacheEmpty": "Cache is already empty",
   "confirm": "Confirm",
   "autoCompletedNoDifficult": "0 difficult sentences, skipped",

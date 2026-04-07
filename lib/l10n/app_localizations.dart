@@ -3344,6 +3344,12 @@ abstract class AppLocalizations {
   /// **'Cache cleared'**
   String get clearCacheSuccess;
 
+  /// No description provided for @clearCacheSuccessWithSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache cleared, freed {size}'**
+  String clearCacheSuccessWithSize(String size);
+
   /// No description provided for @clearCacheEmpty.
   ///
   /// In en, this message translates to:

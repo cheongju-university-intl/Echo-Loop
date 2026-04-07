@@ -21,6 +21,7 @@ import 'providers/review_reminder_provider.dart';
 import 'router/app_router.dart';
 import 'services/dictionary_service.dart';
 import 'services/bundled_example_installer.dart';
+import 'services/temp_cleanup_service.dart';
 import 'theme/app_theme.dart';
 import 'config/api_config.dart';
 import 'services/notification_tap_router_bridge.dart';
@@ -144,6 +145,9 @@ void main() async {
   // 初始化分析服务（根据 geo 选择 Firebase/友盟/Log 通道）
   final analyticsService = await initAnalyticsService(prefs);
   initAnalytics(analyticsService);
+
+  // 清理上次残留的录音临时文件（沙盒/tmp/ 中超过 60 秒的文件），不阻塞启动
+  unawaited(cleanupRecordingTempFiles());
 
   // 预热本地词典数据库，避免首次查询时冷启动延迟（异步，不阻塞启动）
   unawaited(

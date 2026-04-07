@@ -283,6 +283,12 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
       return;
     }
 
+    // 清理上一次录音的临时文件（避免重录时旧文件泄漏）
+    final oldFilePath = state.currentAttempt?.filePath;
+    if (oldFilePath != null && oldFilePath.isNotEmpty) {
+      unawaited(_recordingService.deleteRecording(oldFilePath));
+    }
+
     _cancelAllTimers();
     _isStopping = false;
     _hasDetectedSpeech = false;

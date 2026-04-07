@@ -1812,6 +1812,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get clearCacheSuccess => '缓存已清除';
 
   @override
+  String clearCacheSuccessWithSize(String size) {
+    return '缓存已清除，释放了 $size';
+  }
+
+  @override
   String get clearCacheEmpty => '缓存已为空';
 
   @override

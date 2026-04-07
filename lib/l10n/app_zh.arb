@@ -754,6 +754,14 @@
   "clearCache": "清除缓存",
   "clearCacheConfirm": "将清除所有缓存数据（如 AI 翻译和解析结果），需要时会重新获取。是否继续？",
   "clearCacheSuccess": "缓存已清除",
+  "clearCacheSuccessWithSize": "缓存已清除，释放了 {size}",
+  "@clearCacheSuccessWithSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "clearCacheEmpty": "缓存已为空",
   "confirm": "确认",
   "autoCompletedNoDifficult": "0 个难句，已跳过",

@@ -228,6 +228,12 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       return;
     }
 
+    // 清理上一次录音的临时文件（避免重录时旧文件泄漏）
+    final oldFilePath = state.currentAttempt?.filePath;
+    if (oldFilePath != null && oldFilePath.isNotEmpty) {
+      unawaited(_recordingService.deleteRecording(oldFilePath));
+    }
+
     _cancelAllTimers();
     _isStopping = false;
     _hasDetectedSpeech = false;
@@ -391,10 +397,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       );
     }
 
-    AppLogger.log(
-      'RetellRec',
-      '📋 final: "${transcript ?? '(null)'}"',
-    );
+    AppLogger.log('RetellRec', '📋 final: "${transcript ?? '(null)'}"');
 
     // 无法获得任何 transcript → 走错误分支
     if (transcript == null || transcript.isEmpty) {
@@ -615,7 +618,10 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
             '${_silenceTimeout.inMilliseconds}ms | '
             '$summary',
       );
-      _stopForEvaluation(promptId: promptId, reason: '静音兜底${_silenceTimeout.inSeconds}s');
+      _stopForEvaluation(
+        promptId: promptId,
+        reason: '静音兜底${_silenceTimeout.inSeconds}s',
+      );
     }
   }
 
@@ -701,7 +707,10 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     if (shortest == null) {
       shortest = _silenceTimeout;
       desc = '转录停滞兜底${_silenceTimeout.inSeconds}s';
-      AppLogger.log('RetellRec', '转录停滞: 无规则触发, 靠静音兜底 ${_silenceTimeout.inSeconds}s');
+      AppLogger.log(
+        'RetellRec',
+        '转录停滞: 无规则触发, 靠静音兜底 ${_silenceTimeout.inSeconds}s',
+      );
     }
 
     AppLogger.log('RetellRec', '转录停滞阈值 ${shortest.inMilliseconds}ms | $desc');
