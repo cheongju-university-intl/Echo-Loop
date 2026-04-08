@@ -649,6 +649,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
   void _onBlindFlowStateChanged(BlindPracticeFlowState flowState) {
     final phase = flowState.phase;
     final interval = phase is BlindWaitingInterval ? phase : null;
+    final sentenceChanged =
+        flowState.sentenceIndex != state.currentSentenceIndex;
 
     state = state.copyWith(
       blindFlowState: flowState,
@@ -668,6 +670,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       annotationReplayRemaining: Duration.zero,
       annotationReplayDuration: Duration.zero,
       annotationState: null,
+      isTextRevealed: sentenceChanged ? false : state.isTextRevealed,
       stepFinished: phase is BlindSessionCompleted,
       playingSenseGroupIndex: null,
       playedSenseGroupIndices: const {},

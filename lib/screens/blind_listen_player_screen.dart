@@ -454,38 +454,44 @@ class _BlindListenPlayerScreenState
             keywordMap: const {},
             playingSentenceIndex: playerState.playingSentenceIndex,
           ),
-          contentControls: GestureDetector(
-            onTap: () {
-              final next =
-                  playerState.displayMode == BlindListenDisplayMode.showAll
-                  ? BlindListenDisplayMode.hideAll
-                  : BlindListenDisplayMode.showAll;
-              player.setDisplayMode(next);
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  playerState.displayMode == BlindListenDisplayMode.showAll
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  size: 14,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.5,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  playerState.displayMode == BlindListenDisplayMode.showAll
-                      ? l10n.blindListenDisplayHideAll
-                      : l10n.intensiveListenPeek,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.5,
+          contentControls: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                final next =
+                    playerState.displayMode == BlindListenDisplayMode.showAll
+                    ? BlindListenDisplayMode.hideAll
+                    : BlindListenDisplayMode.showAll;
+                player.setDisplayMode(next);
+              },
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      playerState.displayMode == BlindListenDisplayMode.showAll
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 14,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Text(
+                      playerState.displayMode == BlindListenDisplayMode.showAll
+                          ? l10n.blindListenDisplayHideAll
+                          : l10n.intensiveListenPeek,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           practiceControls: Column(

@@ -859,4 +859,59 @@ void main() {
       expect(result, const Duration(seconds: 4));
     });
   });
+
+  group('盲听自动切句时重置偷看字幕', () {
+    test('自动推进到下一句时 isTextRevealed 重置为 false', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+          learningSessionProvider.overrideWith(() => TestLearningSession()),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final sentences = [
+        Sentence(
+          index: 0,
+          text: 'First short sentence.',
+          startTime: Duration.zero,
+          endTime: const Duration(milliseconds: 120),
+        ),
+        Sentence(
+          index: 1,
+          text: 'Second short sentence.',
+          startTime: const Duration(milliseconds: 200),
+          endTime: const Duration(milliseconds: 320),
+        ),
+      ];
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(sentences);
+      // 使用极短倒计时以加速测试
+      notifier.updateSettings(
+        const IntensiveListenSettings(
+          pauseMode: PauseMode.multiplier,
+          pauseMultiplier: 0.5,
+        ),
+      );
+
+      // 偷看字幕
+      notifier.setTextRevealed(true);
+      expect(
+        container.read(intensiveListenPlayerProvider).isTextRevealed,
+        true,
+      );
+
+      // 播放 → 句间倒计时 → 自动切到下一句
+      await notifier.startPlaying();
+      // 等待倒计时 tick（100ms 间隔）+ 第二句播放
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      final state = container.read(intensiveListenPlayerProvider);
+      expect(state.currentSentenceIndex, 1);
+      expect(state.isTextRevealed, false);
+    });
+  });
 }
