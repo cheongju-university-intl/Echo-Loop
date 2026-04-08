@@ -180,74 +180,93 @@ class EditTagMembershipSheet extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(l10n.createTag),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: l10n.tagName,
-                  hintText: l10n.enterTagName,
+        builder: (ctx, setDialogState) {
+          final isEmpty = controller.text.trim().isEmpty;
+          return AlertDialog(
+            title: Text(l10n.createTag, textAlign: TextAlign.center),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: l10n.tagName,
+                    hintText: l10n.enterTagName,
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                  onSubmitted: (_) {
+                    if (!isEmpty) {
+                      _createAndAssign(ctx, ref, controller, selectedColor);
+                    }
+                  },
                 ),
-                onSubmitted: (_) =>
-                    _createAndAssign(ctx, ref, controller, selectedColor),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                l10n.selectColor,
-                style: Theme.of(ctx).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: kTagColors.map((colorValue) {
-                  final isChosen = colorValue == selectedColor;
-                  return GestureDetector(
-                    onTap: () {
-                      setDialogState(() {
-                        selectedColor = colorValue;
-                      });
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Color(colorValue),
-                        shape: BoxShape.circle,
-                        border: isChosen
-                            ? Border.all(
-                                color: Theme.of(ctx).colorScheme.onSurface,
-                                width: 2,
-                              )
+                const SizedBox(height: 16),
+                Text(
+                  l10n.selectColor,
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: kTagColors.map((colorValue) {
+                    final isChosen = colorValue == selectedColor;
+                    return GestureDetector(
+                      onTap: () {
+                        setDialogState(() {
+                          selectedColor = colorValue;
+                        });
+                      },
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Color(colorValue),
+                          shape: BoxShape.circle,
+                          border: isChosen
+                              ? Border.all(
+                                  color: Theme.of(ctx).colorScheme.onSurface,
+                                  width: 2,
+                                )
+                              : null,
+                        ),
+                        child: isChosen
+                            ? const Icon(Icons.check,
+                                size: 18, color: Colors.white)
                             : null,
                       ),
-                      child: isChosen
-                          ? const Icon(Icons.check,
-                              size: 18, color: Colors.white)
-                          : null,
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(l10n.cancel),
                     ),
-                  );
-                }).toList(),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: isEmpty
+                          ? null
+                          : () => _createAndAssign(
+                              ctx, ref, controller, selectedColor),
+                      child: Text(l10n.add),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () =>
-                  _createAndAssign(ctx, ref, controller, selectedColor),
-              child: Text(l10n.add),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
