@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../database/enums.dart';
+import '../widgets/asr_download_prompt_dialog.dart';
 import '../l10n/app_localizations.dart';
 import '../models/retell_settings.dart';
 import '../models/sentence.dart';
@@ -83,7 +84,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       retellRecordingControllerProvider,
       _onRetellRecordingStateChanged,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await checkAndShowAsrPrompt(context, ref);
+      if (!mounted) return;
       // 同步初始控制模式到录音控制器
       final settings = ref.read(retellPlayerProvider).settings;
       ref
@@ -96,6 +99,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 
   @override
   void dispose() {
+    unloadAsrEngine(ref);
     _playerSubscription?.close();
     _recordingSubscription?.close();
     super.dispose();
@@ -747,109 +751,107 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         },
         onPrevious: _goToPreviousParagraph,
         onNext: _goToNextParagraph,
-          child: PopScope(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, _) async {
-              if (didPop) return;
-              await _handleExit();
-            },
-            child: ParagraphPracticeScaffold(
-              title: l10n.retellTitle,
-              onClose: _handleExit,
-              onOpenSettings: _openSettings,
-              current: state.currentParagraphIndex + 1,
-              total: state.totalParagraphs,
-              progressText: l10n.retellParagraphProgress(
-                state.currentParagraphIndex + 1,
-                state.totalParagraphs,
-              ),
-              durationText: l10n.retellParagraphDuration(
-                '${paragraphDuration.inSeconds}',
-              ),
-              paragraphContent: ParagraphSentenceListCard(
-                sentences: sentences,
-                displayMode:
-                    state.settings.keywordMethod != KeywordMethod.off
-                    ? state.displayMode
-                    : RetellDisplayMode.hideAll,
-                keywordMap: keywords,
-                playingSentenceIndex: state.phase == RetellPhase.listening
-                    ? state.playingSentenceIndex
-                    : -1,
-                bookmarkedSentenceIndices: state.bookmarkedSentenceIndices,
-                onSentenceTap: _handleSentenceTap,
-              ),
-              contentControls: state.settings.keywordMethod != KeywordMethod.off
-                  ? ParagraphVisibilityControls(
-                      selectedMode: state.displayMode,
-                      onChanged: player.setDisplayMode,
-                    )
-                  : null,
-              practiceControls: RepeatPracticePanel(
-                l10n: l10n,
-                theme: theme,
-                recordingMode: recordingMode,
-                isProcessing: isProcessing,
-                currentAttempt: currentAttempt,
-                hintText: state.phase == RetellPhase.listening
-                    ? (state.isPlaying
-                        ? l10n.retellListeningPhase
-                        : l10n.retellPreListenHint)
-                    : null,
-                showCountdown: state.isRetellCountdown,
-                isInPause: state.phase == RetellPhase.retelling &&
-                    !state.isRetellCountdown,
-                countdownWidget: state.isRetellCountdown
-                    ? Consumer(
-                        builder: (context, ref, _) {
-                          final s = ref.watch(retellPlayerProvider);
-                          return CountdownChip(
-                            remaining: s.pauseRemaining,
-                            total: s.pauseDuration,
-                            isPaused: s.isCountdownPaused,
-                            onPause: () => ref
-                                .read(retellPlayerProvider.notifier)
-                                .pauseCountdown(),
-                            onResume: () => ref
-                                .read(retellPlayerProvider.notifier)
-                                .resumeCountdown(),
-                          );
-                        },
-                      )
-                    : null,
-                onRecordTap: _handleRecordTap,
-                onFastForward: state.isRetellCountdown &&
-                        !state.isCountdownPaused
-                    ? () => ref
-                        .read(retellPlayerProvider.notifier)
-                        .toggleCountdownFastForward()
-                    : null,
-                onBeforePlayback: _prepareAttemptPlayback,
-                thresholds: RatingThresholds.retell,
-              ),
-              canGoPrev: state.currentParagraphIndex > 0,
-              isLast:
-                  state.currentParagraphIndex >= state.totalParagraphs - 1,
-              centerIcon: _isRetellMainPlaybackActive(state)
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
-              onPrevious: _goToPreviousParagraph,
-              onNext: _goToNextParagraph,
-              onCenter: state.phase == RetellPhase.listening
-                  ? (_isRetellMainPlaybackActive(state)
-                        ? player.pause
-                        : player.resume)
-                  : _handleReplay,
-              isManualMode: state.settings.isManualMode,
-              playCountText: l10n.retellRepeatInfo(
-                state.currentRepeatCount,
-                state.settings.repeatCount,
-              ),
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            await _handleExit();
+          },
+          child: ParagraphPracticeScaffold(
+            title: l10n.retellTitle,
+            onClose: _handleExit,
+            onOpenSettings: _openSettings,
+            current: state.currentParagraphIndex + 1,
+            total: state.totalParagraphs,
+            progressText: l10n.retellParagraphProgress(
+              state.currentParagraphIndex + 1,
+              state.totalParagraphs,
+            ),
+            durationText: l10n.retellParagraphDuration(
+              '${paragraphDuration.inSeconds}',
+            ),
+            paragraphContent: ParagraphSentenceListCard(
+              sentences: sentences,
+              displayMode: state.settings.keywordMethod != KeywordMethod.off
+                  ? state.displayMode
+                  : RetellDisplayMode.hideAll,
+              keywordMap: keywords,
+              playingSentenceIndex: state.phase == RetellPhase.listening
+                  ? state.playingSentenceIndex
+                  : -1,
+              bookmarkedSentenceIndices: state.bookmarkedSentenceIndices,
+              onSentenceTap: _handleSentenceTap,
+            ),
+            contentControls: state.settings.keywordMethod != KeywordMethod.off
+                ? ParagraphVisibilityControls(
+                    selectedMode: state.displayMode,
+                    onChanged: player.setDisplayMode,
+                  )
+                : null,
+            practiceControls: RepeatPracticePanel(
               l10n: l10n,
               theme: theme,
+              recordingMode: recordingMode,
+              isProcessing: isProcessing,
+              currentAttempt: currentAttempt,
+              hintText: state.phase == RetellPhase.listening
+                  ? (state.isPlaying
+                        ? l10n.retellListeningPhase
+                        : l10n.retellPreListenHint)
+                  : null,
+              showCountdown: state.isRetellCountdown,
+              isInPause:
+                  state.phase == RetellPhase.retelling &&
+                  !state.isRetellCountdown,
+              countdownWidget: state.isRetellCountdown
+                  ? Consumer(
+                      builder: (context, ref, _) {
+                        final s = ref.watch(retellPlayerProvider);
+                        return CountdownChip(
+                          remaining: s.pauseRemaining,
+                          total: s.pauseDuration,
+                          isPaused: s.isCountdownPaused,
+                          onPause: () => ref
+                              .read(retellPlayerProvider.notifier)
+                              .pauseCountdown(),
+                          onResume: () => ref
+                              .read(retellPlayerProvider.notifier)
+                              .resumeCountdown(),
+                        );
+                      },
+                    )
+                  : null,
+              onRecordTap: _handleRecordTap,
+              onFastForward: state.isRetellCountdown && !state.isCountdownPaused
+                  ? () => ref
+                        .read(retellPlayerProvider.notifier)
+                        .toggleCountdownFastForward()
+                  : null,
+              onBeforePlayback: _prepareAttemptPlayback,
+              thresholds: RatingThresholds.retell,
             ),
+            canGoPrev: state.currentParagraphIndex > 0,
+            isLast: state.currentParagraphIndex >= state.totalParagraphs - 1,
+            centerIcon: _isRetellMainPlaybackActive(state)
+                ? Icons.pause_rounded
+                : Icons.play_arrow_rounded,
+            onPrevious: _goToPreviousParagraph,
+            onNext: _goToNextParagraph,
+            onCenter: state.phase == RetellPhase.listening
+                ? (_isRetellMainPlaybackActive(state)
+                      ? player.pause
+                      : player.resume)
+                : _handleReplay,
+            isManualMode: state.settings.isManualMode,
+            playCountText: l10n.retellRepeatInfo(
+              state.currentRepeatCount,
+              state.settings.repeatCount,
+            ),
+            l10n: l10n,
+            theme: theme,
           ),
         ),
+      ),
     );
   }
 }

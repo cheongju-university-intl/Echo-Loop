@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
+import '../widgets/asr_download_prompt_dialog.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
@@ -80,7 +81,9 @@ class _ReviewDifficultPracticeScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await checkAndShowAsrPrompt(context, ref);
+      if (!mounted) return;
       ref.read(reviewDifficultPracticeProvider.notifier).syncRecordingMode();
       ref.read(reviewDifficultPracticeProvider.notifier).startPlaying();
     });
@@ -92,6 +95,7 @@ class _ReviewDifficultPracticeScreenState
 
   @override
   void dispose() {
+    unloadAsrEngine(ref);
     _playerSubscription?.close();
     super.dispose();
   }
@@ -650,7 +654,8 @@ class _ReviewDifficultPracticeScreenState
     final recordingMode = isRecording
         ? RecordingButtonMode.recording
         : RecordingButtonMode.idle;
-    final isProcessing = turnState.promptId == effectivePromptId &&
+    final isProcessing =
+        turnState.promptId == effectivePromptId &&
         turnState.phase == SpeechRecordingPhase.processing;
 
     return RepeatPracticePanel(
@@ -689,7 +694,8 @@ class _ReviewDifficultPracticeScreenState
         if (engine == null) return;
         unawaited(engine.onRecordButtonTapped());
       },
-      onFastForward: showCountdown &&
+      onFastForward:
+          showCountdown &&
               flowState.phase is WaitingInterval &&
               !(flowState.phase as WaitingInterval).isPaused
           ? (engine?.fastForwardInterval ?? noop)

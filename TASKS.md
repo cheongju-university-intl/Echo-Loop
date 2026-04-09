@@ -1,7 +1,22 @@
 # Fluency 任务清单
 
-> 最后更新：2026-04-09
-> 当前焦点：本地 ASR 引擎集成
+> 最后更新：2026-04-10
+> 当前焦点：本地 ASR 用户流程集成
+
+## 进行中：本地 ASR 用户流程集成
+
+- [x] 国际化文案：新增 ~30 个 ASR 相关 i18n key（en + zh）
+- [x] `OfflineAsrSettingsProvider`：三态 enabled、下载管理、引擎生命周期
+- [x] `speechPracticeBackendProvider` 动态切换（OfflineAsrBackend / Platform）
+- [x] 语音识别设置页 UI（开关/进度/删除/确认弹窗）
+- [x] 设置主页 AI section（仅 Android 无 GMS 显示）
+- [x] GMS 检测 + 模型推荐 main() 一次性计算全局注入
+- [x] 录音页面入口弹窗（首次引导 + 下载进度 + 自动恢复）
+- [ ] 改为页面内嵌 UI（AsrSetupGuard），替代 dialog，避免导航栈污染
+
+  **预计完成时间**: 2026-04-10
+
+---
 
 ## 已完成：本地 ASR 引擎集成（sherpa-onnx）
 

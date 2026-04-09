@@ -13,6 +13,7 @@ library;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/asr_download_prompt_dialog.dart';
 import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
 import '../database/enums.dart';
@@ -78,7 +79,9 @@ class _ListenAndRepeatPlayerScreenState
     WidgetsBinding.instance.addObserver(this);
     // Controller.initialize() 已在路由跳转前准备好数据，
     // 进入页面后开始播放。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await checkAndShowAsrPrompt(context, ref);
+      if (!mounted) return;
       ref.read(listenAndRepeatControllerProvider.notifier).startPlaying();
     });
     _controllerSubscription = ref.listenManual<ListenAndRepeatSessionState>(
@@ -93,6 +96,7 @@ class _ListenAndRepeatPlayerScreenState
 
   @override
   void dispose() {
+    unloadAsrEngine(ref);
     _settingsSubscription?.close();
     _controllerSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
@@ -375,7 +379,8 @@ class _ListenAndRepeatPlayerScreenState
     final recordingMode = isRecording
         ? RecordingButtonMode.recording
         : RecordingButtonMode.idle;
-    final isProcessing = turnState.promptId == currentPromptId &&
+    final isProcessing =
+        turnState.promptId == currentPromptId &&
         turnState.phase == SpeechRecordingPhase.processing;
 
     // 句子时长（如 "2.8秒"）
@@ -513,9 +518,7 @@ class _ListenAndRepeatPlayerScreenState
                   recordingMode: recordingMode,
                   isProcessing: isProcessing,
                   currentAttempt: currentAttempt,
-                  hintText: isPlaying
-                      ? l10n.listenAndRepeatListenHint
-                      : null,
+                  hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
                   showCountdown: showCountdown,
                   isInPause: isInPause,
                   countdownWidget: showCountdown
@@ -542,15 +545,14 @@ class _ListenAndRepeatPlayerScreenState
                         )
                       : null,
                   onRecordTap: () => ctrl.onRecordButtonTapped(),
-                  onFastForward: showCountdown &&
+                  onFastForward:
+                      showCountdown &&
                           ctrlState.phase is WaitingInterval &&
                           !(ctrlState.phase as WaitingInterval).isPaused
                       ? ctrl.fastForwardInterval
                       : null,
                   onBeforePlayback: () => ref
-                      .read(
-                        listenAndRepeatControllerProvider.notifier,
-                      )
+                      .read(listenAndRepeatControllerProvider.notifier)
                       .prepareForPlayback(),
                 ),
                 PracticePlaybackFooter(

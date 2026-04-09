@@ -14,6 +14,7 @@ import '../models/app_update_info.dart';
 import '../providers/app_update_provider.dart';
 import '../providers/backup_provider.dart';
 import '../providers/developer_options_provider.dart';
+import '../providers/offline_asr_settings_provider.dart';
 import '../providers/package_info_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../providers/sentence_ai_provider.dart';
@@ -32,6 +33,7 @@ import '../services/demo_data_seeder.dart';
 import '../models/dict_entry.dart';
 import '../services/dictionary_service.dart';
 import '../theme/app_theme.dart';
+import 'asr_settings_screen.dart';
 import 'asr_test_screen.dart';
 import 'log_viewer_screen.dart';
 import 'reminder_settings_screen.dart';
@@ -84,6 +86,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: AppSpacing.m),
           _buildReminderSection(context, ref, l10n),
+          if (ref.watch(needsLocalAsrProvider)) ...[
+            const SizedBox(height: AppSpacing.m),
+            _buildAiSection(context, ref, l10n),
+          ],
           const SizedBox(height: AppSpacing.m),
           _buildStorageSection(context, ref, l10n),
           const SizedBox(height: AppSpacing.m),
@@ -163,6 +169,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             MaterialPageRoute<void>(
               builder: (_) => const ReminderSettingsScreen(),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 构建 AI section（仅 Android 无 GMS 显示）。
+  Widget _buildAiSection(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    final asrState = ref.watch(offlineAsrSettingsProvider);
+
+    final String statusText;
+    if (asrState.enabled == null) {
+      statusText = l10n.speechRecognitionNotConfigured;
+    } else if (asrState.enabled == true) {
+      statusText = l10n.speechRecognitionEnabled;
+    } else {
+      statusText = l10n.speechRecognitionDisabled;
+    }
+
+    return _buildSection(
+      context,
+      title: l10n.aiSectionTitle,
+      children: [
+        ListTile(
+          leading: _emojiIcon('🤖'),
+          title: Text(l10n.speechRecognition),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(statusText, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const AsrSettingsScreen()),
           ),
         ),
       ],

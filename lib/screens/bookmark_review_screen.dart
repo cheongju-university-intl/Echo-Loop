@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../l10n/app_localizations.dart';
+import '../widgets/asr_download_prompt_dialog.dart';
 import '../models/speech_practice_models.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
@@ -65,7 +66,9 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await checkAndShowAsrPrompt(context, ref);
+      if (!mounted) return;
       ref.read(bookmarkReviewProvider.notifier).syncRecordingMode();
       ref.read(bookmarkReviewProvider.notifier).startPlaying();
     });
@@ -77,6 +80,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
 
   @override
   void dispose() {
+    unloadAsrEngine(ref);
     _playerSubscription?.close();
     super.dispose();
   }
@@ -445,7 +449,8 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     final recordingMode = isRecording
         ? RecordingButtonMode.recording
         : RecordingButtonMode.idle;
-    final isProcessingState = turnState.promptId == currentPromptId &&
+    final isProcessingState =
+        turnState.promptId == currentPromptId &&
         turnState.phase == SpeechRecordingPhase.processing;
 
     return RepeatPracticePanel(
@@ -484,7 +489,8 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
         if (engine == null) return;
         unawaited(engine.onRecordButtonTapped());
       },
-      onFastForward: showCountdown &&
+      onFastForward:
+          showCountdown &&
               flowState.phase is WaitingInterval &&
               !(flowState.phase as WaitingInterval).isPaused
           ? (engine?.fastForwardInterval ?? noop)
