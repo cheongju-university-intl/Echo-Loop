@@ -1,9 +1,17 @@
 /// 跟读录音识别文本比对器。
 library;
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lemmatizerx/lemmatizerx.dart';
 
 import '../models/speech_practice_models.dart';
+
+/// 文本匹配器 provider。
+final speechTranscriptMatcherProvider = Provider<SpeechTranscriptMatcher>((
+  ref,
+) {
+  return SpeechTranscriptMatcher();
+});
 
 class _IndexedToken {
   final String rawText;

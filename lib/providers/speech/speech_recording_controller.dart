@@ -27,9 +27,9 @@ import '../../models/speech_practice_models.dart';
 import '../../services/app_logger.dart';
 import '../../services/recording_service.dart';
 import '../../services/speech_completion_detector.dart';
+import '../../services/speech_practice_matcher.dart';
 import '../../services/speech_practice_platform.dart';
 import '../../services/study_event_recorder.dart';
-import '../speech_practice_session_provider.dart';
 
 /// 等待开口最大时长
 const _awaitingSpeechTimeout = Duration(seconds: 60);

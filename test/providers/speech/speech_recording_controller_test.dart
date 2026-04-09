@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/speech_practice_models.dart';
 import 'package:fluency/providers/speech/speech_recording_controller.dart';
-import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/services/speech_practice_platform.dart';
 
 class _FakeSpeechPracticeBackend implements SpeechPracticeBackend {

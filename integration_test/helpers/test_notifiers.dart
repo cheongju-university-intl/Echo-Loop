@@ -45,7 +45,6 @@ import 'package:fluency/providers/learning_session/blind_listen_player_provider.
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
 import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
-import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/package_info_provider.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/models/speech_practice_models.dart';

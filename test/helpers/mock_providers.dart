@@ -34,7 +34,6 @@ import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
 import 'package:fluency/providers/repeat_flow/repeat_flow_engine.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
-import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/speech/speech_recording_controller.dart';
 import 'package:fluency/providers/retell_recording_controller_provider.dart';
 import 'package:fluency/models/speech_practice_models.dart';
@@ -1517,39 +1516,6 @@ class TestRetellPlayer extends RetellPlayer {
     _testKeywords = {};
     state = const RetellPlayerState();
   }
-}
-
-/// 测试用 SpeechPracticeSession — 不依赖平台通道
-class TestSpeechPracticeSession extends SpeechPracticeSession {
-  @override
-  SpeechPracticeSessionState build() => const SpeechPracticeSessionState();
-
-  @override
-  Future<void> startRecording({required String promptId}) async {}
-
-  @override
-  Future<SpeechPracticeAttempt?> stopRecordingAndEvaluate({
-    required String promptId,
-    required String referenceText,
-  }) async => null;
-
-  @override
-  Future<void> cancelActiveRecording() async {}
-
-  @override
-  Future<void> stopAttemptPlayback() async {}
-
-  @override
-  Future<void> playAttempt(String promptId) async {}
-
-  @override
-  Future<void> disposeSession() async {}
-
-  @override
-  bool isRecordingPrompt(String promptId) => false;
-
-  @override
-  SpeechPracticeAttempt? attemptFor(String promptId) => null;
 }
 
 /// 测试用 SpeechRecordingController — 不依赖平台通道

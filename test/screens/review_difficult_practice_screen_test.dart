@@ -24,7 +24,6 @@ import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/app_database.dart' show Bookmark;
 import 'package:fluency/database/providers.dart';
 import 'package:fluency/providers/sentence_ai_provider.dart';
-import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/speech/speech_recording_controller.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/services/transcription_api_client.dart';
@@ -242,9 +241,6 @@ void main() {
               TestReviewDifficultPractice(initialPlayerState, sentences),
         ),
         bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
-        speechPracticeSessionProvider.overrideWith(
-          () => TestSpeechPracticeSession(),
-        ),
         speechRecordingControllerProvider.overrideWith(
           () => TestSpeechRecordingController(initialPhase: turnPhase),
         ),

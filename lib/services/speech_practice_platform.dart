@@ -1,4 +1,4 @@
-/// Apple 录音识别平台桥接。
+/// 录音识别平台桥接。
 library;
 
 import 'dart:async';
@@ -6,8 +6,14 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/speech_practice_models.dart';
+
+/// 统一后端 provider。
+final speechPracticeBackendProvider = Provider<SpeechPracticeBackend>((ref) {
+  return SpeechPracticePlatform.instance;
+});
 
 /// 平台桥接异常。
 class SpeechPracticePlatformException implements Exception {

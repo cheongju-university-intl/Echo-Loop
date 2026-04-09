@@ -23,8 +23,8 @@ import kotlin.math.sqrt
  */
 class WavRecorder {
 
-    /** 每个 buffer 的 RMS 回调，在 IO 线程上调用。 */
-    var onRms: ((Float) -> Unit)? = null
+    /** 每个 buffer 的回调（RMS, 帧数），在 IO 线程上调用。 */
+    var onBuffer: ((Float, Int) -> Unit)? = null
 
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
@@ -44,6 +44,14 @@ class WavRecorder {
         private const val GAIN = 2.2f
         private const val BYTES_PER_SAMPLE = 2
         private const val NUM_CHANNELS = 1
+
+        // 录音后裁剪参数（对齐 iOS/macOS）。
+        private const val TRIM_RMS_THRESHOLD = 0.022f
+        private const val TRIM_LEADING_PADDING_MS = 120.0
+        private const val TRIM_TRAILING_PADDING_MS = 180.0
+        private const val MIN_TRIM_DURATION_MS = 120.0
+        private const val DETECT_CHUNK_FRAMES = 2048
+        private const val WAV_HEADER_SIZE = 44
     }
 
     /**
@@ -103,7 +111,7 @@ class WavRecorder {
                 if (read <= 0) continue
 
                 val rms = computeRms(buffer, read)
-                onRms?.invoke(rms)
+                onBuffer?.invoke(rms, read)
 
                 applyGainAndWrite(buffer, read)
             }
@@ -147,7 +155,7 @@ class WavRecorder {
         wavFile?.close()
         wavFile = null
         currentFilePath = null
-        onRms = null
+        onBuffer = null
     }
 
     /** 计算 16bit PCM buffer 的 RMS（归一化到 0.0~1.0）。 */
@@ -218,6 +226,123 @@ class WavRecorder {
             Log.e(TAG, "Failed to patch WAV header", e)
         }
     }
+    // region 录音后裁剪
+
+    /**
+     * 裁剪 WAV 文件的首尾静音。
+     *
+     * 以 [TRIM_RMS_THRESHOLD] 检测语音范围，前后各保留 padding，
+     * 原地替换文件。全静音或时长不足 [MIN_TRIM_DURATION_MS] 则跳过。
+     */
+    fun trimSilence(filePath: String) {
+        try {
+            val range = detectSpeechRange(filePath) ?: return
+
+            val totalDataBytes = File(filePath).length() - WAV_HEADER_SIZE
+            val totalFrames = totalDataBytes / BYTES_PER_SAMPLE
+            val totalDurationMs = (totalFrames.toDouble() / SAMPLE_RATE) * 1000.0
+
+            val startMs = max(0.0, range.first - TRIM_LEADING_PADDING_MS)
+            val endMs = min(range.second + TRIM_TRAILING_PADDING_MS, totalDurationMs)
+            if (endMs - startMs < MIN_TRIM_DURATION_MS) return
+
+            val startFrame = ((startMs / 1000.0) * SAMPLE_RATE).toLong()
+            val endFrame = ((endMs / 1000.0) * SAMPLE_RATE).toLong()
+            val safeStart = max(0, min(startFrame, totalFrames))
+            val safeEnd = max(safeStart, min(endFrame, totalFrames))
+            val framesToCopy = (safeEnd - safeStart).toInt()
+            if (framesToCopy <= 0) return
+
+            val sourceFile = File(filePath)
+            val tempFile = File(sourceFile.parent, "${sourceFile.nameWithoutExtension}_trimmed.wav")
+
+            RandomAccessFile(sourceFile, "r").use { src ->
+                RandomAccessFile(tempFile, "rw").use { dst ->
+                    writeWavHeader(dst)
+                    val dataBytes = framesToCopy * BYTES_PER_SAMPLE
+                    src.seek((WAV_HEADER_SIZE + safeStart * BYTES_PER_SAMPLE))
+                    val chunkBytes = DETECT_CHUNK_FRAMES * BYTES_PER_SAMPLE
+                    val buf = ByteArray(chunkBytes)
+                    var remaining = dataBytes
+                    while (remaining > 0) {
+                        val toRead = min(chunkBytes, remaining)
+                        val read = src.read(buf, 0, toRead)
+                        if (read <= 0) break
+                        dst.write(buf, 0, read)
+                        remaining -= read
+                    }
+                    // 回填 WAV 头。
+                    val writtenDataBytes = dataBytes - remaining
+                    dst.seek(40)
+                    dst.writeIntLE(writtenDataBytes)
+                    dst.seek(4)
+                    dst.writeIntLE(36 + writtenDataBytes)
+                }
+            }
+
+            // 原地替换。
+            tempFile.renameTo(sourceFile)
+        } catch (e: Exception) {
+            Log.w(TAG, "trimSilence failed, keeping original file", e)
+        }
+    }
+
+    /**
+     * 检测 WAV 文件中的语音起止时间（毫秒）。
+     * @return (startMs, endMs) 或 null（全静音）。
+     */
+    private fun detectSpeechRange(filePath: String): Pair<Double, Double>? {
+        var firstSpeechFrame: Long? = null
+        var lastSpeechFrame: Long? = null
+
+        RandomAccessFile(File(filePath), "r").use { raf ->
+            val fileLength = raf.length()
+            val dataBytes = fileLength - WAV_HEADER_SIZE
+            if (dataBytes <= 0) return null
+
+            raf.seek(WAV_HEADER_SIZE.toLong())
+            val totalFrames = dataBytes / BYTES_PER_SAMPLE
+            var frameOffset = 0L
+
+            val chunkFrames = DETECT_CHUNK_FRAMES
+            val buf = ShortArray(chunkFrames)
+            val byteBuf = ByteArray(chunkFrames * BYTES_PER_SAMPLE)
+
+            while (frameOffset < totalFrames) {
+                val framesToRead = min(chunkFrames.toLong(), totalFrames - frameOffset).toInt()
+                val bytesToRead = framesToRead * BYTES_PER_SAMPLE
+                val bytesRead = raf.read(byteBuf, 0, bytesToRead)
+                if (bytesRead <= 0) break
+                val framesRead = bytesRead / BYTES_PER_SAMPLE
+
+                // little-endian bytes → Short
+                for (i in 0 until framesRead) {
+                    val lo = byteBuf[i * 2].toInt() and 0xFF
+                    val hi = byteBuf[i * 2 + 1].toInt()
+                    buf[i] = ((hi shl 8) or lo).toShort()
+                }
+
+                val rms = computeRms(buf, framesRead)
+                if (rms >= TRIM_RMS_THRESHOLD) {
+                    if (firstSpeechFrame == null) firstSpeechFrame = frameOffset
+                    lastSpeechFrame = frameOffset + framesRead
+                }
+
+                frameOffset += framesRead
+            }
+        }
+
+        val first = firstSpeechFrame ?: return null
+        val last = lastSpeechFrame ?: return null
+        if (last <= first) return null
+
+        return Pair(
+            (first.toDouble() / SAMPLE_RATE) * 1000.0,
+            (last.toDouble() / SAMPLE_RATE) * 1000.0,
+        )
+    }
+
+    // endregion
 }
 
 /** 以 little-endian 写入 4 字节整数。 */

@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/speech_practice_models.dart';
 import 'package:fluency/models/study_stage.dart';
 import 'package:fluency/providers/retell_recording_controller_provider.dart';
-import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/services/speech_practice_platform.dart';
 import 'package:fluency/services/study_event_recorder.dart';
 import 'package:fluency/services/study_time_service.dart';

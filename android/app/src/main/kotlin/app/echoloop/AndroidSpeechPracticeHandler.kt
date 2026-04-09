@@ -57,6 +57,9 @@ class AndroidSpeechPracticeHandler(
     private var hasDetectedSpeech = false
     private var silenceStartAt: Long = 0L
     private var lastReportedSilenceMs = -1
+    private var recordedDurationMs: Double = 0.0
+    private var firstDetectedSpeechMs: Double? = null
+    private var lastDetectedSpeechMs: Double? = null
 
     // 权限请求回调
     private var pendingPermissionResult: MethodChannel.Result? = null
@@ -70,7 +73,7 @@ class AndroidSpeechPracticeHandler(
     init {
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
-        wavRecorder.onRms = { rms -> handleVoiceActivity(rms) }
+        wavRecorder.onBuffer = { rms, frameCount -> handleVoiceActivity(rms, frameCount) }
     }
 
     // region StreamHandler
@@ -353,6 +356,11 @@ class AndroidSpeechPracticeHandler(
             currentFilePath
         }
 
+        // 裁剪首尾静音（对齐 iOS/macOS）。
+        if (!filePath.isNullOrEmpty()) {
+            wavRecorder.trimSilence(filePath)
+        }
+
         if (!recognizerFinished && speechRecognizer != null) {
             try { speechRecognizer?.stopListening() } catch (_: Exception) {}
         }
@@ -397,15 +405,22 @@ class AndroidSpeechPracticeHandler(
     // region VAD
 
     /** 在 IO 线程被 WavRecorder 调用，处理 VAD 逻辑并发事件到主线程。 */
-    private fun handleVoiceActivity(rms: Float) {
+    private fun handleVoiceActivity(rms: Float, frameCount: Int) {
         if (!isRecording) return
         val promptId = currentPromptId ?: return
+
+        val bufferDurationMs = (frameCount.toDouble() / 16000.0) * 1000.0
+        val bufferStartMs = recordedDurationMs
+        val bufferEndMs = bufferStartMs + bufferDurationMs
 
         if (rms >= RMS_THRESHOLD) {
             if (!hasDetectedSpeech) {
                 hasDetectedSpeech = true
                 emitEvent(mapOf("type" to "speechStarted", "promptId" to promptId))
             }
+            if (firstDetectedSpeechMs == null) firstDetectedSpeechMs = bufferStartMs
+            lastDetectedSpeechMs = bufferEndMs
+
             if (silenceStartAt > 0 || lastReportedSilenceMs > 0) {
                 emitEvent(mapOf(
                     "type" to "silenceProgress",
@@ -415,9 +430,11 @@ class AndroidSpeechPracticeHandler(
             }
             silenceStartAt = 0L
             lastReportedSilenceMs = 0
+            recordedDurationMs = bufferEndMs
             return
         }
 
+        recordedDurationMs = bufferEndMs
         if (!hasDetectedSpeech) return
 
         val now = System.currentTimeMillis()
@@ -446,6 +463,9 @@ class AndroidSpeechPracticeHandler(
         hasDetectedSpeech = false
         silenceStartAt = 0L
         lastReportedSilenceMs = -1
+        recordedDurationMs = 0.0
+        firstDetectedSpeechMs = null
+        lastDetectedSpeechMs = null
     }
 
     private fun cleanupSentenceState(cancelRecognition: Boolean) {
@@ -461,6 +481,9 @@ class AndroidSpeechPracticeHandler(
         lastReportedSilenceMs = -1
         recognizerFinished = false
         finalTranscriptEmitted = false
+        recordedDurationMs = 0.0
+        firstDetectedSpeechMs = null
+        lastDetectedSpeechMs = null
     }
 
     private fun emitEvent(event: Map<String, Any>) {
