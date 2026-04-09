@@ -22,65 +22,32 @@ class ParagraphVisibilityControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 360;
-        return SegmentedButton<RetellDisplayMode>(
-          direction: isCompact ? Axis.vertical : Axis.horizontal,
-          showSelectedIcon: false,
-          segments: [
-            ButtonSegment(
-              value: RetellDisplayMode.hideAll,
-              label: _ParagraphVisibilitySegmentLabel(
-                text: _displayModeLabel(
-                  context,
-                  regularText: l10n.retellDisplayHideAll,
-                  compactEnglishText: 'Hide',
-                  isCompact: isCompact,
-                ),
-              ),
-            ),
-            ButtonSegment(
-              value: RetellDisplayMode.keywordsOnly,
-              label: _ParagraphVisibilitySegmentLabel(
-                text: _displayModeLabel(
-                  context,
-                  regularText: l10n.retellDisplayKeywordsOnly,
-                  compactEnglishText: 'Visible',
-                  isCompact: isCompact,
-                ),
-              ),
-            ),
-            ButtonSegment(
-              value: RetellDisplayMode.showAll,
-              label: _ParagraphVisibilitySegmentLabel(
-                text: _displayModeLabel(
-                  context,
-                  regularText: l10n.retellDisplayShowAll,
-                  compactEnglishText: 'Show',
-                  isCompact: isCompact,
-                ),
-              ),
-            ),
-          ],
-          selected: {selectedMode},
-          onSelectionChanged: (selected) => onChanged(selected.first),
-        );
-      },
+    return SegmentedButton<RetellDisplayMode>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: RetellDisplayMode.hideAll,
+          label: _ParagraphVisibilitySegmentLabel(
+            text: l10n.retellDisplayHideAll,
+          ),
+        ),
+        ButtonSegment(
+          value: RetellDisplayMode.keywordsOnly,
+          label: _ParagraphVisibilitySegmentLabel(
+            text: l10n.retellDisplayKeywordsOnly,
+          ),
+        ),
+        ButtonSegment(
+          value: RetellDisplayMode.showAll,
+          label: _ParagraphVisibilitySegmentLabel(
+            text: l10n.retellDisplayShowAll,
+          ),
+        ),
+      ],
+      selected: {selectedMode},
+      onSelectionChanged: (selected) => onChanged(selected.first),
     );
   }
-}
-
-String _displayModeLabel(
-  BuildContext context, {
-  required String regularText,
-  required String compactEnglishText,
-  required bool isCompact,
-}) {
-  if (!isCompact) return regularText;
-  return Localizations.localeOf(context).languageCode == 'en'
-      ? compactEnglishText
-      : regularText;
 }
 
 class _ParagraphVisibilitySegmentLabel extends StatelessWidget {
