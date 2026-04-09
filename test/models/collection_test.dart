@@ -10,7 +10,7 @@ void main() {
         id: 'col-1',
         name: '我的合集',
         createdDate: now,
-        isStarred: true,
+        isPinned: true,
       );
     }
 
@@ -20,7 +20,7 @@ void main() {
           'id': 'col-1',
           'name': '我的合集',
           'createdDate': now.toIso8601String(),
-          'isStarred': true,
+          'isPinned': true,
           'audioItemIds': ['a1', 'a2'], // 旧格式兼容
         };
         final col = Collection.fromJson(json);
@@ -28,7 +28,18 @@ void main() {
         expect(col.id, 'col-1');
         expect(col.name, '我的合集');
         expect(col.createdDate, now);
-        expect(col.isStarred, true);
+        expect(col.isPinned, true);
+      });
+
+      test('兼容旧 isStarred key', () {
+        final json = {
+          'id': 'col-1',
+          'name': '旧格式',
+          'createdDate': now.toIso8601String(),
+          'isStarred': true,
+        };
+        final col = Collection.fromJson(json);
+        expect(col.isPinned, true);
       });
 
       test('处理缺失可选字段', () {
@@ -39,7 +50,7 @@ void main() {
         };
         final col = Collection.fromJson(json);
 
-        expect(col.isStarred, isFalse);
+        expect(col.isPinned, isFalse);
       });
     });
 
@@ -67,10 +78,10 @@ void main() {
     group('copyWith', () {
       test('部分字段覆盖', () {
         final col = createSample();
-        final copied = col.copyWith(name: '新合集', isStarred: false);
+        final copied = col.copyWith(name: '新合集', isPinned: false);
 
         expect(copied.name, '新合集');
-        expect(copied.isStarred, isFalse);
+        expect(copied.isPinned, isFalse);
         expect(copied.id, col.id);
       });
     });

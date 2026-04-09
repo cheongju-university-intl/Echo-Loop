@@ -118,7 +118,7 @@ void main() {
       final cols = await db.collectionDao.getAllActive();
       expect(cols.length, 1);
       expect(cols.first.name, 'Collection 1');
-      expect(cols.first.isStarred, true);
+      expect(cols.first.isPinned, true);
 
       final audioIds = await db.collectionDao.getAudioIds('c1');
       expect(audioIds.length, 2);

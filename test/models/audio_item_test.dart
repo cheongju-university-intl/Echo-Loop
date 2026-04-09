@@ -10,7 +10,7 @@ void main() {
       int totalDuration = 120,
       int sentenceCount = 10,
       int wordCount = 50,
-      bool isStarred = false,
+      bool isPinned = false,
       TranscriptSource? transcriptSource,
       String? audioSha256,
       String? transcriptLanguage,
@@ -24,7 +24,7 @@ void main() {
         totalDuration: totalDuration,
         sentenceCount: sentenceCount,
         wordCount: wordCount,
-        isStarred: isStarred,
+        isPinned: isPinned,
         transcriptSource: transcriptSource,
         audioSha256: audioSha256,
         transcriptLanguage: transcriptLanguage,
@@ -45,15 +45,15 @@ void main() {
         expect(restored.totalDuration, item.totalDuration);
         expect(restored.sentenceCount, item.sentenceCount);
         expect(restored.wordCount, item.wordCount);
-        expect(restored.isStarred, item.isStarred);
+        expect(restored.isPinned, item.isPinned);
       });
 
-      test('isStarred=true 往返一致', () {
-        final item = createSample(isStarred: true);
+      test('isPinned=true 往返一致', () {
+        final item = createSample(isPinned: true);
         final json = item.toJson();
         final restored = AudioItem.fromJson(json);
 
-        expect(restored.isStarred, isTrue);
+        expect(restored.isPinned, isTrue);
       });
 
       test('transcriptPath 为 null 时往返一致', () {
@@ -89,11 +89,11 @@ void main() {
         expect(copied.wordCount, 100);
       });
 
-      test('isStarred 覆盖', () {
-        final item = createSample(isStarred: false);
-        final copied = item.copyWith(isStarred: true);
+      test('isPinned 覆盖', () {
+        final item = createSample(isPinned: false);
+        final copied = item.copyWith(isPinned: true);
 
-        expect(copied.isStarred, isTrue);
+        expect(copied.isPinned, isTrue);
         // 未修改的字段保持不变
         expect(copied.id, item.id);
         expect(copied.name, item.name);
@@ -153,7 +153,7 @@ void main() {
       expect(item.wordCount, 0);
     });
 
-    test('fromJson 处理缺失 isStarred 字段（默认 false）', () {
+    test('fromJson 处理缺失 isPinned 字段（默认 false）', () {
       final json = {
         'id': 'audio-1',
         'name': '测试',
@@ -161,13 +161,13 @@ void main() {
         'transcriptPath': null,
         'addedDate': now.toIso8601String(),
         'totalDuration': 60,
-        // 无 isStarred
+        // 无 isPinned
       };
       final item = AudioItem.fromJson(json);
-      expect(item.isStarred, isFalse);
+      expect(item.isPinned, isFalse);
     });
 
-    test('默认 sentenceCount、wordCount 为 0，isStarred 为 false', () {
+    test('默认 sentenceCount、wordCount 为 0，isPinned 为 false', () {
       final item = AudioItem(
         id: 'audio-1',
         name: '测试',
@@ -176,7 +176,7 @@ void main() {
       );
       expect(item.sentenceCount, 0);
       expect(item.wordCount, 0);
-      expect(item.isStarred, isFalse);
+      expect(item.isPinned, isFalse);
     });
 
     group('TranscriptSource 枚举', () {

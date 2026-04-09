@@ -16,7 +16,7 @@ import 'groups/blind_listen_tests.dart';
 import 'groups/intensive_listen_tests.dart';
 import 'groups/listen_and_repeat_tests.dart';
 import 'groups/learning_flow_tests.dart';
-import 'groups/audio_star_tests.dart';
+import 'groups/audio_pin_tests.dart';
 import 'groups/tag_tests.dart';
 import 'groups/stats_display_tests.dart';
 import 'groups/retell_tests.dart';
@@ -34,7 +34,7 @@ void main() {
   navigationTests();
   settingsTests();
   collectionTests();
-  audioStarTests();
+  audioPinTests();
   tagTests();
   learningPlanTests();
   blindListenTests();

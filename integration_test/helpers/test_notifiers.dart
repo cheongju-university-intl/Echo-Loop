@@ -194,14 +194,14 @@ List<Sentence> createTestSentences({int count = 5}) {
 Collection createTestCollection({
   String id = 'test-collection-1',
   String name = 'Test Collection',
-  bool isStarred = false,
+  bool isPinned = false,
   DateTime? createdDate,
 }) {
   return Collection(
     id: id,
     name: name,
     createdDate: createdDate ?? DateTime(2026, 1, 1),
-    isStarred: isStarred,
+    isPinned: isPinned,
   );
 }
 
@@ -304,11 +304,15 @@ class TestAudioLibrary extends AudioLibrary {
   }
 
   @override
-  Future<void> toggleStar(String id) async {
+  Future<void> togglePin(String id) async {
     final items = [...state.audioItems];
     final index = items.indexWhere((item) => item.id == id);
     if (index != -1) {
-      items[index] = items[index].copyWith(isStarred: !items[index].isStarred);
+      items[index] = items[index].copyWith(isPinned: !items[index].isPinned);
+      items.sort((a, b) {
+        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+        return b.addedDate.compareTo(a.addedDate);
+      });
       state = state.copyWith(audioItems: items);
     }
   }
@@ -342,12 +346,12 @@ class TestCollectionList extends CollectionList {
   }
 
   @override
-  Future<void> toggleStar(String id) async {
+  Future<void> togglePin(String id) async {
     final collections = [...state.rawCollections];
     final index = collections.indexWhere((c) => c.id == id);
     if (index != -1) {
       collections[index] = collections[index].copyWith(
-        isStarred: !collections[index].isStarred,
+        isPinned: !collections[index].isPinned,
       );
       state = state.copyWith(rawCollections: collections);
     }
@@ -1368,10 +1372,7 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
     _testSentences = List.from(_testSentences)..removeAt(removedIndex);
 
     if (_testSentences.isEmpty) {
-      state = state.copyWith(
-        isPlaying: false,
-        totalSentences: 0,
-      );
+      state = state.copyWith(isPlaying: false, totalSentences: 0);
       return removed;
     }
 

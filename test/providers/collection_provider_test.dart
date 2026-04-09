@@ -10,13 +10,13 @@ void main() {
       required String id,
       required String name,
       DateTime? createdDate,
-      bool isStarred = false,
+      bool isPinned = false,
     }) {
       return Collection(
         id: id,
         name: name,
         createdDate: createdDate ?? now,
-        isStarred: isStarred,
+        isPinned: isPinned,
       );
     }
 
@@ -109,6 +109,104 @@ void main() {
       });
     });
 
+    group('置顶排序', () {
+      test('置顶合集始终排在最前面（dateDesc 排序）', () {
+        final state = CollectionState(
+          rawCollections: [
+            createCollection(
+              id: '1',
+              name: 'A集',
+              createdDate: DateTime(2026, 1, 15),
+            ),
+            createCollection(
+              id: '2',
+              name: 'B集',
+              createdDate: DateTime(2026, 1, 10),
+              isPinned: true,
+            ),
+            createCollection(
+              id: '3',
+              name: 'C集',
+              createdDate: DateTime(2026, 1, 12),
+            ),
+          ],
+          sortType: CollectionSortType.dateDesc,
+        );
+        final sorted = state.collections;
+        // 置顶项 B集 排第一，其余按日期倒序
+        expect(sorted[0].id, '2');
+        expect(sorted[1].id, '1');
+        expect(sorted[2].id, '3');
+      });
+
+      test('置顶合集始终排在最前面（nameAsc 排序）', () {
+        final state = CollectionState(
+          rawCollections: [
+            createCollection(id: '1', name: 'B集'),
+            createCollection(id: '2', name: 'A集'),
+            createCollection(id: '3', name: 'C集', isPinned: true),
+          ],
+          sortType: CollectionSortType.nameAsc,
+        );
+        final sorted = state.collections;
+        // 置顶项 C集 排第一，其余按名称升序
+        expect(sorted[0].id, '3');
+        expect(sorted[1].id, '2');
+        expect(sorted[2].id, '1');
+      });
+
+      test('多个置顶合集之间保持排序类型的顺序', () {
+        final state = CollectionState(
+          rawCollections: [
+            createCollection(
+              id: '1',
+              name: 'C集',
+              createdDate: DateTime(2026, 1, 15),
+              isPinned: true,
+            ),
+            createCollection(
+              id: '2',
+              name: 'A集',
+              createdDate: DateTime(2026, 1, 10),
+              isPinned: true,
+            ),
+            createCollection(
+              id: '3',
+              name: 'B集',
+              createdDate: DateTime(2026, 1, 12),
+            ),
+          ],
+          sortType: CollectionSortType.nameAsc,
+        );
+        final sorted = state.collections;
+        // 置顶区按名称升序：A集, C集；非置顶区：B集
+        expect(sorted[0].id, '2'); // A集
+        expect(sorted[1].id, '1'); // C集
+        expect(sorted[2].id, '3'); // B集
+      });
+
+      test('无置顶时排序行为不变', () {
+        final state = CollectionState(
+          rawCollections: [
+            createCollection(
+              id: '1',
+              name: 'B集',
+              createdDate: DateTime(2026, 1, 10),
+            ),
+            createCollection(
+              id: '2',
+              name: 'A集',
+              createdDate: DateTime(2026, 1, 15),
+            ),
+          ],
+          sortType: CollectionSortType.nameAsc,
+        );
+        final sorted = state.collections;
+        expect(sorted[0].name, 'A集');
+        expect(sorted[1].name, 'B集');
+      });
+    });
+
     group('audioIdsMap', () {
       test('getAudioIds 返回对应合集的音频 ID 列表', () {
         final state = CollectionState(
@@ -149,9 +247,8 @@ void main() {
 
         // 模拟修复后的 deleteCollection 逻辑
         const deleteId = 'c1';
-        final newMap = Map<String, List<String>>.from(
-          initialState.audioIdsMap,
-        )..remove(deleteId);
+        final newMap = Map<String, List<String>>.from(initialState.audioIdsMap)
+          ..remove(deleteId);
         final newState = initialState.copyWith(
           rawCollections: initialState.rawCollections
               .where((c) => c.id != deleteId)
@@ -180,9 +277,8 @@ void main() {
         );
 
         const deleteId = 'c2';
-        final newMap = Map<String, List<String>>.from(
-          initialState.audioIdsMap,
-        )..remove(deleteId);
+        final newMap = Map<String, List<String>>.from(initialState.audioIdsMap)
+          ..remove(deleteId);
         final newState = initialState.copyWith(
           rawCollections: initialState.rawCollections
               .where((c) => c.id != deleteId)

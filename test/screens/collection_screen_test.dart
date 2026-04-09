@@ -54,12 +54,12 @@ void main() {
         final c1 = createTestCollection(
           id: '1',
           name: 'English Lessons',
-          isStarred: true,
+          isPinned: true,
         );
         final c2 = createTestCollection(
           id: '2',
           name: 'Podcasts',
-          isStarred: false,
+          isPinned: false,
         );
 
         await tester.pumpWidget(
@@ -97,11 +97,11 @@ void main() {
         expect(find.textContaining('1 audios'), findsOneWidget);
       });
 
-      testWidgets('星标合集显示星标图标', (tester) async {
+      testWidgets('置顶合集显示图钉图标', (tester) async {
         final c = createTestCollection(
           id: '1',
           name: 'Starred',
-          isStarred: true,
+          isPinned: true,
         );
 
         await tester.pumpWidget(
@@ -127,8 +127,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // 星标合集显示实心星标
-        expect(find.byIcon(Icons.star), findsOneWidget);
+        // 置顶合集显示实心图钉
+        expect(find.byIcon(Icons.push_pin), findsOneWidget);
       });
 
       testWidgets('加载中显示进度指示器', (tester) async {
@@ -227,11 +227,11 @@ void main() {
         expect(find.text('No audio files yet'), findsOneWidget);
       });
 
-      testWidgets('点击星标切换', (tester) async {
+      testWidgets('点击置顶切换', (tester) async {
         final c = createTestCollection(
           id: '1',
           name: 'Test Collection',
-          isStarred: false,
+          isPinned: false,
         );
 
         await tester.pumpWidget(
@@ -257,15 +257,15 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // 初始状态应为空心星标
-        expect(find.byIcon(Icons.star_border), findsOneWidget);
+        // 初始状态应为空心图钉
+        expect(find.byIcon(Icons.push_pin_outlined), findsOneWidget);
 
-        // 点击星标
-        await tester.tap(find.byIcon(Icons.star_border));
+        // 点击置顶
+        await tester.tap(find.byIcon(Icons.push_pin_outlined));
         await tester.pumpAndSettle();
 
-        // 切换后应为实心星标
-        expect(find.byIcon(Icons.star), findsOneWidget);
+        // 切换后应为实心图钉
+        expect(find.byIcon(Icons.push_pin), findsOneWidget);
       });
     });
   });
