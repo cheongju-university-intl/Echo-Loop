@@ -1,7 +1,22 @@
 # Fluency 任务清单
 
-> 最后更新：2026-04-03
-> 当前焦点：录音+识别功能
+> 最后更新：2026-04-09
+> 当前焦点：本地 ASR 引擎集成
+
+## 已完成：本地 ASR 引擎集成（sherpa-onnx）
+
+- [x] 统一 `OfflineAsrEngine` 接口，支持 Moonshine 和 Whisper ONNX 模型
+- [x] `SherpaOnnxEngine` 实现：Recognizer 常驻内存，Android 尝试 NNAPI 加速（fallback CPU）
+- [x] `AsrModelManager`：HuggingFace 镜像下载、进度回调、本地缓存
+- [x] `AudioFileReader`：支持 WAV（RIFF）和 CAF（Float32/Int16）格式解析
+- [x] `OfflineAsrBackend` 装饰器：拦截空 transcript 补充离线转录（待接入 provider）
+- [x] 开发者 ASR 测试页面：引擎切换、模型下载、录音、转录结果、性能指标、事件日志
+- [x] Android `warmup` 增加 `hasGms` 字段透传
+- [x] 单元测试 14 个 + 集成测试 1 个
+
+  **完成时间**: 2026-04-09
+
+---
 
 ## 历史归档
 - [Milestone 2 - 学习流程引擎](./docs/tasks-archive/milestone-2-learning-engine.md)

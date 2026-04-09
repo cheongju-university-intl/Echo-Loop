@@ -32,6 +32,7 @@ import '../services/demo_data_seeder.dart';
 import '../models/dict_entry.dart';
 import '../services/dictionary_service.dart';
 import '../theme/app_theme.dart';
+import 'asr_test_screen.dart';
 import 'log_viewer_screen.dart';
 import 'reminder_settings_screen.dart';
 import '../widgets/app_update_dialog.dart';
@@ -413,6 +414,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             l10n,
             controller,
             settings.timeMachineDateTime,
+          ),
+        ),
+        ListTile(
+          leading: _emojiIcon('🎙'),
+          title: const Text('ASR 引擎测试'),
+          subtitle: const Text('测试 Platform / Moonshine / Whisper'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const AsrTestScreen()),
           ),
         ),
         ListTile(
