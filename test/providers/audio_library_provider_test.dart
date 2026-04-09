@@ -71,48 +71,23 @@ void main() {
       expect(container.read(audioLibraryProvider).audioItems.length, before);
     });
 
-    test('置顶后的音频排在列表最前面', () async {
+    test('togglePin 不改变列表顺序（排序由 UI 层 sortAudioItems 负责）', () async {
       final notifier = container.read(audioLibraryProvider.notifier);
-      // 置顶最后一项 a1（日期最早）
-      await notifier.togglePin('a1');
-
-      final ids = container
+      final idsBefore = container
           .read(audioLibraryProvider)
           .audioItems
           .map((i) => i.id)
           .toList();
-      // a1 应排到最前面，其余保持日期倒序
-      expect(ids, ['a1', 'a3', 'a2']);
-    });
 
-    test('多个置顶项之间按添加日期倒序排列', () async {
-      final notifier = container.read(audioLibraryProvider.notifier);
-      // 置顶 a1（jan1）和 a2（jan5）
       await notifier.togglePin('a1');
-      await notifier.togglePin('a2');
 
-      final ids = container
+      final idsAfter = container
           .read(audioLibraryProvider)
           .audioItems
           .map((i) => i.id)
           .toList();
-      // 置顶区：a2(jan5) > a1(jan1)，非置顶区：a3(jan10)
-      expect(ids, ['a2', 'a1', 'a3']);
-    });
-
-    test('取消置顶后音频回到日期排序的正确位置', () async {
-      final notifier = container.read(audioLibraryProvider.notifier);
-      await notifier.togglePin('a1');
-      // 此时顺序：a1, a3, a2
-
-      await notifier.togglePin('a1');
-      // 取消置顶后回到日期倒序：a3(jan10), a2(jan5), a1(jan1)
-      final ids = container
-          .read(audioLibraryProvider)
-          .audioItems
-          .map((i) => i.id)
-          .toList();
-      expect(ids, ['a3', 'a2', 'a1']);
+      // 顺序不变，只有 isPinned 字段变化
+      expect(idsAfter, idsBefore);
     });
   });
 }

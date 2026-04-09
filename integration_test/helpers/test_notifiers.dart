@@ -309,10 +309,6 @@ class TestAudioLibrary extends AudioLibrary {
     final index = items.indexWhere((item) => item.id == id);
     if (index != -1) {
       items[index] = items[index].copyWith(isPinned: !items[index].isPinned);
-      items.sort((a, b) {
-        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-        return b.addedDate.compareTo(a.addedDate);
-      });
       state = state.copyWith(audioItems: items);
     }
   }

@@ -17,7 +17,10 @@ class CollectionDao extends DatabaseAccessor<AppDatabase>
   Future<List<Collection>> getAllActive() {
     return (select(collections)
           ..where((t) => t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.desc(t.createdDate)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.isPinned),
+            (t) => OrderingTerm.desc(t.createdDate),
+          ]))
         .get();
   }
 
@@ -25,7 +28,10 @@ class CollectionDao extends DatabaseAccessor<AppDatabase>
   Stream<List<Collection>> watchAllActive() {
     return (select(collections)
           ..where((t) => t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.desc(t.createdDate)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.isPinned),
+            (t) => OrderingTerm.desc(t.createdDate),
+          ]))
         .watch();
   }
 

@@ -243,19 +243,14 @@ class AudioLibrary extends _$AudioLibrary {
     }
   }
 
-  /// 切换音频置顶状态（乐观更新 + 重排 + 持久化）
+  /// 切换音频置顶状态（乐观更新 + 持久化，排序由 UI 层统一处理）
   Future<void> togglePin(String id) async {
     final items = [...state.audioItems];
     final index = items.indexWhere((item) => item.id == id);
     if (index != -1) {
       items[index] = items[index].copyWith(isPinned: !items[index].isPinned);
-      // 置顶项固定在前，非置顶项按添加日期倒序
-      items.sort((a, b) {
-        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-        return b.addedDate.compareTo(a.addedDate);
-      });
       state = state.copyWith(audioItems: items);
-      await _upsertItem(items.firstWhere((item) => item.id == id));
+      await _upsertItem(items[index]);
     }
   }
 
