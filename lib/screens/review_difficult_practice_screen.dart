@@ -366,7 +366,32 @@ class _ReviewDifficultPracticeScreenState
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    final playerState = ref.watch(reviewDifficultPracticeProvider);
+    // select 过滤倒计时 tick（100ms 一次的 remaining 变化），避免整页频繁 rebuild
+    // 导致 TapGestureRecognizer 被反复 dispose/重建，点击单词无法触发词典弹窗。
+    ref.watch(
+      reviewDifficultPracticeProvider.select(
+        (s) => (
+          s.currentSentenceIndex,
+          s.totalSentences,
+          s.currentPlayCount,
+          s.isPlaying,
+          s.isPauseBetweenPlays,
+          s.isAnnotationMode,
+          s.isTextRevealed,
+          s.isCountdownPaused,
+          s.stepFinished,
+          s.bookmarkVersion,
+          s.isManualMode,
+          s.settings,
+          s.repeatFlowState?.phase.runtimeType,
+          s.repeatFlowState?.repeatIndex,
+          s.repeatFlowState?.isReviewPlaybackActive,
+          s.repeatFlowState?.recordingScore,
+          s.blindFlowState?.phase.runtimeType,
+        ),
+      ),
+    );
+    final playerState = ref.read(reviewDifficultPracticeProvider);
     final player = ref.read(reviewDifficultPracticeProvider.notifier);
 
     // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
