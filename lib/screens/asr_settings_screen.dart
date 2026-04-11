@@ -331,7 +331,8 @@ class _AsrSettingsScreenState extends ConsumerState<AsrSettingsScreen> {
 
   static String _modelLabel(String modelId) {
     if (modelId.contains('tiny')) return 'Fast';
-    if (modelId.contains('base')) return 'Accurate';
+    if (modelId.contains('base')) return 'Balanced';
+    if (modelId.contains('small')) return 'Accurate';
     return '';
   }
 
