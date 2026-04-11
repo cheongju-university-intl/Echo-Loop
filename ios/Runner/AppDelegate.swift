@@ -281,15 +281,19 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       let req = SFSpeechAudioBufferRecognitionRequest()
       req.shouldReportPartialResults = true
       request = req
+    }
 
+    // 必须先 resetSentenceState（递增 generation），再创建 recognitionTask（capture generation）
+    resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
+
+    if recognitionEnabled, let req = request {
+      let recognizer = cachedRecognizer ?? SFSpeechRecognizer(locale: Locale(identifier: locale))
       let generation = sessionGeneration
-      recognitionTask = recognizer.recognitionTask(with: req) { [weak self] recognitionResult, error in
+      recognitionTask = recognizer!.recognitionTask(with: req) { [weak self] recognitionResult, error in
         guard let self, self.sessionGeneration == generation else { return }
         self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
       }
     }
-
-    resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
 
     isRecording = true
     result(["filePath": fileURL.path])
@@ -354,16 +358,19 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
         request = req
+      }
 
+      // 必须先 resetSentenceState（递增 generation），再创建 recognitionTask
+      resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
+      audioEngine = engine
+
+      if recognitionEnabled, let recognizer = cachedRecognizer, let req = request {
         let generation = sessionGeneration
         recognitionTask = recognizer.recognitionTask(with: req) { [weak self] recognitionResult, error in
           guard let self, self.sessionGeneration == generation else { return }
           self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
         }
       }
-
-      resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
-      audioEngine = engine
 
       inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
         guard let self, self.isRecording else { return }
