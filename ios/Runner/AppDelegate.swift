@@ -786,7 +786,7 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   }
 
   /// 重置句子级状态变量。
-  private func resetSentenceState(promptId: String, fileURL: URL, audioFile: AVAudioFile, request: SFSpeechAudioBufferRecognitionRequest) {
+  private func resetSentenceState(promptId: String, fileURL: URL, audioFile: AVAudioFile, request: SFSpeechAudioBufferRecognitionRequest?) {
     sessionGeneration += 1
     currentPromptId = promptId
     currentFileURL = fileURL
