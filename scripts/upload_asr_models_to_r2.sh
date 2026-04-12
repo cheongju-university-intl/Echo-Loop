@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 从 HuggingFace 镜像下载 whisper 模型文件，校验 SHA256，上传到 R2。
-# 一次性脚本，模型文件固定后不需要重复运行。
+# 支持断点续传：自动跳过 R2 上已存在且大小匹配的文件。
 #
 # 用法:
 #   scripts/upload_asr_models_to_r2.sh
@@ -24,7 +24,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 log() { echo "$(date +%H:%M:%S) $*"; }
 fail() { log "✗ $*"; exit 1; }
 
-# 校验 SHA256，失败则退出
+# 校验 SHA256
 verify_sha256() {
   local file="$1" expected="$2"
   local actual
@@ -32,7 +32,22 @@ verify_sha256() {
   if [[ "$actual" != "$expected" ]]; then
     fail "SHA256 不匹配: $file\n  期望: $expected\n  实际: $actual"
   fi
-  log "    ✓ SHA256 校验通过"
+}
+
+# 检查 R2 上文件是否已存在且大小匹配
+r2_file_exists() {
+  local r2_key="$1" expected_size="$2"
+  local result
+  result=$(AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID_PUBLIC" \
+    AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY_PUBLIC" \
+    aws s3api head-object \
+      --bucket "$R2_BUCKET" \
+      --key "$r2_key" \
+      --endpoint-url "$R2_ENDPOINT" 2>/dev/null) || return 1
+
+  local remote_size
+  remote_size=$(echo "$result" | python3 -c "import sys,json; print(json.load(sys.stdin)['ContentLength'])" 2>/dev/null)
+  [[ "$remote_size" == "$expected_size" ]]
 }
 
 # 模型定义: model_id|hf_repo|commit|filename:sha256,filename:sha256,...
@@ -50,22 +65,45 @@ for entry in "${MODELS[@]}"; do
 
   for spec in "${file_specs[@]}"; do
     IFS=':' read -r filename expected_sha <<< "$spec"
+    r2_key="model/$model_id/$filename"
     url="$HF_MIRROR/$hf_repo/resolve/$commit/$filename"
     local_path="$TMP_DIR/$filename"
 
+    # 下载到本地获取预期大小（用 HEAD 请求）
+    expected_size=$(curl -fsSLI "$url" | grep -i content-length | tail -1 | tr -dc '0-9')
+
+    # 检查 R2 是否已有且大小匹配
+    if r2_file_exists "$r2_key" "$expected_size"; then
+      log "  ⏭ $filename 已存在，跳过"
+      continue
+    fi
+
+    # 下载
     log "  ↓ 下载 $filename ..."
-    curl -fSL --progress-bar -o "$local_path" "$url"
+    if ! curl -fSL --progress-bar -o "$local_path" "$url"; then
+      log "  ✗ 下载失败: $filename"
+      rm -f "$local_path"
+      continue
+    fi
 
+    # 校验
     log "  🔒 校验 SHA256 ..."
-    verify_sha256 "$local_path" "$expected_sha"
+    if ! verify_sha256 "$local_path" "$expected_sha"; then
+      log "  ✗ 校验失败，删除: $filename"
+      rm -f "$local_path"
+      continue
+    fi
+    log "    ✓ SHA256 校验通过"
 
-    r2_key="model/$model_id/$filename"
+    # 上传
     log "  ↑ 上传 → s3://${R2_BUCKET}/${r2_key}"
-    AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID_PUBLIC" \
-    AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY_PUBLIC" \
-    aws s3 cp "$local_path" "s3://${R2_BUCKET}/${r2_key}" \
-      --endpoint-url "$R2_ENDPOINT" \
-      --no-progress
+    if ! AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID_PUBLIC" \
+      AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY_PUBLIC" \
+      aws s3 cp "$local_path" "s3://${R2_BUCKET}/${r2_key}" \
+        --endpoint-url "$R2_ENDPOINT" \
+        --no-progress; then
+      log "  ✗ 上传失败: $filename"
+    fi
 
     rm -f "$local_path"
   done
