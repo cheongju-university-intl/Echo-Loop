@@ -1,7 +1,7 @@
 /// 语音识别设置页。
 ///
-/// iOS/macOS：全局开关 + 后端选择（Apple 自带 / 应用模型）+ 离线模型管理。
-/// Android：全局开关 + 离线模型管理（固定应用模型）。
+/// iOS/macOS：全局开关 + 后端选择（Apple Speech / Echo Loop AI）+ 离线模型状态。
+/// Android：全局开关 + 离线模型状态（固定 Echo Loop AI）。
 library;
 
 import 'dart:io' show Platform;
@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/offline_asr_settings_provider.dart';
 import '../services/asr/asr_model_manager.dart';
+import '../theme/app_theme.dart';
 
 /// 语音识别设置页。
 class AsrSettingsScreen extends ConsumerStatefulWidget {
@@ -25,9 +26,7 @@ class _AsrSettingsScreenState extends ConsumerState<AsrSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    // 进入设置页时，如果离线模型未下载完成，自动恢复下载。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 仅对 failed 状态自动恢复下载，notDownloaded 等用户手动操作。
       final state = ref.read(offlineAsrSettingsProvider);
       if (state.enabled &&
           state.backend == AsrBackend.offline &&
@@ -48,179 +47,223 @@ class _AsrSettingsScreenState extends ConsumerState<AsrSettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.speechRecognition)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.m),
         children: [
-          // 说明卡片
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                l10n.speechRecognitionDescription,
-                style: theme.textTheme.bodyMedium,
+          // 说明文字（轻量，无背景）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s, 0, AppSpacing.s, AppSpacing.m,
+            ),
+            child: Text(
+              l10n.speechRecognitionDescription,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
-          const SizedBox(height: 16),
 
-          // 全局开关
+          // 主卡片：开关 + 后端选择 + 模型状态
           Card(
-            child: SwitchListTile(
-              title: Text(l10n.speechRecognition),
-              subtitle: Text(
-                state.enabled
-                    ? l10n.speechRecognitionEnabled
-                    : l10n.speechRecognitionDisabled,
-              ),
-              value: state.enabled,
-              onChanged: (value) => _onEnabledToggle(context, ref, l10n, value),
+            child: Column(
+              children: [
+                // 全局开关
+                SwitchListTile(
+                  title: Text(l10n.speechRecognition),
+                  subtitle: Text(
+                    state.enabled
+                        ? l10n.speechRecognitionEnabled
+                        : l10n.speechRecognitionDisabled,
+                  ),
+                  value: state.enabled,
+                  onChanged: (v) => _onEnabledToggle(context, ref, l10n, v),
+                ),
+
+                // 以下内容仅在开启时显示
+                if (state.enabled) ...[
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+
+                  // iOS/macOS：后端选择
+                  if (showBackendSelector) ...[
+                    _buildBackendSelector(l10n, state, theme),
+                  ],
+
+                  // Android：无后端选择，直接显示模型状态
+                  if (!showBackendSelector) ...[
+                    _buildOfflineModelTile(l10n, state, theme),
+                  ],
+
+                  // 离线模型进度/错误（选中 offline 时）
+                  if (state.backend == AsrBackend.offline)
+                    _buildOfflineStatus(l10n, state, theme),
+                ],
+              ],
             ),
           ),
-
-          // 后端选择（仅 iOS/macOS）
-          if (showBackendSelector && state.enabled) ...[
-            const SizedBox(height: 16),
-            _buildBackendSelector(context, l10n, state, theme),
-          ],
-
-          // 离线模型管理（backend == offline 且已启用）
-          if (state.enabled && state.backend == AsrBackend.offline) ...[
-            const SizedBox(height: 16),
-            _buildOfflineModelCard(context, l10n, state, theme),
-          ],
-
         ],
       ),
     );
   }
 
-  // ========== 后端选择器 ==========
+  // ========== 后端选择器（iOS/macOS）==========
 
   Widget _buildBackendSelector(
-    BuildContext context,
     AppLocalizations l10n,
     OfflineAsrSettingsState state,
     ThemeData theme,
   ) {
-    return Card(
-      child: RadioGroup<AsrBackend>(
-        groupValue: state.backend,
-        onChanged: (value) {
-          if (value != null) {
-            ref.read(offlineAsrSettingsProvider.notifier).setBackend(value);
-          }
-        },
-        child: Column(
-          children: [
-            RadioListTile<AsrBackend>(
-              title: Text(l10n.asrBackendPlatform),
-              subtitle: Text(l10n.asrBackendPlatformDescription),
-              value: AsrBackend.platform,
+    return RadioGroup<AsrBackend>(
+      groupValue: state.backend,
+      onChanged: (value) {
+        if (value != null) {
+          ref.read(offlineAsrSettingsProvider.notifier).setBackend(value);
+        }
+      },
+      child: Column(
+        children: [
+          RadioListTile<AsrBackend>(
+            title: Text(l10n.asrBackendPlatform),
+            subtitle: Text(
+              l10n.asrBackendPlatformDescription,
+              style: theme.textTheme.bodySmall,
             ),
-            const Divider(height: 1, indent: 16, endIndent: 16),
-            RadioListTile<AsrBackend>(
-              title: Text(l10n.asrBackendOffline),
-              subtitle: Text(l10n.asrBackendOfflineDescription),
-              value: AsrBackend.offline,
-            ),
-          ],
+            value: AsrBackend.platform,
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          RadioListTile<AsrBackend>(
+            title: Text(l10n.asrBackendOffline),
+            subtitle: _buildOfflineSubtitle(l10n, state, theme),
+            value: AsrBackend.offline,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========== 离线模型信息 ==========
+
+  /// Echo Loop AI 的 subtitle：显示模型档位 + 状态。
+  Widget _buildOfflineSubtitle(
+    AppLocalizations l10n,
+    OfflineAsrSettingsState state,
+    ThemeData theme,
+  ) {
+    final modelLabel = _modelLabel(state.recommendedModel.id);
+    final statusText = _modelStatusText(l10n, state);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.asrBackendOfflineDescription,
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          statusText.isEmpty ? modelLabel : '$modelLabel · $statusText',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: state.downloadStatus == AsrModelDownloadStatus.downloaded
+                ? Colors.green
+                : state.downloadStatus == AsrModelDownloadStatus.failed
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Android 直接显示模型信息的 ListTile。
+  Widget _buildOfflineModelTile(
+    AppLocalizations l10n,
+    OfflineAsrSettingsState state,
+    ThemeData theme,
+  ) {
+    final modelLabel = _modelLabel(state.recommendedModel.id);
+    final statusText = _modelStatusText(l10n, state);
+
+    return ListTile(
+      title: Text(l10n.localSpeechRecognition),
+      subtitle: Text(
+        statusText.isEmpty ? modelLabel : '$modelLabel · $statusText',
+        style: TextStyle(
+          color: state.downloadStatus == AsrModelDownloadStatus.downloaded
+              ? Colors.green
+              : null,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
   }
 
-  // ========== 离线模型管理 ==========
+  /// 模型状态文字（Ready · 358 MB / Downloading 45% / 空）。
+  String _modelStatusText(AppLocalizations l10n, OfflineAsrSettingsState state) {
+    if (state.downloadStatus == AsrModelDownloadStatus.downloaded) {
+      return l10n.speechModelReady(_formatBytes(state.localSizeBytes));
+    }
+    if (state.isDownloading) {
+      return l10n.speechModelDownloading(
+        '${(state.downloadProgress * 100).toStringAsFixed(0)}%',
+      );
+    }
+    if (state.downloadStatus == AsrModelDownloadStatus.failed) {
+      return l10n.speechModelDownloadFailed;
+    }
+    return '';
+  }
 
-  Widget _buildOfflineModelCard(
-    BuildContext context,
+  /// 下载进度条 / 错误提示（在 Card 底部展开）。
+  Widget _buildOfflineStatus(
     AppLocalizations l10n,
     OfflineAsrSettingsState state,
     ThemeData theme,
   ) {
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            title: Text(l10n.localSpeechRecognition),
-            subtitle: _buildModelSubtitle(l10n, state),
-          ),
-
-          // 下载进度条
-          if (state.isDownloading)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LinearProgressIndicator(value: state.downloadProgress),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.speechModelDownloading(
-                      '${(state.downloadProgress * 100).toStringAsFixed(0)}%',
-                    ),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-
-          // 下载失败
-          if (state.downloadStatus == AsrModelDownloadStatus.failed)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      state.errorMessage ?? l10n.speechModelDownloadFailed,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.red,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => ref
-                        .read(offlineAsrSettingsProvider.notifier)
-                        .retryDownload(),
-                    child: Text(l10n.retryDownload),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget? _buildModelSubtitle(
-    AppLocalizations l10n,
-    OfflineAsrSettingsState state,
-  ) {
-    final localSizeText = _formatBytes(state.localSizeBytes);
-    final modelLabel = _modelLabel(state.recommendedModel.id);
-
-    final isReady =
-        state.downloadStatus == AsrModelDownloadStatus.downloaded;
-
-    if (isReady) {
-      return Text(
-        '$modelLabel · ${l10n.speechModelReady(localSizeText)}',
-        style: const TextStyle(color: Colors.green),
-      );
-    }
-
     if (state.isDownloading) {
-      return Text(
-        '$modelLabel · ${l10n.speechModelDownloading('${(state.downloadProgress * 100).toStringAsFixed(0)}%')}',
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LinearProgressIndicator(value: state.downloadProgress),
+            const SizedBox(height: 4),
+            Text(
+              l10n.speechModelDownloading(
+                '${(state.downloadProgress * 100).toStringAsFixed(0)}%',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
       );
     }
 
-    if (state.localSizeBytes > 0) {
-      return Text('$modelLabel · $localSizeText');
+    if (state.downloadStatus == AsrModelDownloadStatus.failed) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                state.errorMessage ?? l10n.speechModelDownloadFailed,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => ref
+                  .read(offlineAsrSettingsProvider.notifier)
+                  .retryDownload(),
+              child: Text(l10n.retryDownload),
+            ),
+          ],
+        ),
+      );
     }
 
-    return Text(modelLabel);
+    return const SizedBox.shrink();
   }
 
   // ========== 开关操作 ==========
@@ -237,7 +280,6 @@ class _AsrSettingsScreenState extends ConsumerState<AsrSettingsScreen> {
     if (value) {
       notifier.enable();
     } else {
-      // 关闭时：如果离线模型已下载，询问是否删除
       if (state.backend == AsrBackend.offline &&
           state.downloadStatus == AsrModelDownloadStatus.downloaded) {
         _confirmDisable(context, ref, l10n);

@@ -22,6 +22,23 @@ class _StaticOfflineAsrSettingsNotifier extends OfflineAsrSettingsNotifier {
   Future<void> retryDownload() async {}
 }
 
+Widget _buildTestWidget(_StaticOfflineAsrSettingsNotifier notifier) {
+  return ProviderScope(
+    overrides: [offlineAsrSettingsProvider.overrideWith(() => notifier)],
+    child: MaterialApp(
+      supportedLocales: const [Locale('en'), Locale('zh')],
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      theme: AppTheme.light(),
+      home: const AsrSettingsScreen(),
+    ),
+  );
+}
+
 void main() {
   const recommendedModel = AsrModelInfo(
     id: 'whisper-base-en-int8',
@@ -29,7 +46,7 @@ void main() {
     type: AsrModelType.whisper,
   );
 
-  testWidgets('残缺模型显示当前本地大小', (tester) async {
+  testWidgets('残缺模型显示失败状态和模型档位', (tester) async {
     final notifier = _StaticOfflineAsrSettingsNotifier(
       OfflineAsrSettingsState(
         enabled: true,
@@ -40,57 +57,52 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [offlineAsrSettingsProvider.overrideWith(() => notifier)],
-        child: MaterialApp(
-          supportedLocales: const [Locale('en'), Locale('zh')],
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          theme: AppTheme.light(),
-          home: const AsrSettingsScreen(),
-        ),
-      ),
-    );
+    await tester.pumpWidget(_buildTestWidget(notifier));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Accurate'), findsOneWidget);
-    expect(find.textContaining('153 MB'), findsOneWidget);
+    // 显示模型档位名称
+    expect(find.textContaining('Balanced'), findsAny);
+    // 不显示 Ready（下载失败）
     expect(find.textContaining('Ready'), findsNothing);
   });
 
-  testWidgets('删除模型按钮不显示大小', (tester) async {
+  testWidgets('关闭状态下隐藏后端选择和模型信息', (tester) async {
     final notifier = _StaticOfflineAsrSettingsNotifier(
       OfflineAsrSettingsState(
         enabled: false,
+        backend: AsrBackend.offline,
         localSizeBytes: 153 * 1024 * 1024,
         recommendedModel: recommendedModel,
       ),
     );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [offlineAsrSettingsProvider.overrideWith(() => notifier)],
-        child: MaterialApp(
-          supportedLocales: const [Locale('en'), Locale('zh')],
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          theme: AppTheme.light(),
-          home: const AsrSettingsScreen(),
-        ),
-      ),
-    );
+    await tester.pumpWidget(_buildTestWidget(notifier));
     await tester.pumpAndSettle();
 
-    expect(find.text('Delete Model'), findsOneWidget);
-    expect(find.textContaining('Delete Model ('), findsNothing);
+    // 开关显示 Disabled
+    expect(find.text('Disabled'), findsOneWidget);
+    // 不显示模型档位（关闭时隐藏）
+    expect(find.textContaining('Balanced'), findsNothing);
+    // 不显示删除按钮（已移除）
+    expect(find.text('Delete Model'), findsNothing);
+  });
+
+  testWidgets('已下载模型显示 Ready 和大小', (tester) async {
+    final notifier = _StaticOfflineAsrSettingsNotifier(
+      OfflineAsrSettingsState(
+        enabled: true,
+        backend: AsrBackend.offline,
+        downloadStatus: AsrModelDownloadStatus.downloaded,
+        localSizeBytes: 153 * 1024 * 1024,
+        recommendedModel: recommendedModel,
+      ),
+    );
+
+    await tester.pumpWidget(_buildTestWidget(notifier));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Balanced'), findsAny);
+    expect(find.textContaining('Ready'), findsAny);
+    expect(find.textContaining('153 MB'), findsAny);
   });
 }
