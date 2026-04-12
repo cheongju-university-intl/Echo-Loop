@@ -45,52 +45,69 @@ class SentenceAiNotifier {
   ///
   /// L1 内存 → L2 SQLite → L3 API。
   /// 并发请求同一句子会复用同一个 Future。
+  /// [targetLanguage] 为 BCP 47 代码，用于缓存隔离和 API 调用。
   Future<SentenceTranslation> getTranslation(
     String text, {
+    required String targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final hash = hashText(text);
+    final cacheKey = '$hash:$targetLanguage';
 
     // L1: 内存缓存
-    final cached = _translationCache[hash];
+    final cached = _translationCache[cacheKey];
     if (cached != null) return cached;
 
     // 去重：复用正在进行的请求
-    if (_pendingTranslations.containsKey(hash)) {
-      return _pendingTranslations[hash]!;
+    if (_pendingTranslations.containsKey(cacheKey)) {
+      return _pendingTranslations[cacheKey]!;
     }
 
-    final future = _fetchTranslation(hash, text, cancelToken: cancelToken);
-    _pendingTranslations[hash] = future;
+    final future = _fetchTranslation(
+      hash,
+      text,
+      targetLanguage: targetLanguage,
+      cancelToken: cancelToken,
+    );
+    _pendingTranslations[cacheKey] = future;
     try {
       return await future;
     } finally {
-      _pendingTranslations.remove(hash);
+      _pendingTranslations.remove(cacheKey);
     }
   }
 
   /// 获取解析（三级缓存查找）
+  ///
+  /// [targetLanguage] 为 BCP 47 代码，用于缓存隔离和 API 调用。
   Future<SentenceAnalysis> getAnalysis(
     String text, {
+    required String targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final hash = hashText(text);
+    final cacheKey = '$hash:$targetLanguage';
 
     // L1: 内存缓存
-    final cached = _analysisCache[hash];
+    final cached = _analysisCache[cacheKey];
     if (cached != null) return cached;
 
     // 去重：复用正在进行的请求
-    if (_pendingAnalyses.containsKey(hash)) {
-      return _pendingAnalyses[hash]!;
+    if (_pendingAnalyses.containsKey(cacheKey)) {
+      return _pendingAnalyses[cacheKey]!;
     }
 
-    final future = _fetchAnalysis(hash, text, cancelToken: cancelToken);
-    _pendingAnalyses[hash] = future;
+    final future = _fetchAnalysis(
+      hash,
+      text,
+      targetLanguage: targetLanguage,
+      cancelToken: cancelToken,
+    );
+    _pendingAnalyses[cacheKey] = future;
     try {
       return await future;
     } finally {
-      _pendingAnalyses.remove(hash);
+      _pendingAnalyses.remove(cacheKey);
     }
   }
 
@@ -131,13 +148,38 @@ class SentenceAiNotifier {
   }
 
   /// 同步查找 L1 翻译缓存（仅内存）
-  SentenceTranslation? getCachedTranslation(String text) {
-    return _translationCache[hashText(text)];
+  ///
+  /// [targetLanguage] 不传时遍历所有语言版本（向后兼容），传入时精确匹配。
+  SentenceTranslation? getCachedTranslation(
+    String text, {
+    String? targetLanguage,
+  }) {
+    final hash = hashText(text);
+    if (targetLanguage != null) {
+      return _translationCache['$hash:$targetLanguage'];
+    }
+    // 向后兼容：遍历查找任意语言版本
+    for (final entry in _translationCache.entries) {
+      if (entry.key.startsWith('$hash:')) return entry.value;
+    }
+    return null;
   }
 
   /// 同步查找 L1 解析缓存（仅内存）
-  SentenceAnalysis? getCachedAnalysis(String text) {
-    return _analysisCache[hashText(text)];
+  ///
+  /// [targetLanguage] 不传时遍历所有语言版本（向后兼容），传入时精确匹配。
+  SentenceAnalysis? getCachedAnalysis(
+    String text, {
+    String? targetLanguage,
+  }) {
+    final hash = hashText(text);
+    if (targetLanguage != null) {
+      return _analysisCache['$hash:$targetLanguage'];
+    }
+    for (final entry in _analysisCache.entries) {
+      if (entry.key.startsWith('$hash:')) return entry.value;
+    }
+    return null;
   }
 
   /// 同步查找 L1 意群缓存（仅内存）
@@ -156,16 +198,20 @@ class SentenceAiNotifier {
   Future<SentenceTranslation> _fetchTranslation(
     String hash,
     String text, {
+    required String targetLanguage,
     CancelToken? cancelToken,
   }) async {
+    final cacheKey = '$hash:$targetLanguage';
+    final l2Type = 'translation:$targetLanguage';
+
     // L2: SQLite 缓存（JSON 损坏时跳过，fallthrough 到 L3）
-    final dbResult = await _cacheDao.getByHash(hash, 'translation');
+    final dbResult = await _cacheDao.getByHash(hash, l2Type);
     if (dbResult != null) {
       try {
         final translation = SentenceTranslation.fromJson(
           jsonDecode(dbResult) as Map<String, dynamic>,
         );
-        _translationCache[hash] = translation;
+        _translationCache[cacheKey] = translation;
         return translation;
       } catch (_) {
         // L2 数据损坏或结构变更，继续到 L3 API 调用
@@ -175,13 +221,14 @@ class SentenceAiNotifier {
     // L3: API 调用
     final translation = await _apiClient.translate(
       text,
+      targetLanguage: targetLanguage,
       cancelToken: cancelToken,
     );
     // 写入 L1 + L2
-    _translationCache[hash] = translation;
+    _translationCache[cacheKey] = translation;
     await _cacheDao.upsert(
       hash,
-      'translation',
+      l2Type,
       jsonEncode({'translation': translation.translation}),
     );
     return translation;
@@ -191,16 +238,20 @@ class SentenceAiNotifier {
   Future<SentenceAnalysis> _fetchAnalysis(
     String hash,
     String text, {
+    required String targetLanguage,
     CancelToken? cancelToken,
   }) async {
+    final cacheKey = '$hash:$targetLanguage';
+    final l2Type = 'analysis:$targetLanguage';
+
     // L2: SQLite 缓存（JSON 损坏时跳过，fallthrough 到 L3）
-    final dbResult = await _cacheDao.getByHash(hash, 'analysis');
+    final dbResult = await _cacheDao.getByHash(hash, l2Type);
     if (dbResult != null) {
       try {
         final analysis = SentenceAnalysis.fromJson(
           jsonDecode(dbResult) as Map<String, dynamic>,
         );
-        _analysisCache[hash] = analysis;
+        _analysisCache[cacheKey] = analysis;
         return analysis;
       } catch (_) {
         // L2 数据损坏或结构变更，继续到 L3 API 调用
@@ -208,12 +259,16 @@ class SentenceAiNotifier {
     }
 
     // L3: API 调用
-    final analysis = await _apiClient.analyze(text, cancelToken: cancelToken);
+    final analysis = await _apiClient.analyze(
+      text,
+      targetLanguage: targetLanguage,
+      cancelToken: cancelToken,
+    );
     // 写入 L1 + L2
-    _analysisCache[hash] = analysis;
+    _analysisCache[cacheKey] = analysis;
     await _cacheDao.upsert(
       hash,
-      'analysis',
+      l2Type,
       jsonEncode({
         'analysis': {
           'grammar': analysis.grammar,

@@ -47,14 +47,19 @@ class SentenceAiApiClient {
 
   /// 翻译句子
   ///
-  /// 调用后端 AI 翻译接口，返回中文翻译结果。
+  /// 调用后端 AI 翻译接口，返回目标语言的翻译结果。
+  /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
   Future<SentenceTranslation> translate(
     String text, {
+    String? targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/v1/ai/translate',
-      data: {'text': text},
+      data: {
+        'text': text,
+        if (targetLanguage != null) 'targetLanguage': targetLanguage,
+      },
       cancelToken: cancelToken,
     );
     return SentenceTranslation.fromJson(response.data!);
@@ -62,14 +67,19 @@ class SentenceAiApiClient {
 
   /// 解析句子
   ///
-  /// 调用后端 AI 解析接口，返回语法、词汇和用法分析。
+  /// 调用后端 AI 解析接口，返回语法、词汇和听力分析。
+  /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
   Future<SentenceAnalysis> analyze(
     String text, {
+    String? targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/v1/ai/analyze',
-      data: {'text': text},
+      data: {
+        'text': text,
+        if (targetLanguage != null) 'targetLanguage': targetLanguage,
+      },
       cancelToken: cancelToken,
     );
     return SentenceAnalysis.fromJson(response.data!);

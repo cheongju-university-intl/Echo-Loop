@@ -365,8 +365,14 @@ abstract class AppLocalizations {
   /// No description provided for @language.
   ///
   /// In en, this message translates to:
-  /// **'Language'**
+  /// **'App Language'**
   String get language;
+
+  /// No description provided for @languageDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Language used for the app interface'**
+  String get languageDescription;
 
   /// No description provided for @languageSystem.
   ///
@@ -385,6 +391,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'简体中文'**
   String get languageChinese;
+
+  /// No description provided for @nativeLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Native Language'**
+  String get nativeLanguage;
+
+  /// No description provided for @nativeLanguageDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Language for translations and analysis'**
+  String get nativeLanguageDescription;
 
   /// No description provided for @about.
   ///

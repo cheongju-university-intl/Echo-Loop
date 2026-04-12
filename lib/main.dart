@@ -273,7 +273,7 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
       darkTheme: AppTheme.dark(),
       themeMode: settings.themeMode,
       locale: settings.locale,
-      supportedLocales: const [Locale('en'), Locale('zh')],
+      supportedLocales: const [Locale('en'), Locale('zh', 'CN')],
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

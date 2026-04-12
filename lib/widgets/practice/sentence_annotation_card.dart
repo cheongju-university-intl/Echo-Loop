@@ -210,6 +210,22 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         }
       });
     }
+    // 母语切换：缓存内容变化时重置已展示的翻译/解析
+    if (widget.cachedTranslation != oldWidget.cachedTranslation) {
+      _translationContent = widget.cachedTranslation;
+      if (_translationContent == null && _translationExpanded) {
+        _translationExpanded = false;
+        _translationState = ContentLoadState.idle;
+        _translationActivated = false;
+      }
+    }
+    if (widget.cachedAnalysis != oldWidget.cachedAnalysis) {
+      _analysisContent = widget.cachedAnalysis;
+      if (_analysisContent == null && _analysisExpanded) {
+        _analysisExpanded = false;
+        _analysisState = ContentLoadState.idle;
+      }
+    }
     // 意群数据变化时通知工具栏刷新
     if (widget.senseGroupResult != oldWidget.senseGroupResult) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

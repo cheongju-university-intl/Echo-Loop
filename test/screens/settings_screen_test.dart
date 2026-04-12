@@ -65,7 +65,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Language'), findsOneWidget);
+        expect(find.text('App Language'), findsOneWidget);
         // 默认跟随系统
         expect(find.text('Follow System'), findsAtLeast(1));
       });
@@ -183,13 +183,13 @@ void main() {
         await tester.pumpAndSettle();
 
         // 点击语言设置项
-        await tester.tap(find.text('Language'));
+        await tester.tap(find.text('App Language'));
         await tester.pumpAndSettle();
 
         // 应弹出对话框，显示三个选项
         expect(find.text('Follow System'), findsAtLeast(1));
         expect(find.text('English'), findsAtLeast(1));
-        expect(find.text('简体中文'), findsOneWidget);
+        expect(find.text('简体中文'), findsAtLeast(1));
       });
 
       testWidgets('点击时光机弹出设置对话框', (tester) async {

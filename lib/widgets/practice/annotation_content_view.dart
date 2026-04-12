@@ -18,6 +18,7 @@ import '../../models/speech_practice_models.dart';
 import '../../models/word_timestamp.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
 import '../../providers/sentence_ai_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../providers/saved_sense_group_provider.dart';
 import '../../services/app_logger.dart';
 import '../../services/transcription_api_client.dart';
@@ -378,10 +379,16 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   @override
   Widget build(BuildContext context) {
     final ai = widget.aiNotifier;
+    final nativeLanguage = ref.watch(
+      appSettingsProvider.select((s) => s.nativeLanguage),
+    );
     final cachedTranslation = ai
-        ?.getCachedTranslation(widget.text)
+        ?.getCachedTranslation(widget.text, targetLanguage: nativeLanguage)
         ?.translation;
-    final cachedAnalysis = ai?.getCachedAnalysis(widget.text);
+    final cachedAnalysis = ai?.getCachedAnalysis(
+      widget.text,
+      targetLanguage: nativeLanguage,
+    );
     final cachedAnalysisText = cachedAnalysis?.toDisplayString();
 
     // 局部 watch 已收藏意群文本集合，避免全局重建
@@ -424,13 +431,19 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                 onToolbarStateChanged: _toolbarNotifier.notify,
                 onRequestTranslation: ai != null
                     ? () async {
-                        final result = await ai.getTranslation(widget.text);
+                        final result = await ai.getTranslation(
+                          widget.text,
+                          targetLanguage: nativeLanguage,
+                        );
                         return result.translation;
                       }
                     : null,
                 onRequestAnalysis: ai != null
                     ? () async {
-                        final result = await ai.getAnalysis(widget.text);
+                        final result = await ai.getAnalysis(
+                          widget.text,
+                          targetLanguage: nativeLanguage,
+                        );
                         return result.toDisplayString();
                       }
                     : null,

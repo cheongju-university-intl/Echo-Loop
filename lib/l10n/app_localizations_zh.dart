@@ -143,7 +143,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeModeDark => '深色模式';
 
   @override
-  String get language => '语言';
+  String get language => '应用语言';
+
+  @override
+  String get languageDescription => '应用界面使用的语言';
 
   @override
   String get languageSystem => '跟随系统';
@@ -153,6 +156,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get languageChinese => '简体中文';
+
+  @override
+  String get nativeLanguage => '母语';
+
+  @override
+  String get nativeLanguageDescription => '翻译和解析使用的语言';
 
   @override
   String get about => '关于';

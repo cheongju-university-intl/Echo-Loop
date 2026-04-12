@@ -143,7 +143,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeModeDark => 'Dark Mode';
 
   @override
-  String get language => 'Language';
+  String get language => 'App Language';
+
+  @override
+  String get languageDescription => 'Language used for the app interface';
 
   @override
   String get languageSystem => 'Follow System';
@@ -153,6 +156,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languageChinese => '简体中文';
+
+  @override
+  String get nativeLanguage => 'Native Language';
+
+  @override
+  String get nativeLanguageDescription =>
+      'Language for translations and analysis';
 
   @override
   String get about => 'About';

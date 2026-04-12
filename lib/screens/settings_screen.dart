@@ -73,6 +73,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               _buildThemeModeTile(context, l10n, settings, settingsController),
               _buildLanguageTile(context, l10n, settings, settingsController),
+              _buildNativeLanguageTile(
+                context,
+                l10n,
+                settings,
+                settingsController,
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.m),
@@ -1037,6 +1043,95 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Widget _buildNativeLanguageTile(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppSettingsState settings,
+    AppSettings controller,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayName =
+        supportedNativeLanguages[settings.nativeLanguage] ??
+        settings.nativeLanguage;
+    return ListTile(
+      leading: _emojiIcon('🗣️'),
+      title: Text(l10n.nativeLanguage),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            displayName,
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
+      onTap: () =>
+          _showNativeLanguageDialog(context, l10n, settings, controller),
+    );
+  }
+
+  void _showNativeLanguageDialog(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppSettingsState settings,
+    AppSettings controller,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.nativeLanguage),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s),
+              child: Text(
+                l10n.nativeLanguageDescription,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            for (final entry in supportedNativeLanguages.entries)
+              _buildNativeLanguageOption(
+                context,
+                settings,
+                controller,
+                entry.key,
+                entry.value,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNativeLanguageOption(
+    BuildContext context,
+    AppSettingsState settings,
+    AppSettings controller,
+    String code,
+    String label,
+  ) {
+    final isSelected = settings.nativeLanguage == code;
+    return ListTile(
+      leading: Icon(
+        isSelected ? Icons.check_circle : Icons.circle_outlined,
+        color: isSelected
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.outline,
+      ),
+      title: Text(label),
+      selected: isSelected,
+      onTap: () {
+        controller.setNativeLanguage(code);
+        Navigator.pop(context);
+      },
+    );
+  }
+
   String _getThemeModeName(AppLocalizations l10n, ThemeMode mode) {
     return switch (mode) {
       ThemeMode.light => l10n.themeModeLight,
@@ -1046,11 +1141,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   String _getLanguageName(AppLocalizations l10n, Locale? locale) {
-    return switch (locale?.languageCode) {
-      'zh' => l10n.languageChinese,
-      'en' => l10n.languageEnglish,
-      _ => l10n.languageSystem,
-    };
+    if (locale == null) return l10n.languageSystem;
+    if (locale.languageCode == 'zh') return l10n.languageChinese;
+    if (locale.languageCode == 'en') return l10n.languageEnglish;
+    return l10n.languageSystem;
   }
 
   void _showThemeModeDialog(
@@ -1144,6 +1238,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s),
+              child: Text(
+                l10n.languageDescription,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
             _buildLanguageOption(
               context,
               l10n,
@@ -1167,7 +1270,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               l10n,
               settings,
               controller,
-              const Locale('zh'),
+              const Locale('zh', 'CN'),
               '🇨🇳',
               l10n.languageChinese,
             ),

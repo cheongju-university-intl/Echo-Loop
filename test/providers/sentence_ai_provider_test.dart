@@ -18,6 +18,10 @@ void main() {
   late MockApiClient mockApi;
   late SentenceAiNotifier notifier;
 
+  const lang = 'zh-CN';
+  const l2TranslationType = 'translation:$lang';
+  const l2AnalysisType = 'analysis:$lang';
+
   setUp(() {
     mockDao = MockCacheDao();
     mockApi = MockApiClient();
@@ -30,62 +34,89 @@ void main() {
     test('L1 内存缓存命中', () async {
       // 预填充 L1
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceTranslation(translation: '你好世界'),
       );
       when(
-        () => mockDao.upsert(any(), 'translation', any()),
+        () => mockDao.upsert(any(), l2TranslationType, any()),
       ).thenAnswer((_) async {});
 
       // 第一次：API 调用
-      await notifier.getTranslation(text);
+      await notifier.getTranslation(text, targetLanguage: lang);
 
       // 第二次：L1 命中，不再调 DAO 或 API
-      final result = await notifier.getTranslation(text);
+      final result = await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+      );
       expect(result.translation, '你好世界');
 
       // API 只调了一次
       verify(
-        () => mockApi.translate(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).called(1);
     });
 
     test('L2 SQLite 缓存命中', () async {
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => '{"translation":"你好世界"}');
 
-      final result = await notifier.getTranslation(text);
+      final result = await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+      );
       expect(result.translation, '你好世界');
 
       // 不应调用 API
       verifyNever(
-        () => mockApi.translate(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          any(),
+          targetLanguage: any(named: 'targetLanguage'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
       );
     });
 
     test('L3 API 调用并写入缓存', () async {
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceTranslation(translation: '你好世界'),
       );
       when(
-        () => mockDao.upsert(any(), 'translation', any()),
+        () => mockDao.upsert(any(), l2TranslationType, any()),
       ).thenAnswer((_) async {});
 
-      final result = await notifier.getTranslation(text);
+      final result = await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+      );
       expect(result.translation, '你好世界');
 
       // 验证写入 SQLite
-      verify(() => mockDao.upsert(any(), 'translation', any())).called(1);
+      verify(
+        () => mockDao.upsert(any(), l2TranslationType, any()),
+      ).called(1);
 
       // 验证 L1 也已缓存
       expect(notifier.getCachedTranslation(text)?.translation, '你好世界');
@@ -95,18 +126,22 @@ void main() {
       final completer = Completer<SentenceTranslation>();
 
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer((_) => completer.future);
       when(
-        () => mockDao.upsert(any(), 'translation', any()),
+        () => mockDao.upsert(any(), l2TranslationType, any()),
       ).thenAnswer((_) async {});
 
       // 同时发起两个请求
-      final f1 = notifier.getTranslation(text);
-      final f2 = notifier.getTranslation(text);
+      final f1 = notifier.getTranslation(text, targetLanguage: lang);
+      final f2 = notifier.getTranslation(text, targetLanguage: lang);
 
       completer.complete(const SentenceTranslation(translation: '你好'));
 
@@ -118,7 +153,11 @@ void main() {
 
       // API 只被调了一次
       verify(
-        () => mockApi.translate(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).called(1);
     });
   });
@@ -128,13 +167,16 @@ void main() {
 
     test('L2 SQLite 缓存命中', () async {
       when(
-        () => mockDao.getByHash(any(), 'analysis'),
+        () => mockDao.getByHash(any(), l2AnalysisType),
       ).thenAnswer(
         (_) async =>
             '{"analysis":{"grammar":"现在完成进行时","vocabulary":"study","listening":"持续动作"}}',
       );
 
-      final result = await notifier.getAnalysis(text);
+      final result = await notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+      );
       expect(result.grammar, '现在完成进行时');
       expect(result.vocabulary, 'study');
       expect(result.listening, '持续动作');
@@ -142,10 +184,14 @@ void main() {
 
     test('L3 API 调用', () async {
       when(
-        () => mockDao.getByHash(any(), 'analysis'),
+        () => mockDao.getByHash(any(), l2AnalysisType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.analyze(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.analyze(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceAnalysis(
           grammar: 'g',
@@ -154,13 +200,16 @@ void main() {
         ),
       );
       when(
-        () => mockDao.upsert(any(), 'analysis', any()),
+        () => mockDao.upsert(any(), l2AnalysisType, any()),
       ).thenAnswer((_) async {});
 
-      final result = await notifier.getAnalysis(text);
+      final result = await notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+      );
       expect(result.grammar, 'g');
 
-      verify(() => mockDao.upsert(any(), 'analysis', any())).called(1);
+      verify(() => mockDao.upsert(any(), l2AnalysisType, any())).called(1);
     });
   });
 
@@ -174,10 +223,14 @@ void main() {
   group('clearMemoryCache', () {
     test('清除后 getCachedTranslation 返回 null', () async {
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          any(),
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceTranslation(translation: 't'),
       );
@@ -185,7 +238,7 @@ void main() {
         () => mockDao.upsert(any(), any(), any()),
       ).thenAnswer((_) async {});
 
-      await notifier.getTranslation('test');
+      await notifier.getTranslation('test', targetLanguage: lang);
       expect(notifier.getCachedTranslation('test'), isNotNull);
 
       notifier.clearMemoryCache();
@@ -199,10 +252,14 @@ void main() {
     test('L1 内存缓存命中直接返回', () async {
       // 预填充 L1：先走一次完整流程
       when(
-        () => mockDao.getByHash(any(), 'analysis'),
+        () => mockDao.getByHash(any(), l2AnalysisType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.analyze(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.analyze(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceAnalysis(
           grammar: 'g',
@@ -211,23 +268,30 @@ void main() {
         ),
       );
       when(
-        () => mockDao.upsert(any(), 'analysis', any()),
+        () => mockDao.upsert(any(), l2AnalysisType, any()),
       ).thenAnswer((_) async {});
 
       // 第一次：API 调用写入 L1
-      await notifier.getAnalysis(text);
+      await notifier.getAnalysis(text, targetLanguage: lang);
 
       // 重置 mock 交互记录
       reset(mockDao);
       reset(mockApi);
 
       // 第二次：L1 命中，不查 DB 也不调 API
-      final result = await notifier.getAnalysis(text);
+      final result = await notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+      );
       expect(result.grammar, 'g');
 
       verifyNever(() => mockDao.getByHash(any(), any()));
       verifyNever(
-        () => mockApi.analyze(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.analyze(
+          any(),
+          targetLanguage: any(named: 'targetLanguage'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
       );
     });
 
@@ -235,18 +299,22 @@ void main() {
       final completer = Completer<SentenceAnalysis>();
 
       when(
-        () => mockDao.getByHash(any(), 'analysis'),
+        () => mockDao.getByHash(any(), l2AnalysisType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.analyze(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.analyze(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer((_) => completer.future);
       when(
-        () => mockDao.upsert(any(), 'analysis', any()),
+        () => mockDao.upsert(any(), l2AnalysisType, any()),
       ).thenAnswer((_) async {});
 
       // 同时发起两个请求
-      final f1 = notifier.getAnalysis(text);
-      final f2 = notifier.getAnalysis(text);
+      final f1 = notifier.getAnalysis(text, targetLanguage: lang);
+      final f2 = notifier.getAnalysis(text, targetLanguage: lang);
 
       completer.complete(const SentenceAnalysis(
         grammar: 'g',
@@ -262,7 +330,11 @@ void main() {
 
       // API 只被调了一次
       verify(
-        () => mockApi.analyze(text, cancelToken: any(named: 'cancelToken')),
+        () => mockApi.analyze(
+          text,
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).called(1);
     });
   });
@@ -270,15 +342,19 @@ void main() {
   group('失败处理', () {
     test('getTranslation API 失败时不写入缓存', () async {
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          any(),
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenThrow(Exception('network error'));
 
       // API 抛异常
       expect(
-        () => notifier.getTranslation('fail test'),
+        () => notifier.getTranslation('fail test', targetLanguage: lang),
         throwsA(isA<Exception>()),
       );
 
@@ -292,10 +368,14 @@ void main() {
     test('clearMemoryCache 同时清除 analysis 缓存', () async {
       // 写入 translation
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          any(),
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceTranslation(translation: 't'),
       );
@@ -305,10 +385,14 @@ void main() {
 
       // 写入 analysis
       when(
-        () => mockDao.getByHash(any(), 'analysis'),
+        () => mockDao.getByHash(any(), l2AnalysisType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.analyze(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.analyze(
+          any(),
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceAnalysis(
           grammar: 'g',
@@ -317,8 +401,8 @@ void main() {
         ),
       );
 
-      await notifier.getTranslation('test');
-      await notifier.getAnalysis('test');
+      await notifier.getTranslation('test', targetLanguage: lang);
+      await notifier.getAnalysis('test', targetLanguage: lang);
 
       // 确认两者都有缓存
       expect(notifier.getCachedTranslation('test'), isNotNull);
@@ -334,10 +418,14 @@ void main() {
   group('hashText 一致性', () {
     test('归一化后相同的文本命中同一缓存', () async {
       when(
-        () => mockDao.getByHash(any(), 'translation'),
+        () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => null);
       when(
-        () => mockApi.translate(any(), cancelToken: any(named: 'cancelToken')),
+        () => mockApi.translate(
+          any(),
+          targetLanguage: lang,
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer(
         (_) async => const SentenceTranslation(translation: 'x'),
       );
@@ -345,7 +433,7 @@ void main() {
         () => mockDao.upsert(any(), any(), any()),
       ).thenAnswer((_) async {});
 
-      await notifier.getTranslation('Hello World.');
+      await notifier.getTranslation('Hello World.', targetLanguage: lang);
 
       // 归一化后与 "hello world." 和 "  HELLO   WORLD.  " 相同
       final hash1 = hashText('Hello World.');
@@ -355,6 +443,71 @@ void main() {
       // L1 缓存应命中
       final cached = notifier.getCachedTranslation('  HELLO   WORLD  ');
       expect(cached?.translation, 'x');
+    });
+  });
+
+  group('不同 targetLanguage 缓存隔离', () {
+    const text = 'Hello';
+
+    test('不同语言各自独立缓存', () async {
+      // zh-CN 缓存
+      when(
+        () => mockDao.getByHash(any(), 'translation:zh-CN'),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockApi.translate(
+          text,
+          targetLanguage: 'zh-CN',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const SentenceTranslation(translation: '你好'),
+      );
+      when(
+        () => mockDao.upsert(any(), any(), any()),
+      ).thenAnswer((_) async {});
+
+      final zhResult = await notifier.getTranslation(
+        text,
+        targetLanguage: 'zh-CN',
+      );
+      expect(zhResult.translation, '你好');
+
+      // zh-TW 缓存（应该不命中 zh-CN 的 L1）
+      when(
+        () => mockDao.getByHash(any(), 'translation:zh-TW'),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockApi.translate(
+          text,
+          targetLanguage: 'zh-TW',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const SentenceTranslation(translation: '你好'),
+      );
+
+      final twResult = await notifier.getTranslation(
+        text,
+        targetLanguage: 'zh-TW',
+      );
+      expect(twResult.translation, '你好');
+
+      // 两次都应调用 API（不同语言不共享缓存）
+      verify(
+        () => mockApi.translate(
+          text,
+          targetLanguage: 'zh-CN',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+      verify(
+        () => mockApi.translate(
+          text,
+          targetLanguage: 'zh-TW',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
     });
   });
 }
