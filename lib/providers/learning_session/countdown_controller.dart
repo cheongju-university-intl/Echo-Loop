@@ -43,7 +43,8 @@ class CountdownController {
   /// 当前剩余时间（供 engine 在 resume 等场景读取）
   Duration get remaining {
     if (!isActive) return Duration.zero;
-    final totalElapsed = _accumulated +
+    final totalElapsed =
+        _accumulated +
         (_paused || _runStart == null
             ? Duration.zero
             : _scale(DateTime.now().difference(_runStart!), _speed));
@@ -93,9 +94,9 @@ class CountdownController {
   }
 
   /// 快进目标时长
-  static const _fastForwardTargetMs = 1500.0;
+  static const _fastForwardTargetMs = 1000.0;
 
-  /// 快进：动态计算速度，让剩余时间在 ~1.5 秒内走完
+  /// 快进：动态计算速度，让剩余时间在 ~1 秒内走完
   ///
   /// 返回实际设置的速度倍率，供 UI 同步动画。
   /// 最低 2x，避免剩余时间本身就很短时无效果。
