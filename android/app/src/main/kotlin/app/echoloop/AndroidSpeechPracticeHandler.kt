@@ -183,6 +183,8 @@ class AndroidSpeechPracticeHandler(
             val ok = wavRecorder.initialize()
             if (!ok) Log.w(TAG, "WavRecorder initialization failed")
         }
+        // release() 会清空 onBuffer，重新初始化后必须恢复。
+        wavRecorder.onBuffer = { rms, frameCount -> handleVoiceActivity(rms, frameCount) }
     }
 
     private fun cleanupEngine() {
@@ -250,10 +252,6 @@ class AndroidSpeechPracticeHandler(
         // 裁剪首尾静音（对齐 iOS/macOS）。
         if (!filePath.isNullOrEmpty()) {
             wavRecorder.trimSilence(filePath)
-        }
-
-        if (!recognizerFinished && speechRecognizer != null) {
-            try { speechRecognizer?.stopListening() } catch (_: Exception) {}
         }
 
         // 确保 Dart 侧总能收到 finalTranscriptReady，避免等超时。
