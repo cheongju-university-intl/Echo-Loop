@@ -138,6 +138,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     }
 
     if (prev.currentParagraphIndex != next.currentParagraphIndex) {
+      _manualStoppedThisParagraph = false;
       ref.read(retellRecordingControllerProvider.notifier).clearRecording();
     }
 
@@ -196,6 +197,19 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         recState.awaitingSpeechTimedOut ||
         playerState.isRetellCountdown ||
         _manualStoppedThisParagraph) {
+      // 仅在 retelling 阶段输出，避免 listening 阶段大量噪音
+      if (playerState.phase == RetellPhase.retelling) {
+        AppLogger.log(
+          'RetellScreen',
+          '⏭ autoRec 预检查跳过: '
+              'waiting=${playerState.isWaitingForUser}, '
+              'manual=${playerState.settings.isManualMode}, '
+              'recPhase=${recState.phase.name}, '
+              'timedOut=${recState.awaitingSpeechTimedOut}, '
+              'countdown=${playerState.isRetellCountdown}, '
+              'manualStopped=$_manualStoppedThisParagraph',
+        );
+      }
       return;
     }
 
@@ -245,10 +259,16 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         '自动开始录音: 段落${latestState.currentParagraphIndex + 1}',
       );
       _updateRecordingThresholds();
+      final paragraphDuration =
+          ref.read(retellPlayerProvider.notifier).currentParagraphDuration;
       unawaited(
         ref
             .read(retellRecordingControllerProvider.notifier)
-            .startRecording(promptId: promptId, referenceText: referenceText),
+            .startRecording(
+              promptId: promptId,
+              referenceText: referenceText,
+              referenceDuration: paragraphDuration,
+            ),
       );
     });
   }
@@ -318,6 +338,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     await controller.startRecording(
       promptId: promptId,
       referenceText: player.currentParagraphReferenceText,
+      referenceDuration: player.currentParagraphDuration,
     );
   }
 

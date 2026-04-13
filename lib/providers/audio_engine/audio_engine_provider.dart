@@ -230,6 +230,13 @@ class AudioEngine extends _$AudioEngine {
 
     await _audioPlayer.play();
 
+    AppLogger.log(
+      'AudioEngine',
+      '│ play() returned: processingState=${_audioPlayer.processingState.name}, '
+          'playing=${_audioPlayer.playing}, '
+          'sessionActive=${isActiveSession(sessionId)}',
+    );
+
     await _audioPlayer.playerStateStream.firstWhere(
       (s) =>
           !isActiveSession(sessionId) ||
@@ -237,7 +244,8 @@ class AudioEngine extends _$AudioEngine {
     );
     AppLogger.log(
       'AudioEngine',
-      '✓ playRangeOnce done: sessionStillActive=${isActiveSession(sessionId)}',
+      '✓ playRangeOnce done: sessionStillActive=${isActiveSession(sessionId)}, '
+          'processingState=${_audioPlayer.processingState.name}',
     );
   }
 

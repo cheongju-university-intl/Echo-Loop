@@ -724,7 +724,13 @@ class RetellPlayer extends _$RetellPlayer {
     await engine.playRangeOnce(start, end, sid);
 
     // 播放完成后进入复述阶段（用局部变量检查）
-    if (!engine.isActiveSession(sid)) return;
+    final sessionStillActive = engine.isActiveSession(sid);
+    AppLogger.log(
+      'RetellPlayer',
+      'playRangeOnce 返回: sessionActive=$sessionStillActive, '
+          'sid=$sid, paragraph=${state.currentParagraphIndex}',
+    );
+    if (!sessionStillActive) return;
 
     // 通过 recorder 记录听力时长、输入词数、已学词形
     final paragraphWordCount = countWordsInSentences(sentences);
@@ -799,6 +805,10 @@ class RetellPlayer extends _$RetellPlayer {
   /// 不自动启动倒计时。倒计时由 screen 层在录音评估完成后触发
   /// [startPostEvaluationPause]。
   void _enterRetellingPhase() {
+    AppLogger.log(
+      'RetellPlayer',
+      '→ _enterRetellingPhase: paragraph=${state.currentParagraphIndex}',
+    );
     state = state.copyWith(
       phase: RetellPhase.retelling,
       isPlaying: false,
