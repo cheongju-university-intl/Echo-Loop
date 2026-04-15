@@ -93,6 +93,11 @@ class TranscriptionFailed extends TranscriptionTaskState {
   const TranscriptionFailed({required this.message});
 }
 
+/// 转录成功但无语音内容（音乐/背景音）
+class TranscriptionEmptyResult extends TranscriptionTaskState {
+  const TranscriptionEmptyResult();
+}
+
 // ─── Provider ──────────────────────────────────────────────
 
 /// 转录任务管理器
@@ -327,6 +332,13 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
     String language,
     String sha256,
   ) async {
+    // 转录结果为空（音频无人声），不保存 SRT，提示用户
+    if (transcript.sentences.isEmpty) {
+      _cancelTokens.remove(audioItem.id);
+      _updateState(audioItem.id, const TranscriptionEmptyResult());
+      return;
+    }
+
     final fileOps = ref.read(transcriptionFileOpsProvider);
     final srtContent = generateSrtContent(transcript.sentences);
     final relativePath = await fileOps.saveSrt(audioItem.id, srtContent);

@@ -345,7 +345,7 @@
       "count": { "type": "int" }
     }
   },
-  "noTranscriptWarning": "No transcript uploaded. A transcript is required to start the learning flow.",
+  "noTranscriptWarning": "No transcript. A transcript is required to start learning.",
   "intensiveListenAppBarTitle": "Intensive Listening",
   "intensiveListenProgress": "Sentence {current}/{total}",
   "@intensiveListenProgress": {
@@ -816,6 +816,8 @@
   "transcriptionErrorTimeout": "Request timed out, please retry",
   "transcriptionErrorServer": "Server error, please retry later",
   "transcriptionErrorUnknown": "Something went wrong",
+  "transcriptionEmptyResult": "No speech detected",
+  "transcriptionEmptyResultHint": "The audio may contain too much background noise.",
   "transcriptionErrorFileTooLarge": "File too large (max {maxMb}MB)",
   "@transcriptionErrorFileTooLarge": {
     "placeholders": { "maxMb": { "type": "int" } }

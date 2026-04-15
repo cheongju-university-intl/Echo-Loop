@@ -1409,7 +1409,7 @@ abstract class AppLocalizations {
   /// No description provided for @noTranscriptWarning.
   ///
   /// In en, this message translates to:
-  /// **'No transcript uploaded. A transcript is required to start the learning flow.'**
+  /// **'No transcript. A transcript is required to start learning.'**
   String get noTranscriptWarning;
 
   /// No description provided for @intensiveListenAppBarTitle.
@@ -2761,6 +2761,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong'**
   String get transcriptionErrorUnknown;
+
+  /// No description provided for @transcriptionEmptyResult.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech detected'**
+  String get transcriptionEmptyResult;
+
+  /// No description provided for @transcriptionEmptyResultHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio may contain too much background noise.'**
+  String get transcriptionEmptyResultHint;
 
   /// No description provided for @transcriptionErrorFileTooLarge.
   ///

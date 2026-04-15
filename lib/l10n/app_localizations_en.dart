@@ -719,7 +719,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noTranscriptWarning =>
-      'No transcript uploaded. A transcript is required to start the learning flow.';
+      'No transcript. A transcript is required to start learning.';
 
   @override
   String get intensiveListenAppBarTitle => 'Intensive Listening';
@@ -1524,6 +1524,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get transcriptionErrorUnknown => 'Something went wrong';
+
+  @override
+  String get transcriptionEmptyResult => 'No speech detected';
+
+  @override
+  String get transcriptionEmptyResultHint =>
+      'The audio may contain too much background noise.';
 
   @override
   String transcriptionErrorFileTooLarge(int maxMb) {

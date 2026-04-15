@@ -38,22 +38,28 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
   _SubtitleAction _selectedAction = _SubtitleAction.localUpload;
   String _selectedLanguage = 'auto';
 
+  /// 是否刚打开弹窗（用于首帧跳过残留终态的渲染）
+  bool _initialClear = true;
+
   @override
   void initState() {
     super.initState();
-    // 打开弹窗时清除之前的失败状态，避免残留错误阻塞操作
-    // 使用 addPostFrameCallback 避免在 widget tree 构建期间修改 provider 状态
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final taskState = ref.read(
-        transcriptionTaskManagerProvider,
-      )[widget.audioItem.id];
-      if (taskState is TranscriptionFailed) {
+    // 打开弹窗时异步清除之前的失败/空结果状态
+    final taskState = ref.read(
+      transcriptionTaskManagerProvider,
+    )[widget.audioItem.id];
+    if (taskState is TranscriptionFailed ||
+        taskState is TranscriptionEmptyResult) {
+      Future(() {
+        if (!mounted) return;
         ref
             .read(transcriptionTaskManagerProvider.notifier)
             .clearState(widget.audioItem.id);
-      }
-    });
+        _initialClear = false;
+      });
+    } else {
+      _initialClear = false;
+    }
   }
 
   @override
@@ -73,11 +79,18 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         widget.audioItem;
 
     // 监听转录任务状态
-    final taskState =
+    var taskState =
         ref.watch(
           transcriptionTaskManagerProvider.select((map) => map[audioItem.id]),
         ) ??
         const TranscriptionIdle();
+
+    // 首帧跳过残留的终态，避免闪现旧状态 UI
+    if (_initialClear &&
+        (taskState is TranscriptionFailed ||
+            taskState is TranscriptionEmptyResult)) {
+      taskState = const TranscriptionIdle();
+    }
 
     // 是否有进行中的任务
     final isTaskActive =
@@ -155,6 +168,8 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                     ? _buildProgressView(l10n, theme, taskState)
                     : taskState is TranscriptionFailed
                     ? _buildErrorView(l10n, theme, taskState, audioItem)
+                    : taskState is TranscriptionEmptyResult
+                    ? _buildEmptyResultView(l10n, theme)
                     : _buildRadioOptions(l10n, theme, audioItem),
               ),
               const SizedBox(height: AppSpacing.m),
@@ -166,13 +181,15 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                   child: SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: taskState is TranscriptionFailed
+                      onPressed: taskState is TranscriptionFailed ||
+                              taskState is TranscriptionEmptyResult
                           ? () => _handleAction(context, audioItem)
                           : _getActionEnabled(audioItem)
                           ? () => _handleAction(context, audioItem)
                           : null,
                       child: Text(
-                        taskState is TranscriptionFailed
+                        taskState is TranscriptionFailed ||
+                                taskState is TranscriptionEmptyResult
                             ? l10n.retryTranscription
                             : _selectedAction == _SubtitleAction.localUpload
                             ? l10n.uploadTranscript
@@ -338,6 +355,57 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       'server' => l10n.transcriptionErrorServer,
       _ => l10n.transcriptionErrorUnknown,
     };
+  }
+
+  /// 构建空转录结果视图（音频无人声）
+  Widget _buildEmptyResultView(AppLocalizations l10n, ThemeData theme) {
+    return Padding(
+      key: const ValueKey('empty-result'),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.l),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hearing_disabled,
+                size: 28,
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.transcriptionEmptyResult,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+              child: Text(
+                l10n.transcriptionEmptyResultHint,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 构建选项卡片列表（替代 RadioListTile）

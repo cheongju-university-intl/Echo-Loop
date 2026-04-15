@@ -707,7 +707,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get noTranscriptWarning => '尚未上传字幕，需要字幕才能开始学习流程。';
+  String get noTranscriptWarning => '没有字幕，需要字幕才能开始学习。';
 
   @override
   String get intensiveListenAppBarTitle => '逐句精听';
@@ -1474,6 +1474,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get transcriptionErrorUnknown => '出了点问题';
+
+  @override
+  String get transcriptionEmptyResult => '未检测到语音';
+
+  @override
+  String get transcriptionEmptyResultHint => '音频可能包含过多背景噪音。';
 
   @override
   String transcriptionErrorFileTooLarge(int maxMb) {
