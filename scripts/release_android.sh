@@ -26,6 +26,8 @@ Options:
 
 Environment variables:
   API_BASE_URL          API base URL (default: https://www.echo-loop.top)
+  POSTHOG_API_KEY       PostHog API key (required for analytics)
+  POSTHOG_HOST          PostHog host URL (default: https://us.i.posthog.com)
 
   R2 upload:
   R2_ENDPOINT           S3-compatible endpoint URL
@@ -62,6 +64,8 @@ fi
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/tools:$PATH"
 
 API_BASE_URL="${API_BASE_URL:-https://www.echo-loop.top}"
+POSTHOG_API_KEY="${POSTHOG_API_KEY:-}"
+POSTHOG_HOST="${POSTHOG_HOST:-https://us.i.posthog.com}"
 
 # 从 pubspec.yaml 读取版本号
 RAW_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
@@ -85,7 +89,9 @@ if [[ "$SKIP_BUILD" == false ]]; then
   log "Building release APK..."
   flutter build apk --release \
     --target-platform android-arm64 \
-    --dart-define="API_BASE_URL=${API_BASE_URL}"
+    --dart-define="API_BASE_URL=${API_BASE_URL}" \
+    --dart-define="POSTHOG_API_KEY=${POSTHOG_API_KEY}" \
+    --dart-define="POSTHOG_HOST=${POSTHOG_HOST}"
 
   SRC="build/app/outputs/flutter-apk/app-release.apk"
   [[ -f "$SRC" ]] || fail "APK not found at $SRC"

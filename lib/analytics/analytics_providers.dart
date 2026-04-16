@@ -8,6 +8,7 @@ library;
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,14 +16,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import 'analytics_channel.dart';
 import 'analytics_service.dart';
+import 'channels/firebase_channel.dart';
 import 'channels/log_only_channel.dart';
+import 'channels/posthog_channel.dart';
+import 'channels/umeng_channel.dart';
 import 'consent_manager.dart';
 import 'geo_interceptor.dart';
-
-import 'package:firebase_analytics/firebase_analytics.dart';
-
-import 'channels/firebase_channel.dart';
-import 'channels/umeng_channel.dart';
 
 /// 分析服务单例（在 main() 中通过 [initAnalyticsService] 初始化）
 late AnalyticsService _analyticsService;
@@ -41,29 +40,26 @@ final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
 ///
 /// [userId] 由 [initUserIdService] 提前生成，analytics 不负责 ID 管理。
 ///
-/// 1. 获取地区（缓存 → geo API → locale fallback）
-/// 2. 选择通道并初始化
+/// 通道选择策略：
+/// - Debug 模式 → LogOnly
+/// - Release 模式 → PostHog（全平台，不依赖 GMS，中国大陆可用）
+/// - PostHog 未配置时 → LogOnly（需传入 POSTHOG_API_KEY dart-define）
 ///
-/// 首次启动无缓存时调 geo API（2 秒超时），失败则 locale fallback。
+/// Firebase/友盟通道保留备用，当前不启用。
 Future<AnalyticsService> initAnalyticsService(
   SharedPreferences prefs, {
   required String userId,
 }) async {
   final consent = ConsentManager(prefs);
-
-  // 获取地区并选择通道
-  final isChina = await _resolveIsMainlandChina(prefs);
-  final channel = _createChannel(isChina);
+  final channel = _createChannel();
 
   // 初始化通道 + 设置用户 ID
   await channel.initialize();
   await channel.setUserId(userId);
 
-  // 非 Debug 模式下，根据通道选择控制 Firebase 采集开关
-  // 选择友盟时关闭 Firebase 采集，避免 SDK 残留行为产生噪音
+  // 关闭 Firebase 采集（当前使用 PostHog，避免 Firebase SDK 残留上报）
   if (!kDebugMode && !Platform.isMacOS) {
-    await FirebaseAnalytics.instance
-        .setAnalyticsCollectionEnabled(channel is FirebaseChannel);
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(false);
   }
 
   return AnalyticsService(channel: channel, consent: consent);
@@ -71,9 +67,9 @@ Future<AnalyticsService> initAnalyticsService(
 
 /// 获取地区：缓存优先 → geo API → locale fallback
 ///
-/// API 成功的结果会持久化；locale fallback 不持久化，
-/// 下次启动会重新尝试 API。
-Future<bool> _resolveIsMainlandChina(SharedPreferences prefs) async {
+/// 当前仅供 GeoInterceptor 更新缓存使用，不再用于通道选择。
+/// API 成功的结果会持久化；locale fallback 不持久化。
+Future<bool> resolveIsMainlandChina(SharedPreferences prefs) async {
   // 1. 有缓存直接用
   final cached = prefs.getString(geoCountryKey);
   if (cached != null) return cached == 'CN';
@@ -98,15 +94,25 @@ Future<bool> _resolveIsMainlandChina(SharedPreferences prefs) async {
   return Platform.localeName.contains('CN');
 }
 
-/// 根据地区选择分析通道
-AnalyticsChannel _createChannel(bool isChina) {
+/// 根据配置选择分析通道
+///
+/// 当前策略：PostHog 全平台统一上报。
+/// 如需切回 Firebase/友盟，修改此函数即可。
+AnalyticsChannel _createChannel() {
   if (kDebugMode) return LogOnlyChannel();
+  if (PostHogChannel.isConfigured) return PostHogChannel();
+  // PostHog 未配置（缺少 POSTHOG_API_KEY dart-define）时降级到日志
+  return LogOnlyChannel();
+}
 
+// 以下通道备用，当前未启用
+// ignore: unused_element
+AnalyticsChannel _createChannelLegacy(bool isChina) {
+  if (kDebugMode) return LogOnlyChannel();
   if (Platform.isAndroid) {
     if (isChina && UmengChannel.isConfigured) return UmengChannel();
     return FirebaseChannel();
   }
-
   if (!Platform.isMacOS && isChina && UmengChannel.isConfigured) {
     return UmengChannel();
   }

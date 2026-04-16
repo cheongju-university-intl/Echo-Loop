@@ -26,6 +26,8 @@ Environment overrides:
   IOS_BUILD_NAME
   IOS_BUILD_NUMBER
   API_BASE_URL
+  POSTHOG_API_KEY
+  POSTHOG_HOST
   APP_STORE_API_KEY_ID
   APP_STORE_API_ISSUER_ID
   APP_STORE_API_KEY_PATH
@@ -48,7 +50,13 @@ ensure_apple_toolchain_path() {
 }
 
 encode_dart_define() {
-  printf '%s' "$1" | base64 | tr -d '\n'
+  local result=""
+  for arg in "$@"; do
+    local encoded
+    encoded="$(printf '%s' "$arg" | base64 | tr -d '\n')"
+    result="${result:+$result,}$encoded"
+  done
+  printf '%s' "$result"
 }
 
 require_command() {
@@ -149,10 +157,12 @@ SCHEME="${IOS_SCHEME:-Runner}"
 CONFIGURATION="${IOS_CONFIGURATION:-Release}"
 TEAM_ID="${IOS_TEAM_ID:-S8S968QAV3}"
 API_BASE_URL="${API_BASE_URL:-https://www.echo-loop.top}"
+POSTHOG_API_KEY="${POSTHOG_API_KEY:-}"
+POSTHOG_HOST="${POSTHOG_HOST:-https://us.i.posthog.com}"
 API_KEY_ID="${APP_STORE_API_KEY_ID:-5GB5KL75VZ}"
 API_ISSUER_ID="${APP_STORE_API_ISSUER_ID:-3ec439fe-b66c-4034-b8c2-16e133fc4d6b}"
 API_KEY_PATH="${APP_STORE_API_KEY_PATH:-$ROOT_DIR/ios/AuthKey_${API_KEY_ID}.p8}"
-DART_DEFINES_VALUE="$(encode_dart_define "API_BASE_URL=${API_BASE_URL}")"
+DART_DEFINES_VALUE="$(encode_dart_define "API_BASE_URL=${API_BASE_URL}" "POSTHOG_API_KEY=${POSTHOG_API_KEY}" "POSTHOG_HOST=${POSTHOG_HOST}")"
 
 [[ -d "$WORKSPACE" ]] || fail "Workspace not found: $WORKSPACE"
 [[ -f "$API_KEY_PATH" ]] || fail "API key file not found: $API_KEY_PATH"
