@@ -16,12 +16,12 @@ import 'database/migration/sp_to_drift_migration.dart';
 import 'providers/package_info_provider.dart';
 import 'providers/dictionary_provider.dart';
 import 'providers/settings_provider.dart';
-import 'providers/review_reminder_provider.dart';
 import 'router/app_router.dart';
 import 'services/bundled_example_installer.dart';
 import 'services/temp_cleanup_service.dart';
 import 'theme/app_theme.dart';
 import 'config/api_config.dart';
+import 'providers/review_reminder_provider.dart';
 import 'services/notification_tap_router_bridge.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'analytics/analytics_providers.dart';
@@ -206,12 +206,6 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
       final pendingIntent = bridge.takePendingIntent();
       if (pendingIntent != null) {
         _handleNotificationIntent(pendingIntent);
-      }
-
-      await ref.read(reviewReminderServiceProvider).init();
-      final latestPendingIntent = bridge.takePendingIntent();
-      if (latestPendingIntent != null) {
-        _handleNotificationIntent(latestPendingIntent);
       }
     });
   }
