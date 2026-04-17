@@ -748,10 +748,14 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         ? _buildWithTranscriptGuideSteps(l10n)
         : _buildNoTranscriptGuideSteps(l10n);
 
-    return GuideFlowHost(
-      flowId: guideFlowId,
-      shouldRun: guideSteps.isNotEmpty,
-      steps: guideSteps,
+    return GuideFlowSequenceHost(
+      flows: [
+        GuideFlow(
+          flowId: guideFlowId,
+          shouldRun: guideSteps.isNotEmpty,
+          steps: guideSteps,
+        ),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: Text(audioItem.name),

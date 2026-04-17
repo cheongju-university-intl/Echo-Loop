@@ -68,6 +68,32 @@ void main() {
       expect(await registry.isSeen('learning_plan_with_transcript'), isFalse);
     });
 
+    test('中途 completeActiveFlow 标记已看并清空（兜底路径依赖）', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final registry = GuideRegistry(prefs: prefs);
+      final container = ProviderContainer(
+        overrides: [guideRegistryProvider.overrideWithValue(registry)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(guideControllerProvider.notifier);
+      await controller.startFlow(
+        flowId: 'stuck_flow',
+        targetIds: const ['step1', 'step2', 'step3'],
+      );
+      expect(
+        container.read(guideControllerProvider).activeTargetId,
+        'step1',
+      );
+
+      // 在第一步就 complete（模拟 target 起不来的兜底场景）
+      await controller.completeActiveFlow();
+
+      expect(container.read(guideControllerProvider).isActive, isFalse);
+      expect(await registry.isSeen('stuck_flow'), isTrue);
+    });
+
     test('已 seen 的 flow 不再启动', () async {
       SharedPreferences.setMockInitialValues({'guide_v1_library_seen': true});
       final prefs = await SharedPreferences.getInstance();

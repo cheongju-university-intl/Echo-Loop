@@ -47,14 +47,18 @@ class CollectionDetailScreen extends ConsumerWidget {
 
     final hasAudioItems = audioItems.isNotEmpty;
 
-    return GuideFlowHost(
-      flowId: GuideFlowIds.collectionDetailUpload,
-      shouldRun: true,
-      steps: [
-        GuideStep(
-          targetId: GuideTargetIds.uploadAudio,
-          title: l10n.guideCollectionUploadTitle,
-          description: l10n.guideCollectionUploadDescription,
+    return GuideFlowSequenceHost(
+      flows: [
+        GuideFlow(
+          flowId: GuideFlowIds.collectionDetailUpload,
+          shouldRun: true,
+          steps: [
+            GuideStep(
+              targetId: GuideTargetIds.uploadAudio,
+              title: l10n.guideCollectionUploadTitle,
+              description: l10n.guideCollectionUploadDescription,
+            ),
+          ],
         ),
       ],
       child: Scaffold(

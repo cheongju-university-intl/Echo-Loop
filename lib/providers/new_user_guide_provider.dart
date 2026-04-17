@@ -89,12 +89,12 @@ final guideRegistryProvider = Provider<GuideRegistry>((ref) {
 });
 
 /// 当前版本的新用户引导 flow id。
+///
+/// [active] 是当前真正被 screen 使用的 flow id。
+/// [legacy] 仅用于重置时清掉旧版本遗留在 SharedPreferences 中的 key，
+/// 没有任何 screen 仍在引用，新增 flow 时不要往里加。
+/// [all] 用于设置页"重置引导"一键清空，合并 active + legacy。
 abstract final class GuideFlowIds {
-  static const legacyLibrary = 'library';
-  static const legacyCollectionDetail = 'collection_detail';
-  static const legacyLibraryExamples = 'library_examples';
-  static const legacyCollectionDetailExampleAudio =
-      'collection_detail_example_audio';
   static const libraryCreateCollection = 'library_create_collection';
   static const libraryCollectionList = 'library_collection_list';
   static const collectionDetailUpload = 'collection_detail_upload';
@@ -103,11 +103,7 @@ abstract final class GuideFlowIds {
   static const learningPlanWithTranscript = 'learning_plan_with_transcript';
   static const subtitleSheetTranscription = 'subtitle_sheet_transcription';
 
-  static const all = [
-    legacyLibrary,
-    legacyCollectionDetail,
-    legacyLibraryExamples,
-    legacyCollectionDetailExampleAudio,
+  static const active = [
     libraryCreateCollection,
     libraryCollectionList,
     collectionDetailUpload,
@@ -116,6 +112,15 @@ abstract final class GuideFlowIds {
     learningPlanWithTranscript,
     subtitleSheetTranscription,
   ];
+
+  static const legacy = [
+    'library',
+    'collection_detail',
+    'library_examples',
+    'collection_detail_example_audio',
+  ];
+
+  static const all = [...active, ...legacy];
 }
 
 /// 当前版本的新用户引导 target id。
@@ -168,15 +173,6 @@ class GuideController extends Notifier<GuideControllerState> {
     if (await registry.isSeen(flowId)) {
       AppLogger.log('Guide', 'start skipped flow=$flowId reason=seen');
       return false;
-    }
-    if (state.isActive) {
-      final sameFlow = state.activeFlowId == flowId;
-      AppLogger.log(
-        'Guide',
-        'start skipped flow=$flowId reason=activeFlowAfterSeenCheck '
-            'active=${state.activeFlowId} sameFlow=$sameFlow',
-      );
-      return sameFlow;
     }
 
     state = GuideControllerState(

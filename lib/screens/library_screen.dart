@@ -39,70 +39,74 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         !collectionState.isLoading;
     final hasCollections = collectionState.collections.isNotEmpty;
 
-    return GuideFlowHost(
-      flowId: GuideFlowIds.libraryCollectionList,
-      shouldRun: shouldRunGuide && hasCollections,
-      steps: [
-        GuideStep(
-          targetId: GuideTargetIds.collectionList,
-          title: l10n.guideLibraryCollectionListTitle,
-          description: l10n.guideLibraryCollectionListDescription,
-        ),
-        if (hasCollections)
-          GuideStep(
-            targetId: GuideTargetIds.collectionMenu,
-            title: l10n.guideLibraryCollectionMenuTitle,
-            description: l10n.guideLibraryCollectionMenuDescription,
-          ),
-      ],
-      child: GuideFlowHost(
-        flowId: GuideFlowIds.libraryCreateCollection,
-        shouldRun: shouldRunGuide,
-        steps: [
-          GuideStep(
-            targetId: GuideTargetIds.createCollection,
-            title: l10n.guideLibraryCreateCollectionTitle,
-            description: l10n.guideLibraryCreateCollectionDescription,
-          ),
-        ],
-        child: Scaffold(
-          appBar: AppBar(
-            title: SegmentedButton<LibraryViewType>(
-              segments: [
-                ButtonSegment(
-                  value: LibraryViewType.collections,
-                  label: Text(l10n.collectionsTab),
-                ),
-                ButtonSegment(
-                  value: LibraryViewType.audio,
-                  label: Text(l10n.audioTab),
-                ),
-              ],
-              selected: {_currentView},
-              onSelectionChanged: (selected) {
-                setState(() {
-                  _currentView = selected.first;
-                });
-              },
-              showSelectedIcon: false,
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+    return GuideFlowSequenceHost(
+      flows: [
+        GuideFlow(
+          flowId: GuideFlowIds.libraryCollectionList,
+          shouldRun: shouldRunGuide && hasCollections,
+          steps: [
+            GuideStep(
+              targetId: GuideTargetIds.collectionList,
+              title: l10n.guideLibraryCollectionListTitle,
+              description: l10n.guideLibraryCollectionListDescription,
             ),
-            actions: _buildActions(l10n),
-          ),
-          body: IndexedStack(
-            index: _currentView.index,
-            children: [
-              _CollectionListBody(),
-              AudioListView(
-                guideFirstAudioMenu: true,
-                guideLeadingItems: true,
-                guideEnabled: _currentView == LibraryViewType.audio,
+            if (hasCollections)
+              GuideStep(
+                targetId: GuideTargetIds.collectionMenu,
+                title: l10n.guideLibraryCollectionMenuTitle,
+                description: l10n.guideLibraryCollectionMenuDescription,
+              ),
+          ],
+        ),
+        GuideFlow(
+          flowId: GuideFlowIds.libraryCreateCollection,
+          shouldRun: shouldRunGuide,
+          steps: [
+            GuideStep(
+              targetId: GuideTargetIds.createCollection,
+              title: l10n.guideLibraryCreateCollectionTitle,
+              description: l10n.guideLibraryCreateCollectionDescription,
+            ),
+          ],
+        ),
+      ],
+      child: Scaffold(
+        appBar: AppBar(
+          title: SegmentedButton<LibraryViewType>(
+            segments: [
+              ButtonSegment(
+                value: LibraryViewType.collections,
+                label: Text(l10n.collectionsTab),
+              ),
+              ButtonSegment(
+                value: LibraryViewType.audio,
+                label: Text(l10n.audioTab),
               ),
             ],
+            selected: {_currentView},
+            onSelectionChanged: (selected) {
+              setState(() {
+                _currentView = selected.first;
+              });
+            },
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
+          actions: _buildActions(l10n),
+        ),
+        body: IndexedStack(
+          index: _currentView.index,
+          children: [
+            _CollectionListBody(),
+            AudioListView(
+              guideFirstAudioMenu: true,
+              guideLeadingItems: true,
+              guideEnabled: _currentView == LibraryViewType.audio,
+            ),
+          ],
         ),
       ),
     );

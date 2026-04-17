@@ -114,19 +114,23 @@ class AudioListView extends ConsumerWidget {
     if (!guideEnabled || (!guideLeadingItems && !guideFirstAudioMenu)) {
       return listView;
     }
-    return GuideFlowHost(
-      flowId: GuideFlowIds.collectionDetailAudioList,
-      shouldRun: true,
-      steps: [
-        GuideStep(
-          targetId: GuideTargetIds.audioList,
-          title: l10n.guideCollectionAudioListTitle,
-          description: l10n.guideCollectionAudioListDescription,
-        ),
-        GuideStep(
-          targetId: GuideTargetIds.audioMenu,
-          title: l10n.guideCollectionAudioMenuTitle,
-          description: l10n.guideCollectionAudioMenuDescription,
+    return GuideFlowSequenceHost(
+      flows: [
+        GuideFlow(
+          flowId: GuideFlowIds.collectionDetailAudioList,
+          shouldRun: true,
+          steps: [
+            GuideStep(
+              targetId: GuideTargetIds.audioList,
+              title: l10n.guideCollectionAudioListTitle,
+              description: l10n.guideCollectionAudioListDescription,
+            ),
+            GuideStep(
+              targetId: GuideTargetIds.audioMenu,
+              title: l10n.guideCollectionAudioMenuTitle,
+              description: l10n.guideCollectionAudioMenuDescription,
+            ),
+          ],
         ),
       ],
       child: listView,

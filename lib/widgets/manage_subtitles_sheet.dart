@@ -195,19 +195,23 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       ),
     );
     if (audioItem.hasTranscript) return content;
-    return GuideFlowHost(
-      flowId: GuideFlowIds.subtitleSheetTranscription,
-      shouldRun: true,
-      steps: [
-        GuideStep(
-          targetId: GuideTargetIds.aiTranscription,
-          title: l10n.guidePlanAiTranscriptionTitle,
-          description: l10n.guidePlanAiTranscriptionDescription,
-        ),
-        GuideStep(
-          targetId: GuideTargetIds.startTranscription,
-          title: l10n.guidePlanStartTranscriptionTitle,
-          description: l10n.guidePlanStartTranscriptionDescription,
+    return GuideFlowSequenceHost(
+      flows: [
+        GuideFlow(
+          flowId: GuideFlowIds.subtitleSheetTranscription,
+          shouldRun: true,
+          steps: [
+            GuideStep(
+              targetId: GuideTargetIds.aiTranscription,
+              title: l10n.guidePlanAiTranscriptionTitle,
+              description: l10n.guidePlanAiTranscriptionDescription,
+            ),
+            GuideStep(
+              targetId: GuideTargetIds.startTranscription,
+              title: l10n.guidePlanStartTranscriptionTitle,
+              description: l10n.guidePlanStartTranscriptionDescription,
+            ),
+          ],
         ),
       ],
       child: content,

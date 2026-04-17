@@ -194,10 +194,14 @@ class FluencyApp extends ConsumerStatefulWidget {
 
 class _FluencyAppState extends ConsumerState<FluencyApp> {
   StreamSubscription<NotificationIntent>? _intentSubscription;
+  late final ShowcaseView _showcase;
 
   @override
   void initState() {
     super.initState();
+
+    // 新手引导 showcase 控制器全局注册（替代旧的 ShowCaseWidget InheritedWidget）。
+    _showcase = ShowcaseView.register(enableAutoScroll: true);
 
     // 预加载词典（触发下载或打开本地词典）
     ref.read(dictionaryProvider);
@@ -216,6 +220,7 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
   @override
   void dispose() {
     _intentSubscription?.cancel();
+    _showcase.unregister();
     super.dispose();
   }
 
@@ -252,11 +257,6 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // ignore: deprecated_member_use
-      builder: (context, child) => ShowCaseWidget(
-        enableAutoScroll: true,
-        builder: (_) => child ?? const SizedBox.shrink(),
-      ),
       routerConfig: router,
     );
   }
