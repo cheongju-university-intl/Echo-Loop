@@ -15,6 +15,7 @@ import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/tappable_wrapper.dart';
 import '../../widgets/common/text_context_menu.dart';
+import '../../widgets/guide_flow.dart';
 
 /// 普通模式视图（文字遮盖 / 偷看）
 class PracticeNormalModeView extends StatelessWidget {
@@ -53,6 +54,9 @@ class PracticeNormalModeView extends StatelessWidget {
   /// 点击单词查词回调（null 时不启用逐词点击）
   final void Function(String word)? onWordTap;
 
+  /// 可选：新手引导步骤，用于给「听不太懂」按钮挂 Showcase
+  final GuideStep? cantUnderstandStep;
+
   const PracticeNormalModeView({
     super.key,
     required this.l10n,
@@ -66,6 +70,7 @@ class PracticeNormalModeView extends StatelessWidget {
     this.isDifficult = true,
     this.sentenceText,
     this.onWordTap,
+    this.cantUnderstandStep,
   });
 
   @override
@@ -194,19 +199,7 @@ class PracticeNormalModeView extends StatelessWidget {
                       ),
                       const SizedBox(width: AppSpacing.m),
                     ],
-                    FilledButton.tonal(
-                      onPressed: onCantUnderstand,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: Text(
-                        l10n.intensiveListenCantUnderstand,
-                        style: theme.textTheme.titleSmall,
-                      ),
-                    ),
+                    _buildCantUnderstandButton(),
                   ],
                 ),
               ),
@@ -217,6 +210,21 @@ class PracticeNormalModeView extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildCantUnderstandButton() {
+    final button = FilledButton.tonal(
+      onPressed: onCantUnderstand,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+      ),
+      child: Text(
+        l10n.intensiveListenCantUnderstand,
+        style: theme.textTheme.titleSmall,
+      ),
+    );
+    final step = cantUnderstandStep;
+    return step != null ? GuideTarget(step: step, child: button) : button;
   }
 }
 

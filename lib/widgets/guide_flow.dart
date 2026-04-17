@@ -15,7 +15,9 @@ import '../services/app_logger.dart';
 /// key，并且 showcaseview 能在 tree 里通过 key 定位到目标 widget。
 class GuideStep {
   final GlobalKey key;
-  final String title;
+
+  /// 标题可选：当按钮/目标本身已承载功能名称时，留空避免与描述重复。
+  final String? title;
   final String description;
 
   /// 可选的富文本描述：用于在 description 中嵌入 Icon 等 widget。
@@ -24,10 +26,12 @@ class GuideStep {
 
   const GuideStep({
     required this.key,
-    required this.title,
+    this.title,
     required this.description,
     this.descriptionWidget,
   });
+
+  bool get hasTitle => title != null && title!.isNotEmpty;
 }
 
 /// 单个页面级引导 flow 的声明。
@@ -322,6 +326,8 @@ class GuideTarget extends StatelessWidget {
     final isLastStep = _GuideFlowLastStepKeys.of(context).contains(step.key);
     final actionName = isLastStep ? l10n.guideDone : l10n.guideNext;
 
+    final semanticsLabel = step.hasTitle ? step.title : step.description;
+
     // 若提供了 descriptionWidget，走 Showcase.withWidget 自定义 container；
     // 按钮在 container 内部渲染，点击时调 ShowcaseView.next() 推进流程，
     // 保持与默认 tooltip 视觉一致。
@@ -333,18 +339,18 @@ class GuideTarget extends StatelessWidget {
         overlayColor: scheme.barrier,
         overlayOpacity: scheme.barrierOpacity,
         container: _RichTooltipContainer(
-          title: step.title,
+          title: step.hasTitle ? step.title : null,
           description: step.descriptionWidget!,
           actionName: actionName,
           scheme: scheme,
         ),
-        child: Semantics(label: step.title, child: child),
+        child: Semantics(label: semanticsLabel, child: child),
       );
     }
 
     return Showcase(
       key: step.key,
-      title: step.title,
+      title: step.hasTitle ? step.title : null,
       description: step.description,
 
       // 表面
@@ -354,10 +360,12 @@ class GuideTarget extends StatelessWidget {
       targetPadding: _GuideTooltipStyle.targetPadding,
       targetBorderRadius: _GuideTooltipStyle.targetRadius,
 
-      // 版式
-      titleTextStyle: _GuideTooltipStyle.title(scheme.title),
+      // 版式（title 为空时不设置 titleTextStyle / titlePadding，避免留白）
+      titleTextStyle: step.hasTitle
+          ? _GuideTooltipStyle.title(scheme.title)
+          : null,
       descTextStyle: _GuideTooltipStyle.description(scheme.description),
-      titlePadding: _GuideTooltipStyle.titlePadding,
+      titlePadding: step.hasTitle ? _GuideTooltipStyle.titlePadding : null,
       titleAlignment: Alignment.centerLeft,
       descriptionAlignment: Alignment.centerLeft,
       titleTextAlign: TextAlign.left,
@@ -384,7 +392,7 @@ class GuideTarget extends StatelessWidget {
           padding: _GuideTooltipStyle.actionPadding,
         ),
       ],
-      child: Semantics(label: step.title, child: child),
+      child: Semantics(label: semanticsLabel, child: child),
     );
   }
 }
@@ -394,7 +402,7 @@ class GuideTarget extends StatelessWidget {
 /// 完整复刻默认 tooltip 的视觉方案（surface + radius + padding + action button），
 /// 并将 action 按钮内嵌在容器中，点击时调用 [ShowcaseView.next] 推进流程。
 class _RichTooltipContainer extends StatelessWidget {
-  final String title;
+  final String? title;
   final Widget description;
   final String actionName;
   final _GuideTooltipScheme scheme;
@@ -408,6 +416,7 @@ class _RichTooltipContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasTitle = title != null && title!.isNotEmpty;
     return IntrinsicWidth(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 320),
@@ -420,12 +429,14 @@ class _RichTooltipContainer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              title,
-              textAlign: TextAlign.left,
-              style: _GuideTooltipStyle.title(scheme.title),
-            ),
-            const SizedBox(height: 8),
+            if (hasTitle) ...[
+              Text(
+                title!,
+                textAlign: TextAlign.left,
+                style: _GuideTooltipStyle.title(scheme.title),
+              ),
+              const SizedBox(height: 8),
+            ],
             DefaultTextStyle(
               style: _GuideTooltipStyle.description(scheme.description),
               child: description,

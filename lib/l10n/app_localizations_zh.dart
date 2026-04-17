@@ -2554,6 +2554,24 @@ class AppLocalizationsZh extends AppLocalizations {
       '点击这里进入闪卡模式，复习所有收藏的词汇。通过看单词、听原句，可以更高效地巩固记忆。';
 
   @override
+  String get guideIntensiveListenCantUnderstandDescription =>
+      '遇到听不懂的句子时点这里，会自动标记为难句并进入单句解析模式。';
+
+  @override
+  String get guideSentenceAnnotationSentenceDescription =>
+      '点击任意单词可查看词典；长按句子可复制文字。';
+
+  @override
+  String get guideSentenceAnnotationSenseGroupDescription => '按意群切分，帮你轻松听懂长难句。';
+
+  @override
+  String get guideSentenceAnnotationTranslationDescription => '把这句话翻译成你的母语。';
+
+  @override
+  String get guideSentenceAnnotationAnalysisDescription =>
+      '查看这句话的语法、重点短语、听力要点。';
+
+  @override
   String get resetNewUserGuide => '重置新手引导';
 
   @override

@@ -72,6 +72,9 @@ abstract final class GuideFlowIds {
   static const studyStatsStreak = 'study_stats_streak';
   static const favoritesSentencesReview = 'favorites_sentences_review';
   static const favoritesVocabularyReview = 'favorites_vocabulary_review';
+  static const intensiveListenCantUnderstand =
+      'intensive_listen_cant_understand';
+  static const sentenceAnnotationTour = 'sentence_annotation_tour';
 
   static const active = [
     libraryCreateCollection,
@@ -85,6 +88,8 @@ abstract final class GuideFlowIds {
     studyStatsStreak,
     favoritesSentencesReview,
     favoritesVocabularyReview,
+    intensiveListenCantUnderstand,
+    sentenceAnnotationTour,
   ];
 
   static const legacy = [

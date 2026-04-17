@@ -1030,6 +1030,11 @@
   "guideFavoritesVocabularyListDescription": "这里是你收藏的单词和意群。展开后可查看释义，也可以收听它们在原句中的发音。",
   "guideFavoritesFlashcardTitle": "复习收藏词汇",
   "guideFavoritesFlashcardDescription": "点击这里进入闪卡模式，复习所有收藏的词汇。通过看单词、听原句，可以更高效地巩固记忆。",
+  "guideIntensiveListenCantUnderstandDescription": "遇到听不懂的句子时点这里，会自动标记为难句并进入单句解析模式。",
+  "guideSentenceAnnotationSentenceDescription": "点击任意单词可查看词典；长按句子可复制文字。",
+  "guideSentenceAnnotationSenseGroupDescription": "按意群切分，帮你轻松听懂长难句。",
+  "guideSentenceAnnotationTranslationDescription": "把这句话翻译成你的母语。",
+  "guideSentenceAnnotationAnalysisDescription": "查看这句话的语法、重点短语、听力要点。",
   "resetNewUserGuide": "重置新手引导",
   "resetNewUserGuideSubtitle": "清除所有引导已看过状态，方便测试",
   "resetNewUserGuideDone": "新手引导已重置"

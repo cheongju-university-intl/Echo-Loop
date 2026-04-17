@@ -27,6 +27,8 @@ import '../../services/transcription_api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/sense_group_service.dart';
 import '../../utils/sense_group_timing.dart';
+import '../../providers/new_user_guide_provider.dart';
+import '../guide_flow.dart';
 import 'sentence_annotation_card.dart';
 import 'sense_group_action_bar.dart';
 import 'sense_group_text.dart';
@@ -89,6 +91,12 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   /// 用于访问卡片 State 以构建外部工具栏
   GlobalKey<SentenceAnnotationCardState> _cardKey =
       GlobalKey<SentenceAnnotationCardState>();
+
+  // 新手引导步骤 key —— 解析卡片四步巡览（句子 → 意群 → 翻译 → 解析）
+  final GlobalKey _guideSentenceKey = GlobalKey();
+  final GlobalKey _guideSenseGroupKey = GlobalKey();
+  final GlobalKey _guideTranslationKey = GlobalKey();
+  final GlobalKey _guideAnalysisKey = GlobalKey();
 
   /// 工具栏刷新通知器
   final _toolbarNotifier = RebuildNotifier();
@@ -399,17 +407,45 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final savedTextsAsync = ref.watch(savedSenseGroupTextsProvider);
     final savedTexts = savedTextsAsync.valueOrNull ?? {};
 
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        // 滚动时关闭工具条
-        if (notification is ScrollStartNotification) {
-          _dismissActionBar();
-        }
-        return false;
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    final l10n = AppLocalizations.of(context)!;
+    final sentenceStep = GuideStep(
+      key: _guideSentenceKey,
+      description: l10n.guideSentenceAnnotationSentenceDescription,
+    );
+    final senseGroupStep = GuideStep(
+      key: _guideSenseGroupKey,
+      description: l10n.guideSentenceAnnotationSenseGroupDescription,
+    );
+    final translationStep = GuideStep(
+      key: _guideTranslationKey,
+      description: l10n.guideSentenceAnnotationTranslationDescription,
+    );
+    final analysisStep = GuideStep(
+      key: _guideAnalysisKey,
+      description: l10n.guideSentenceAnnotationAnalysisDescription,
+    );
+    final guideFlows = <GuideFlow>[
+      GuideFlow(
+        flowId: GuideFlowIds.sentenceAnnotationTour,
+        shouldRun: true,
+        // 句子 → 意群 → 翻译 → 解析
+        steps: [sentenceStep, senseGroupStep, translationStep, analysisStep],
+      ),
+    ];
+
+    return GuideFlowSequenceHost(
+      flows: guideFlows,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // 滚动时关闭工具条
+          if (notification is ScrollStartNotification) {
+            _dismissActionBar();
+          }
+          return false;
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // 固定工具栏（监听 notifier 刷新）
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.m),
@@ -475,10 +511,15 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                 savedGroupTexts: savedTexts,
                 onTapGroupWithRect: _showActionBar,
                 onToolbarButtonTapped: widget.onToolbarButtonTapped,
+                sentenceGuideStep: sentenceStep,
+                senseGroupGuideStep: senseGroupStep,
+                translationGuideStep: translationStep,
+                analysisGuideStep: analysisStep,
               ),
             ),
           ),
         ],
+        ),
       ),
     );
   }

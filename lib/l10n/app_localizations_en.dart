@@ -2634,6 +2634,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap here to enter flashcard mode and review every saved word. Seeing the word and hearing it in context makes memory stick.';
 
   @override
+  String get guideIntensiveListenCantUnderstandDescription =>
+      'Tap here when a sentence is hard to follow. It will be auto-marked as difficult and you\'ll enter single-sentence analysis mode.';
+
+  @override
+  String get guideSentenceAnnotationSentenceDescription =>
+      'Tap any word to open the dictionary; long-press the sentence to copy the text.';
+
+  @override
+  String get guideSentenceAnnotationSenseGroupDescription =>
+      'Break the sentence into sense groups to make long, complex lines easier to follow.';
+
+  @override
+  String get guideSentenceAnnotationTranslationDescription =>
+      'Translate this sentence into your native language.';
+
+  @override
+  String get guideSentenceAnnotationAnalysisDescription =>
+      'Check the grammar, key phrases and listening tips for this sentence.';
+
+  @override
   String get resetNewUserGuide => 'Reset New User Guide';
 
   @override

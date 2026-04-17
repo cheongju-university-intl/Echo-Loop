@@ -4694,6 +4694,36 @@ abstract class AppLocalizations {
   /// **'Tap here to enter flashcard mode and review every saved word. Seeing the word and hearing it in context makes memory stick.'**
   String get guideFavoritesFlashcardDescription;
 
+  /// No description provided for @guideIntensiveListenCantUnderstandDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap here when a sentence is hard to follow. It will be auto-marked as difficult and you\'ll enter single-sentence analysis mode.'**
+  String get guideIntensiveListenCantUnderstandDescription;
+
+  /// No description provided for @guideSentenceAnnotationSentenceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap any word to open the dictionary; long-press the sentence to copy the text.'**
+  String get guideSentenceAnnotationSentenceDescription;
+
+  /// No description provided for @guideSentenceAnnotationSenseGroupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Break the sentence into sense groups to make long, complex lines easier to follow.'**
+  String get guideSentenceAnnotationSenseGroupDescription;
+
+  /// No description provided for @guideSentenceAnnotationTranslationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'See how this sentence reads in your native language.'**
+  String get guideSentenceAnnotationTranslationDescription;
+
+  /// No description provided for @guideSentenceAnnotationAnalysisDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the grammar, key phrases and listening tips for this sentence.'**
+  String get guideSentenceAnnotationAnalysisDescription;
+
   /// No description provided for @resetNewUserGuide.
   ///
   /// In en, this message translates to:

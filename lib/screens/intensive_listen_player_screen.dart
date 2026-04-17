@@ -32,10 +32,12 @@ import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/practice_playback_footer.dart';
+import '../widgets/guide_flow.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/practice_progress_section.dart';
+import '../providers/new_user_guide_provider.dart';
 
 /// 精听播放器页面
 class IntensiveListenPlayerScreen extends ConsumerStatefulWidget {
@@ -64,6 +66,9 @@ class _IntensiveListenPlayerScreenState
 
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
+
+  /// 新手引导：「听不太懂」按钮 Showcase key（随 State 生命周期存在）
+  final GlobalKey _guideCantUnderstandKey = GlobalKey();
 
   ProviderSubscription<IntensiveListenState>? _playerSubscription;
 
@@ -491,6 +496,20 @@ class _IntensiveListenPlayerScreenState
 
     final currentSentence = player.currentSentence;
 
+    // 新手引导：仅在普通练习模式（非标注/重播）下展示，确保按钮在屏上
+    final cantUnderstandStep = GuideStep(
+      key: _guideCantUnderstandKey,
+      description: l10n.guideIntensiveListenCantUnderstandDescription,
+    );
+    final guideFlows = <GuideFlow>[
+      GuideFlow(
+        flowId: GuideFlowIds.intensiveListenCantUnderstand,
+        shouldRun:
+            !playerState.isAnnotationMode && !playerState.isAnnotationReplay,
+        steps: [cantUnderstandStep],
+      ),
+    ];
+
     // 句子时长（如 "3.5s"）和时间戳（如 "00:32.1 - 00:35.6"）分开传递，
     // 由 _ProgressSection 用不同样式渲染以建立视觉层级。
     final hasDuration =
@@ -514,29 +533,31 @@ class _IntensiveListenPlayerScreenState
             if (didPop) return;
             _handleExit();
           },
-          child: Scaffold(
-            appBar: AppBar(
-              title: Text(l10n.intensiveListenAppBarTitle),
-              centerTitle: true,
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: _handleExit,
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.tune),
-                  onPressed: () {
-                    if (playerState.annotationState != null) {
-                      player.onAnnotationUserInteraction();
-                    } else {
-                      player.enterWaitingForUserInBlindMode();
-                    }
-                    showIntensiveListenSettingsSheet(context: context);
-                  },
+          child: GuideFlowSequenceHost(
+            flows: guideFlows,
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text(l10n.intensiveListenAppBarTitle),
+                centerTitle: true,
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: _handleExit,
                 ),
-              ],
-            ),
-            body: Column(
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.tune),
+                    onPressed: () {
+                      if (playerState.annotationState != null) {
+                        player.onAnnotationUserInteraction();
+                      } else {
+                        player.enterWaitingForUserInBlindMode();
+                      }
+                      showIntensiveListenSettingsSheet(context: context);
+                    },
+                  ),
+                ],
+              ),
+              body: Column(
               children: [
                 PracticeProgressSection(
                   current: playerState.currentSentenceIndex + 1,
@@ -619,6 +640,7 @@ class _IntensiveListenPlayerScreenState
                           },
                           onToggleMark: _toggleAndSaveDifficult,
                           onCantUnderstand: () => player.enterAnnotationMode(),
+                          cantUnderstandStep: cantUnderstandStep,
                           sentenceText: currentSentence?.text,
                           onWordTap: currentSentence != null
                               ? (word) {
@@ -733,6 +755,7 @@ class _IntensiveListenPlayerScreenState
                 ),
               ],
             ),
+          ),
           ),
         ),
       ),

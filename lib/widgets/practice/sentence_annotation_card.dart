@@ -16,6 +16,7 @@ import '../../utils/sense_group_timing.dart';
 import '../common/async_toggle_button.dart';
 import '../common/shimmer_placeholder.dart';
 import '../common/text_context_menu.dart';
+import '../guide_flow.dart';
 import '../intensive_listen/word_dictionary_sheet.dart';
 import 'sense_group_text.dart';
 
@@ -114,6 +115,18 @@ class SentenceAnnotationCard extends StatefulWidget {
   /// 用户点击工具栏按钮（意群/翻译/解析）时触发，通知外部切换到手动模式
   final VoidCallback? onToolbarButtonTapped;
 
+  /// 新手引导步骤：指向句子文本区域（点词查词典、长按复制）
+  final GuideStep? sentenceGuideStep;
+
+  /// 新手引导步骤：指向意群按钮
+  final GuideStep? senseGroupGuideStep;
+
+  /// 新手引导步骤：指向翻译按钮
+  final GuideStep? translationGuideStep;
+
+  /// 新手引导步骤：指向解析按钮
+  final GuideStep? analysisGuideStep;
+
   const SentenceAnnotationCard({
     super.key,
     required this.text,
@@ -140,6 +153,10 @@ class SentenceAnnotationCard extends StatefulWidget {
     this.onToolbarButtonTapped,
     this.savedGroupTexts = const {},
     this.onTapGroupWithRect,
+    this.sentenceGuideStep,
+    this.senseGroupGuideStep,
+    this.translationGuideStep,
+    this.analysisGuideStep,
   });
 
   @override
@@ -555,48 +572,49 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       SenseGroupMode.off => l10n.annotationBtnSenseGroup,
     };
 
+    final analysisBtn = AsyncToggleButton(
+      key: const ValueKey('analysis'),
+      label: l10n.annotationBtnAnalysis,
+      icon: Icons.auto_awesome,
+      iconColor: Colors.purple.shade400,
+      isActive: _analysisExpanded && _analysisState != ContentLoadState.idle,
+      isDisabled: !_hasAnalysis,
+      onPressed: _onTapAnalysis,
+    );
+    final translationBtn = AsyncToggleButton(
+      key: const ValueKey('translation'),
+      label: l10n.annotationBtnTranslation,
+      icon: Icons.translate,
+      iconColor: Colors.blue.shade600,
+      isActive:
+          _translationExpanded && _translationState != ContentLoadState.idle,
+      isDisabled: !_hasTranslation,
+      onPressed: _onTapTranslation,
+    );
+    final senseGroupBtn = AsyncToggleButton(
+      key: const ValueKey('senseGroup'),
+      label: senseGroupLabel,
+      icon: Icons.auto_fix_high,
+      iconColor: Colors.orange.shade700,
+      isActive: showSenseGroupBlocks,
+      isDisabled: !_isSenseGroupEnabled,
+      onPressed: _onTapSenseGroup,
+    );
+
     return Row(
       children: [
-        Expanded(
-          child: AsyncToggleButton(
-            key: const ValueKey('analysis'),
-            label: l10n.annotationBtnAnalysis,
-            icon: Icons.auto_awesome,
-            iconColor: Colors.purple.shade400,
-            isActive:
-                _analysisExpanded && _analysisState != ContentLoadState.idle,
-            isDisabled: !_hasAnalysis,
-            onPressed: _onTapAnalysis,
-          ),
-        ),
+        Expanded(child: _wrapGuide(widget.analysisGuideStep, analysisBtn)),
         const SizedBox(width: AppSpacing.s),
-        Expanded(
-          child: AsyncToggleButton(
-            key: const ValueKey('translation'),
-            label: l10n.annotationBtnTranslation,
-            icon: Icons.translate,
-            iconColor: Colors.blue.shade600,
-            isActive:
-                _translationExpanded &&
-                _translationState != ContentLoadState.idle,
-            isDisabled: !_hasTranslation,
-            onPressed: _onTapTranslation,
-          ),
-        ),
+        Expanded(child: _wrapGuide(widget.translationGuideStep, translationBtn)),
         const SizedBox(width: AppSpacing.s),
-        Expanded(
-          child: AsyncToggleButton(
-            key: const ValueKey('senseGroup'),
-            label: senseGroupLabel,
-            icon: Icons.auto_fix_high,
-            iconColor: Colors.orange.shade700,
-            isActive: showSenseGroupBlocks,
-            isDisabled: !_isSenseGroupEnabled,
-            onPressed: _onTapSenseGroup,
-          ),
-        ),
+        Expanded(child: _wrapGuide(widget.senseGroupGuideStep, senseGroupBtn)),
       ],
     );
+  }
+
+  /// 可选地包一层 [GuideTarget]。step 为空时直接返回 child。
+  Widget _wrapGuide(GuideStep? step, Widget child) {
+    return step != null ? GuideTarget(step: step, child: child) : child;
   }
 
   // -- 构建 --
@@ -612,12 +630,8 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         _activeSenseGroups != null &&
         _activeSenseGroups!.isNotEmpty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 句子文本 — 意群色块模式或纯 RichText（带长按/右键复制整句）
-        if (showSenseGroupBlocks) ...[
-          SenseGroupText(
+    final Widget sentenceBody = showSenseGroupBlocks
+        ? SenseGroupText(
             chunks: _activeSenseGroups!,
             timings: widget.senseGroupTimings ?? const [],
             playingGroupIndex: widget.playingSenseGroupIndex,
@@ -625,9 +639,8 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
             onTapGroup: widget.onTapSenseGroup ?? (_) {},
             savedGroupTexts: widget.savedGroupTexts,
             onTapGroupWithRect: widget.onTapGroupWithRect,
-          ),
-        ] else
-          GestureDetector(
+          )
+        : GestureDetector(
             onLongPressStart: (details) => TextContextMenu.show(
               context,
               details.globalPosition,
@@ -647,7 +660,13 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
                 children: _buildHighlightedWordSpans(theme),
               ),
             ),
-          ),
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 句子文本 — 意群色块模式或纯 RichText（带长按/右键复制整句）
+        _wrapGuide(widget.sentenceGuideStep, sentenceBody),
 
         // 翻译文本（直接显示在句子下方，弱化字体）
         _buildInlineTranslation(theme, l10n),
