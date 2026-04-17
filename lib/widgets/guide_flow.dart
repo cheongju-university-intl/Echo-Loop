@@ -180,7 +180,34 @@ class _GuideFlowSequenceHostState extends ConsumerState<GuideFlowSequenceHost> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    final lastKeys = <GlobalKey>{
+      for (final flow in widget.flows)
+        if (flow.steps.isNotEmpty) flow.steps.last.key,
+    };
+    return _GuideFlowLastStepKeys(keys: lastKeys, child: widget.child);
+  }
+}
+
+/// 向下层 [GuideTarget] 暴露各 flow 的最后一步 key 集合，
+/// 用于把最后一步的按钮文案从“下一步”切换为“知道了”。
+class _GuideFlowLastStepKeys extends InheritedWidget {
+  const _GuideFlowLastStepKeys({required this.keys, required super.child});
+
+  final Set<GlobalKey> keys;
+
+  static Set<GlobalKey> of(BuildContext context) {
+    final widget = context
+        .dependOnInheritedWidgetOfExactType<_GuideFlowLastStepKeys>();
+    return widget?.keys ?? const <GlobalKey>{};
+  }
+
+  @override
+  bool updateShouldNotify(_GuideFlowLastStepKeys oldWidget) {
+    if (identical(keys, oldWidget.keys)) return false;
+    if (keys.length != oldWidget.keys.length) return true;
+    return !keys.containsAll(oldWidget.keys);
+  }
 }
 
 /// 获取全局 [ShowcaseView]；未注册（如纯 unit 测试环境）时返回 null。
@@ -286,6 +313,8 @@ class GuideTarget extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = _GuideTooltipScheme.of(context);
+    final isLastStep = _GuideFlowLastStepKeys.of(context).contains(step.key);
+    final actionName = isLastStep ? l10n.guideDone : l10n.guideNext;
 
     return Showcase(
       key: step.key,
@@ -321,7 +350,7 @@ class GuideTarget extends StatelessWidget {
       tooltipActions: [
         TooltipActionButton(
           type: TooltipDefaultActionType.next,
-          name: l10n.guideNext,
+          name: actionName,
           backgroundColor: scheme.actionBg,
           textStyle: _GuideTooltipStyle.action(scheme.actionText),
           borderRadius: _GuideTooltipStyle.actionRadius,
