@@ -718,8 +718,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get noTranscriptWarning =>
-      'No transcript. A transcript is required to start learning.';
+  String get noTranscriptWarning => 'This audio has no transcript yet';
 
   @override
   String get intensiveListenAppBarTitle => 'Intensive Listening';
@@ -1076,7 +1075,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get listenAndRepeatBriefingTip =>
-      'Listen to each sentence, then repeat it aloud during the pause.';
+      'Listen first, then repeat during the pause.';
 
   @override
   String listenAndRepeatBriefingDifficultCount(int count) {
@@ -2512,7 +2511,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guideLibraryCollectionListDescription =>
-      'Collections help you organize audio by topic. Tap any collection to see the audio inside.';
+      'Collections let you categorize audio by topic. Tap any collection to see the audio inside.';
 
   @override
   String get guideLibraryCollectionMenuTitle => 'Manage a collection';
@@ -2554,7 +2553,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guidePlanAddSubtitleDescription =>
-      'This audio has no subtitles yet. Add subtitles so Echo Loop can generate a learning plan for you.';
+      'Generate subtitles with AI in one tap, or upload a local subtitle file. You can start learning this audio right after.';
 
   @override
   String get guidePlanAiTranscriptionTitle => 'Use AI transcription';
@@ -2618,7 +2617,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guideFavoritesSentencesReviewDescription =>
-      'Tap here to review every saved sentence at once. Echo Loop will order them for you.';
+      'Tap here to review every saved sentence at once.';
 
   @override
   String get guideFavoritesVocabularyListTitle => 'Saved vocabulary';

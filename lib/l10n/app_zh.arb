@@ -218,7 +218,7 @@
   "replace": "替换",
   "sentenceCountLabel": "{count} 句",
   "wordCountLabel": "{count} 词",
-  "noTranscriptWarning": "没有字幕，需要字幕才能开始学习。",
+  "noTranscriptWarning": "这个音频还没有字幕",
   "intensiveListenAppBarTitle": "逐句精听",
   "intensiveListenProgress": "第 {current}/{total} 句",
   "intensiveListenPlayCount": "第 {current}/{total} 遍",
@@ -401,7 +401,7 @@
   "exitListenAndRepeatMessage": "进度已保存，下次可从断点继续。",
   "listenAndRepeatBriefingTitle": "难句跟读",
   "listenAndRepeatBriefingSubtitle": "首次学习 - 难句跟读",
-  "listenAndRepeatBriefingTip": "听完后跟读，在停顿时间内大声朗读这个句子。",
+  "listenAndRepeatBriefingTip": "先听原句，在停顿期间跟读。",
   "listenAndRepeatBriefingDifficultCount": "{count} 个难句",
   "@listenAndRepeatBriefingDifficultCount": {
     "placeholders": {
@@ -1002,7 +1002,7 @@
   "guideCollectionUploadTitle": "上传自己的音频",
   "guideCollectionUploadDescription": "点击这里，可以上传你自己的音频。",
   "guidePlanAddSubtitleTitle": "添加字幕",
-  "guidePlanAddSubtitleDescription": "该音频目前还没有字幕。添加字幕后，Echo Loop 才能为你生成学习计划。",
+  "guidePlanAddSubtitleDescription": "可以用 AI 一键生成字幕，或上传本地字幕文件。完成后即可开始学习这段音频。",
   "guidePlanAiTranscriptionTitle": "使用 AI 转录",
   "guidePlanAiTranscriptionDescription": "如果你手头没有字幕文件，使用 AI 转录是最快的方式。",
   "guidePlanStartTranscriptionTitle": "开始转录",
@@ -1025,7 +1025,7 @@
     }
   },
   "guideFavoritesSentencesReviewTitle": "复习收藏句子",
-  "guideFavoritesSentencesReviewDescription": "点击这里，可以一键复习所有收藏的句子。Echo Loop 会自动为你排序。",
+  "guideFavoritesSentencesReviewDescription": "点击这里，一键复习所有收藏的句子。",
   "guideFavoritesVocabularyListTitle": "收藏的词汇",
   "guideFavoritesVocabularyListDescription": "这里是你收藏的单词和意群。展开后可查看释义，也可以收听它们在原句中的发音。",
   "guideFavoritesFlashcardTitle": "复习收藏词汇",

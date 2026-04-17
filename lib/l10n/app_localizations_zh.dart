@@ -707,7 +707,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get noTranscriptWarning => '没有字幕，需要字幕才能开始学习。';
+  String get noTranscriptWarning => '这个音频还没有字幕';
 
   @override
   String get intensiveListenAppBarTitle => '逐句精听';
@@ -1046,7 +1046,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get listenAndRepeatBriefingSubtitle => '首次学习 - 难句跟读';
 
   @override
-  String get listenAndRepeatBriefingTip => '听完后跟读，在停顿时间内大声朗读这个句子。';
+  String get listenAndRepeatBriefingTip => '先听原句，在停顿期间跟读。';
 
   @override
   String listenAndRepeatBriefingDifficultCount(int count) {
@@ -2438,7 +2438,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get guideLibraryCollectionListDescription =>
-      '合集用于按主题整理音频。点击任意合集，可以查看其中包含的音频。';
+      '合集用于将音频按主题分类整理。点击任意合集，可以查看其中包含的音频。';
 
   @override
   String get guideLibraryCollectionMenuTitle => '管理合集';
@@ -2476,7 +2476,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get guidePlanAddSubtitleDescription =>
-      '该音频目前还没有字幕。添加字幕后，Echo Loop 才能为你生成学习计划。';
+      '可以用 AI 一键生成字幕，或上传本地字幕文件。完成后即可开始学习这段音频。';
 
   @override
   String get guidePlanAiTranscriptionTitle => '使用 AI 转录';
@@ -2538,7 +2538,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get guideFavoritesSentencesReviewDescription =>
-      '点击这里，可以一键复习所有收藏的句子。Echo Loop 会自动为你排序。';
+      '点击这里，一键复习所有收藏的句子。';
 
   @override
   String get guideFavoritesVocabularyListTitle => '收藏的词汇';

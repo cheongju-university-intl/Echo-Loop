@@ -1409,7 +1409,7 @@ abstract class AppLocalizations {
   /// No description provided for @noTranscriptWarning.
   ///
   /// In en, this message translates to:
-  /// **'No transcript. A transcript is required to start learning.'**
+  /// **'This audio has no transcript yet'**
   String get noTranscriptWarning;
 
   /// No description provided for @intensiveListenAppBarTitle.
@@ -4487,7 +4487,7 @@ abstract class AppLocalizations {
   /// No description provided for @guideLibraryCollectionListDescription.
   ///
   /// In en, this message translates to:
-  /// **'Collections help you organize audio by topic. Tap any collection to see the audio inside.'**
+  /// **'Collections let you categorize audio by topic. Tap any collection to see the audio inside.'**
   String get guideLibraryCollectionListDescription;
 
   /// No description provided for @guideLibraryCollectionMenuTitle.
@@ -4559,7 +4559,7 @@ abstract class AppLocalizations {
   /// No description provided for @guidePlanAddSubtitleDescription.
   ///
   /// In en, this message translates to:
-  /// **'This audio has no subtitles yet. Add subtitles so Echo Loop can generate a learning plan for you.'**
+  /// **'Generate subtitles with AI in one tap, or upload a local subtitle file. You can start learning this audio right after.'**
   String get guidePlanAddSubtitleDescription;
 
   /// No description provided for @guidePlanAiTranscriptionTitle.

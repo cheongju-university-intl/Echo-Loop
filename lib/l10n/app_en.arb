@@ -345,7 +345,7 @@
       "count": { "type": "int" }
     }
   },
-  "noTranscriptWarning": "No transcript. A transcript is required to start learning.",
+  "noTranscriptWarning": "This audio has no transcript yet",
   "intensiveListenAppBarTitle": "Intensive Listening",
   "intensiveListenProgress": "Sentence {current}/{total}",
   "@intensiveListenProgress": {
@@ -558,7 +558,7 @@
   "exitListenAndRepeatMessage": "Your progress will be saved. You can continue from where you left off.",
   "listenAndRepeatBriefingTitle": "Listen & Repeat",
   "listenAndRepeatBriefingSubtitle": "Initial Learning - Listen & Repeat",
-  "listenAndRepeatBriefingTip": "Listen to each sentence, then repeat it aloud during the pause.",
+  "listenAndRepeatBriefingTip": "Listen first, then repeat during the pause.",
   "listenAndRepeatBriefingDifficultCount": "{count} difficult sentences",
   "@listenAndRepeatBriefingDifficultCount": {
     "placeholders": {
@@ -1368,7 +1368,7 @@
   "guideCollectionUploadTitle": "Upload your own audio",
   "guideCollectionUploadDescription": "Tap here to upload your own audio.",
   "guidePlanAddSubtitleTitle": "Add subtitles",
-  "guidePlanAddSubtitleDescription": "This audio has no subtitles yet. Add subtitles so Echo Loop can generate a learning plan for you.",
+  "guidePlanAddSubtitleDescription": "Generate subtitles with AI in one tap, or upload a local subtitle file. You can start learning this audio right after.",
   "guidePlanAiTranscriptionTitle": "Use AI transcription",
   "guidePlanAiTranscriptionDescription": "If you do not have a subtitle file, AI transcription is the fastest way.",
   "guidePlanStartTranscriptionTitle": "Start transcription",
@@ -1391,7 +1391,7 @@
     }
   },
   "guideFavoritesSentencesReviewTitle": "Review saved sentences",
-  "guideFavoritesSentencesReviewDescription": "Tap here to review every saved sentence at once. Echo Loop will order them for you.",
+  "guideFavoritesSentencesReviewDescription": "Tap here to review every saved sentence at once.",
   "guideFavoritesVocabularyListTitle": "Saved vocabulary",
   "guideFavoritesVocabularyListDescription": "Your saved words and phrases. Expand a card to see definitions and hear how they sound in the original sentences.",
   "guideFavoritesFlashcardTitle": "Review saved vocabulary",

@@ -2390,6 +2390,7 @@ class _NoTranscriptBanner extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               Icons.warning_amber_rounded,
@@ -2400,16 +2401,27 @@ class _NoTranscriptBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 l10n.noTranscriptWarning,
-                style: theme.textTheme.bodySmall?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onErrorContainer,
                 ),
               ),
             ),
+            const SizedBox(width: AppSpacing.s),
             GuideTarget(
               step: addSubtitleStep,
-              child: TextButton(
+              child: FilledButton.icon(
                 onPressed: () => _showManageSubtitlesSheet(context),
-                child: Text(l10n.addSubtitle),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(l10n.addSubtitle),
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.onErrorContainer,
+                  foregroundColor: theme.colorScheme.errorContainer,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.m,
+                    vertical: AppSpacing.xs,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ),
           ],
