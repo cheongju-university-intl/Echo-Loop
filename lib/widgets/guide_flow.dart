@@ -264,8 +264,11 @@ class _GuideTooltipScheme {
     description: Color(0xFF9BA3AE),
     actionBg: Color(0xFFF4F5F7),
     actionText: Color(0xFF0F1115),
-    barrier: Color(0xFF000000),
-    barrierOpacity: 0.62,
+    // 夜间模式不走"加深"套路：深色场景再盖黑 barrier 会把卡片和外围一起压成
+    // 近黑，挖孔看不出来。改用浅色 barrier 把外围洗成中灰，挖孔内的深色卡片
+    // 反而成为画面里最暗的区域，和亮色模式一样形成"挖孔凸显"的视觉逻辑。
+    barrier: Color(0xFFE5E7EB),
+    barrierOpacity: 0.45,
   );
 
   static _GuideTooltipScheme of(BuildContext context) =>
