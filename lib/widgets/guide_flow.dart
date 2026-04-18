@@ -320,7 +320,18 @@ class GuideTarget extends StatelessWidget {
   final GuideStep step;
   final Widget child;
 
-  const GuideTarget({super.key, required this.step, required this.child});
+  /// 可选的高亮区域外扩 padding。未指定时使用默认值 [_GuideTooltipStyle.targetPadding]。
+  ///
+  /// 用于少数 child 无法覆盖整个期望高亮区域的场景（如 NavigationDestination
+  /// 的 icon 槽只含图标，不含 label），通过外扩 padding 把相邻区域一起纳入高亮。
+  final EdgeInsets? targetPadding;
+
+  const GuideTarget({
+    super.key,
+    required this.step,
+    required this.child,
+    this.targetPadding,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -328,6 +339,9 @@ class GuideTarget extends StatelessWidget {
     final scheme = _GuideTooltipScheme.of(context);
     final isLastStep = _GuideFlowLastStepKeys.of(context).contains(step.key);
     final actionName = isLastStep ? l10n.guideDone : l10n.guideNext;
+    // 两个 Showcase 分支共用同一份 padding，避免分支间漂移。
+    final effectiveTargetPadding =
+        targetPadding ?? _GuideTooltipStyle.targetPadding;
 
     final semanticsLabel = step.hasTitle ? step.title : step.description;
 
@@ -337,7 +351,7 @@ class GuideTarget extends StatelessWidget {
     if (step.descriptionWidget != null) {
       return Showcase.withWidget(
         key: step.key,
-        targetPadding: _GuideTooltipStyle.targetPadding,
+        targetPadding: effectiveTargetPadding,
         targetBorderRadius: _GuideTooltipStyle.targetRadius,
         overlayColor: scheme.barrier,
         overlayOpacity: scheme.barrierOpacity,
@@ -360,7 +374,7 @@ class GuideTarget extends StatelessWidget {
       tooltipBackgroundColor: scheme.surface,
       tooltipBorderRadius: _GuideTooltipStyle.tooltipRadius,
       tooltipPadding: _GuideTooltipStyle.tooltipPadding,
-      targetPadding: _GuideTooltipStyle.targetPadding,
+      targetPadding: effectiveTargetPadding,
       targetBorderRadius: _GuideTooltipStyle.targetRadius,
 
       // 版式（title 为空时不设置 titleTextStyle / titlePadding，避免留白）

@@ -322,6 +322,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                     NavigationRailDestination(
                       icon: GuideTarget(
                         step: stepLibraryNav,
+                        targetPadding: const EdgeInsets.fromLTRB(16, 6, 16, 36),
                         child: const Icon(Icons.library_music_outlined),
                       ),
                       selectedIcon: const Icon(
@@ -369,6 +370,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                     NavigationDestination(
                       icon: GuideTarget(
                         step: stepLibraryNav,
+                        targetPadding: const EdgeInsets.fromLTRB(16, 6, 16, 36),
                         child: const Icon(Icons.library_music_outlined),
                       ),
                       selectedIcon: const Icon(
