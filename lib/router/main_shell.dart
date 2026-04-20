@@ -23,6 +23,7 @@ import '../providers/study_stats_provider.dart';
 import '../providers/study_task_provider.dart';
 import '../providers/tag_provider.dart';
 import '../providers/time_provider.dart';
+import '../services/app_logger.dart';
 import '../services/review_reminder_service.dart';
 import '../services/review_reminder_time_calculator.dart';
 import '../providers/new_user_guide_provider.dart';
@@ -55,7 +56,31 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   void initState() {
     super.initState();
-    _lifecycleListener = AppLifecycleListener(onResume: _refreshStudyData);
+    _lifecycleListener = AppLifecycleListener(onResume: _onAppResume);
+
+    // 版本更新监听提前注册，确保首次触发 appUpdateProvider.build() → 后台检查。
+    // 同一版本的重复结果不再弹窗（冷启动后用户未处理 → 回前台不反复打扰）。
+    _appUpdateSubscription = ref.listenManual<AppUpdateState>(
+      appUpdateProvider,
+      (previous, next) {
+        if (next is! AppUpdateResult || next.type == AppUpdateType.none) return;
+        if (previous is AppUpdateResult &&
+            previous.type == next.type &&
+            previous.info?.latestVersion == next.info?.latestVersion) {
+          AppLogger.log(
+            'AppUpdate',
+            'listener skipped: same version ${next.info?.latestVersion}',
+          );
+          return;
+        }
+        AppLogger.log(
+          'AppUpdate',
+          'listener show dialog: ${next.info?.latestVersion} (${next.type.name})',
+        );
+        _showUpdateDialog(next);
+      },
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
         ref.read(collectionListProvider.notifier).loadCollections();
@@ -116,15 +141,6 @@ class _MainShellState extends ConsumerState<MainShell> {
         },
       );
 
-      // 监听版本更新状态，弹出对话框
-      _appUpdateSubscription = ref.listenManual<AppUpdateState>(
-        appUpdateProvider,
-        (_, next) {
-          if (next is AppUpdateResult && next.type != AppUpdateType.none) {
-            _showUpdateDialog(next);
-          }
-        },
-      );
     });
   }
 
@@ -170,6 +186,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     ref.invalidate(studyTaskProvider);
     ref.invalidate(completedAudioProvider);
     ref.read(studyStatsNotifierProvider.notifier).refresh();
+  }
+
+  /// App 回到前台回调：刷新学习数据 + 后台检查版本更新
+  void _onAppResume() {
+    AppLogger.log('AppUpdate', 'onAppResume: trigger checkInBackground');
+    _refreshStudyData();
+    ref.read(appUpdateProvider.notifier).checkInBackground();
   }
 
   /// 提醒设置变更回调：重新同步收藏复习提醒和音频复习提醒

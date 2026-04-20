@@ -1,0 +1,98 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../l10n/app_localizations.dart';
+import '../../../providers/collection_provider.dart';
+
+/// 合集列表顶部固定的「发现官方合集」入口条。
+///
+/// 不滚动、永远可见，点击进入 `/discover`。文案两态：
+/// - A：当前已加入的官方合集 < 3 个 → 引导探索
+/// - B：>= 3 → 切换到「看看新上架」复访文案
+class DiscoverEntryBanner extends ConsumerWidget {
+  /// 点击回调；默认 `context.push('/discover')`。测试可注入 mock。
+  final VoidCallback? onTap;
+
+  /// 文案切换阈值：已加入官方合集数 < 此值 → A 态；>= 此值 → B 态
+  static const _thresholdB = 3;
+
+  const DiscoverEntryBanner({super.key, this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    final enrolledOfficialCount = ref.watch(collectionListProvider.select((s) {
+      return s.collections.where((c) => c.isOfficial && !c.isDeprecated).length;
+    }));
+
+    final isStateB = enrolledOfficialCount >= _thresholdB;
+    final title =
+        isStateB ? l10n.discoverEntryTitleB : l10n.discoverEntryTitleA;
+    final subtitle = isStateB
+        ? l10n.discoverEntrySubtitleB
+        : l10n.discoverEntrySubtitleA;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: theme.colorScheme.primaryContainer,
+          child: InkWell(
+            onTap: onTap ?? () => context.push('/discover'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.explore,
+                    size: 24,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer
+                                .withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: theme.colorScheme.onPrimaryContainer.withValues(
+                      alpha: 0.7,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

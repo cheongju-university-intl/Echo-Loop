@@ -86,7 +86,7 @@ class BundledExampleInstaller {
             AudioItemsCompanion.insert(
               id: audioId,
               name: 'English in a Minute - On the Ball',
-              audioPath: _audioRelPath,
+              audioPath: const Value(_audioRelPath),
               addedDate: now,
               updatedAt: now,
             ),

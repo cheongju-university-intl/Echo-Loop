@@ -115,6 +115,20 @@
   "sortByNameDesc": "名称 (Z-A)",
   "sortByDateAsc": "最早创建",
   "sortByDateDesc": "最近创建",
+  "sortDefault": "默认",
+  "sortByOriginalDateAsc": "最早发布",
+  "sortByOriginalDateDesc": "最新发布",
+  "publishedOn": "发布于 {date}",
+  "@publishedOn": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "discoverEntryTitleA": "发现精选合集",
+  "discoverEntrySubtitleA": "托福 · 雅思 · 专四专八 · VOA…",
+  "discoverEntryTitleB": "看看新上架",
+  "discoverEntrySubtitleB": "精选合集持续更新",
+  "officialCollectionEmpty": "该合集暂无音频",
   "sortCollections": "排序",
   "gridView": "文件夹视图",
   "listView": "列表视图",
@@ -1028,5 +1042,53 @@
   "guideSentenceAnnotationAnalysisDescription": "查看这句话的语法、重点短语、听力要点。",
   "resetNewUserGuide": "重置新手引导",
   "resetNewUserGuideSubtitle": "清除所有引导已看过状态，方便测试",
-  "resetNewUserGuideDone": "新手引导已重置"
+  "resetNewUserGuideDone": "新手引导已重置",
+
+  "discoverOfficialCollections": "发现精选合集",
+  "discoverEmpty": "暂无精选合集",
+  "discoverLoadFailed": "加载失败，点击重试",
+  "discoverRetry": "重试",
+  "officialBadge": "精选",
+  "officialDeprecatedBadge": "已下架",
+  "addToMyCollections": "添加到我的合集",
+  "goLearn": "去学习",
+  "removeFromMyCollections": "从我的合集移除",
+  "enrollNeededTitle": "需要先添加合集",
+  "enrollNeededMessage": "添加到我的合集后，就可以开始学习这条音频。",
+  "enrollSucceeded": "已添加到我的合集",
+  "enrollFailed": "添加失败，请检查网络后重试",
+  "removeOfficialConfirmTitle": "移除《{name}》？",
+  "@removeOfficialConfirmTitle": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "removeOfficialConfirmMessage": "将删除本合集所有音频、字幕和相关学习记录，此操作不可恢复。",
+  "removeOfficialConfirmConfirm": "确认移除",
+  "officialCollectionDeprecated": "该合集已下架，本地副本仍可继续使用。",
+  "preparingLearningMaterial": "准备学习材料",
+  "downloadingAudioAndSubtitle": "正在下载音频和字幕…",
+  "downloadCancel": "取消下载",
+  "downloadLater": "先不管",
+  "downloadCompleted": "《{name}》下载完成",
+  "@downloadCompleted": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "downloadFailed": "《{name}》下载失败，请重试",
+  "@downloadFailed": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "downloadInProgressSnackbar": "正在下载《{name}》，完成后再开始这条",
+  "@downloadInProgressSnackbar": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "downloadLoading": "加载中",
+  "audioListColumnName": "名称",
+  "audioListColumnDuration": "时长"
 }

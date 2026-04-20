@@ -1,0 +1,255 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../database/app_database.dart' as db;
+import '../../../database/providers.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../models/word_timestamp.dart';
+import '../../../providers/audio_library_provider.dart';
+import '../../../services/app_logger.dart';
+import '../../../utils/app_data_dir.dart';
+import '../data/official_collection_api.dart';
+import 'download_progress.dart';
+
+part 'official_download_notifier.g.dart';
+
+/// 用于在任何页面推 snackbar 的全局 key；由 `main.dart` 绑定到 MaterialApp。
+final GlobalKey<ScaffoldMessengerState> officialDownloadScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
+/// 全局官方合集音频下载调度器。
+///
+/// MVP 并发约束：同一时刻最多 1 个任务。新请求到来时若已有任务在跑，
+/// 返回 [StartResult.busy]，UI 层给 snackbar 提示而不启动新任务。
+///
+/// 防竞态：每次 start 递增 `_sessionId`，所有异步回调（progress / result）
+/// 都 check 当前 sessionId 是否过期。遵循项目 ADR-3 约束。
+@Riverpod(keepAlive: true)
+class OfficialDownload extends _$OfficialDownload {
+  CancelToken? _cancelToken;
+
+  /// 当前执行中 session 的标识；Dio 回调需 check 避免污染新任务状态。
+  int _sessionId = 0;
+
+  /// 正在下载的音频名称（用于 snackbar 文案）。
+  String? _activeDisplayName;
+
+  @override
+  DownloadProgress build() => const DownloadIdle();
+
+  /// 尝试启动下载。
+  ///
+  /// 返回：
+  /// - [StartResult.started]：新任务已启动
+  /// - [StartResult.alreadyDownloaded]：本地已备好（无需下载）
+  /// - [StartResult.busy]：已有其他任务在跑；调用方应 snackbar 提示
+  Future<StartResult> start({
+    required String audioItemId,
+    required String displayName,
+  }) async {
+    final current = state;
+    if (current is DownloadInProgress) {
+      return StartResult.busy;
+    }
+
+    final audioItem = await ref
+        .read(appDatabaseProvider)
+        .audioItemDao
+        .getById(audioItemId);
+    if (audioItem == null) {
+      return StartResult.alreadyDownloaded; // 不存在按"无需下载"处理，上层忽略
+    }
+    final remoteAudioId = audioItem.remoteAudioId;
+    if (remoteAudioId == null || audioItem.audioPath != null) {
+      // audioPath 非空 → 文件已落地；无 remoteAudioId → 非官方音频不应走下载
+      return StartResult.alreadyDownloaded;
+    }
+
+    _sessionId++;
+    final sid = _sessionId;
+    _cancelToken = CancelToken();
+    _activeDisplayName = displayName;
+    state = DownloadInProgress(
+      audioItemId: audioItemId,
+      displayName: displayName,
+      progress: -1,
+    );
+
+    // 异步执行下载主流程；不 await，避免卡住调用方。
+    unawaited(_runDownload(sid, audioItem, remoteAudioId));
+    return StartResult.started;
+  }
+
+  /// 取消当前下载任务。
+  Future<void> cancel() async {
+    if (state is! DownloadInProgress) return;
+    final token = _cancelToken;
+    _cancelToken = null;
+    _sessionId++; // 过期当前 session，后续回调全部被丢弃
+    token?.cancel('user-cancelled');
+    state = const DownloadIdle();
+    // tmp 文件由 _runDownload 的 finally 负责清理
+  }
+
+  /// 当前正在下载的音频 id（UI 层决定是否为该音频 tile 展示下载态）。
+  String? get activeAudioItemId {
+    final s = state;
+    return s is DownloadInProgress ? s.audioItemId : null;
+  }
+
+  Future<void> _runDownload(
+    int sid,
+    db.AudioItem audioItem,
+    String remoteAudioId,
+  ) async {
+    final api = ref.read(officialCollectionApiProvider);
+    final dio = Dio();
+    final docDir = await getAppDataDirectory();
+    final tmpDir = Directory(p.join(docDir.path, 'tmp', 'official_audio'));
+    await tmpDir.create(recursive: true);
+    final tmpAudioFile = File(
+      p.join(tmpDir.path, '${audioItem.id}.m4a.part'),
+    );
+
+    try {
+      // 1) 拉 /content（SRT + wordTimestamps + audioUrl）
+      final content = await api.getAudioContent(remoteAudioId);
+      if (sid != _sessionId) return; // 过期
+
+      // 2) 下载音频到 tmp
+      await dio.download(
+        content.audioUrl,
+        tmpAudioFile.path,
+        cancelToken: _cancelToken,
+        onReceiveProgress: (received, total) {
+          if (sid != _sessionId) return;
+          if (state is! DownloadInProgress) return;
+          final prev = state as DownloadInProgress;
+          final ratio = total > 0 ? received / total : -1.0;
+          state = DownloadInProgress(
+            audioItemId: prev.audioItemId,
+            displayName: prev.displayName,
+            progress: ratio,
+            receivedBytes: received,
+            totalBytes: total <= 0 ? null : total,
+          );
+        },
+      );
+      if (sid != _sessionId) return;
+
+      // 3) 写 SRT + wordTimestamps + 移动 tmp → final
+      //    audioPath / transcriptPath 此时还是 NULL（enroll 时留白），由本次下载决定。
+      final sha256 = audioItem.audioSha256;
+      if (sha256 == null || sha256.isEmpty) {
+        throw StateError(
+          'audioItem ${audioItem.id} 缺少 audioSha256（enroll 时未写入？）',
+        );
+      }
+      final relativeAudioPath = 'audios/official/$sha256.m4a';
+      final relativeTranscriptPath = 'transcripts/official_${audioItem.id}.srt';
+
+      final audioFinalPath = p.join(docDir.path, relativeAudioPath);
+      final audioFinalFile = File(audioFinalPath);
+      await audioFinalFile.parent.create(recursive: true);
+      await tmpAudioFile.rename(audioFinalPath);
+
+      final transcriptFile = File(p.join(docDir.path, relativeTranscriptPath));
+      await transcriptFile.parent.create(recursive: true);
+      await transcriptFile.writeAsString(content.srt);
+
+      final wordsJson = encodeWordTimestamps(content.wordTimestamps);
+
+      // 4) 写 DB —— audioPath / transcriptPath 是「下载是否就绪」的单一真实来源，
+      //    必须在文件落盘之后写入。
+      final database = ref.read(appDatabaseProvider);
+      await (database.update(database.audioItems)
+            ..where((t) => t.id.equals(audioItem.id)))
+          .write(
+            db.AudioItemsCompanion(
+              audioPath: Value(relativeAudioPath),
+              transcriptPath: Value(relativeTranscriptPath),
+              wordTimestampsJson: Value(wordsJson),
+              transcriptSource: const Value(1),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+      if (sid != _sessionId) return;
+
+      // 5) 刷新 audioLibrary state，让学习计划页等 watcher 立即读到新路径
+      await ref.read(audioLibraryProvider.notifier).loadLibrary();
+      if (sid != _sessionId) return;
+
+      // 6) snackbar 成功提示
+      final messenger = officialDownloadScaffoldMessengerKey.currentState;
+      final l10n = _pickL10n();
+      if (messenger != null && l10n != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.downloadCompleted(_activeDisplayName ?? '')),
+          ),
+        );
+      }
+
+      state = const DownloadIdle();
+    } catch (e, st) {
+      if (sid != _sessionId) return;
+      AppLogger.log('OfficialDownload', 'failed: $e');
+      AppLogger.log('OfficialDownload', st.toString());
+      state = DownloadFailed(
+        audioItemId: audioItem.id,
+        displayName: _activeDisplayName ?? '',
+        error: e,
+      );
+      final messenger = officialDownloadScaffoldMessengerKey.currentState;
+      final l10n = _pickL10n();
+      if (messenger != null && l10n != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.downloadFailed(_activeDisplayName ?? '')),
+          ),
+        );
+      }
+    } finally {
+      // tmp 残留清理
+      if (await tmpAudioFile.exists()) {
+        try {
+          await tmpAudioFile.delete();
+        } catch (_) {}
+      }
+    }
+  }
+
+  AppLocalizations? _pickL10n() {
+    final ctx = officialDownloadScaffoldMessengerKey.currentContext;
+    if (ctx == null) return null;
+    return AppLocalizations.of(ctx);
+  }
+}
+
+enum StartResult { started, alreadyDownloaded, busy }
+
+/// 启动时扫清 `documents/tmp/official_audio/*.m4a.part` 残留文件。
+///
+/// App 上次运行时若崩溃/被杀，tmp 文件可能残留。每次 App 启动调一次即可。
+Future<void> cleanupOfficialDownloadTmp() async {
+  try {
+    final docDir = await getAppDataDirectory();
+    final tmpDir = Directory(p.join(docDir.path, 'tmp', 'official_audio'));
+    if (!await tmpDir.exists()) return;
+    await for (final entity in tmpDir.list(followLinks: false)) {
+      if (entity is File) {
+        try {
+          await entity.delete();
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    AppLogger.log('OfficialDownload', 'cleanup tmp failed (ignored): $e');
+  }
+}

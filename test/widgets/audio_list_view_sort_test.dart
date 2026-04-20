@@ -3,7 +3,24 @@ import 'package:fluency/models/audio_item.dart';
 import 'package:fluency/providers/audio_list_settings_provider.dart';
 import 'package:fluency/widgets/audio_list_view.dart';
 
-import '../helpers/mock_providers.dart';
+/// 本地轻量构造，避免引入 `../helpers/mock_providers.dart`（pre-existing
+/// 编译错误会让整个文件无法 load）。
+AudioItem _item({
+  required String id,
+  String name = 'n',
+  DateTime? addedDate,
+  bool isPinned = false,
+  DateTime? originalDate,
+}) {
+  return AudioItem(
+    id: id,
+    name: name,
+    audioPath: 'audios/$id.m4a',
+    addedDate: addedDate ?? DateTime(2026, 1, 1),
+    isPinned: isPinned,
+    originalDate: originalDate,
+  );
+}
 
 void main() {
   group('sortAudioItems 置顶排序', () {
@@ -18,11 +35,7 @@ void main() {
       DateTime date, {
       bool pinned = false,
     }) {
-      return createTestAudioItem(
-        id: id,
-        name: name,
-        addedDate: date,
-      ).copyWith(isPinned: pinned);
+      return _item(id: id, name: name, addedDate: date, isPinned: pinned);
     }
 
     test('置顶项始终排在最前面（dateDesc）', () {
@@ -130,6 +143,52 @@ void main() {
     test('空列表不报错', () {
       final sorted = sortAudioItems([], AudioSortType.dateDesc);
       expect(sorted, isEmpty);
+    });
+  });
+
+  group('sortAudioItems custom / originalDate', () {
+    AudioItem mk(
+      String id, {
+      String name = 'n',
+      DateTime? original,
+      bool pinned = false,
+    }) {
+      return _item(
+        id: id,
+        name: name,
+        isPinned: pinned,
+        originalDate: original,
+      );
+    }
+
+    test('custom 保持传入顺序（但置顶项提前）', () {
+      final items = [
+        mk('a'),
+        mk('b', pinned: true),
+        mk('c'),
+      ];
+      final sorted = sortAudioItems(items, AudioSortType.custom);
+      expect(sorted.map((i) => i.id).toList(), ['b', 'a', 'c']);
+    });
+
+    test('originalDateAsc：升序，null 排到末尾', () {
+      final items = [
+        mk('a', original: DateTime.utc(2023, 1, 1)),
+        mk('b'), // null
+        mk('c', original: DateTime.utc(2020, 5, 1)),
+      ];
+      final sorted = sortAudioItems(items, AudioSortType.originalDateAsc);
+      expect(sorted.map((i) => i.id).toList(), ['c', 'a', 'b']);
+    });
+
+    test('originalDateDesc：降序，null 排到末尾', () {
+      final items = [
+        mk('a', original: DateTime.utc(2023, 1, 1)),
+        mk('b'), // null
+        mk('c', original: DateTime.utc(2020, 5, 1)),
+      ];
+      final sorted = sortAudioItems(items, AudioSortType.originalDateDesc);
+      expect(sorted.map((i) => i.id).toList(), ['a', 'c', 'b']);
     });
   });
 }

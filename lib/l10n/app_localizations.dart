@@ -788,6 +788,60 @@ abstract class AppLocalizations {
   /// **'Newest First'**
   String get sortByDateDesc;
 
+  /// No description provided for @sortDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get sortDefault;
+
+  /// No description provided for @sortByOriginalDateAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest Published'**
+  String get sortByOriginalDateAsc;
+
+  /// No description provided for @sortByOriginalDateDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest Published'**
+  String get sortByOriginalDateDesc;
+
+  /// No description provided for @publishedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Published {date}'**
+  String publishedOn(String date);
+
+  /// No description provided for @discoverEntryTitleA.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover Curated Collections'**
+  String get discoverEntryTitleA;
+
+  /// No description provided for @discoverEntrySubtitleA.
+  ///
+  /// In en, this message translates to:
+  /// **'TOEFL · IELTS · TEM · VOA…'**
+  String get discoverEntrySubtitleA;
+
+  /// No description provided for @discoverEntryTitleB.
+  ///
+  /// In en, this message translates to:
+  /// **'See what\'s new'**
+  String get discoverEntryTitleB;
+
+  /// No description provided for @discoverEntrySubtitleB.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh picks from our catalog'**
+  String get discoverEntrySubtitleB;
+
+  /// No description provided for @officialCollectionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This collection has no audios yet'**
+  String get officialCollectionEmpty;
+
   /// No description provided for @sortCollections.
   ///
   /// In en, this message translates to:
@@ -4687,6 +4741,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New user guide has been reset'**
   String get resetNewUserGuideDone;
+
+  /// No description provided for @discoverOfficialCollections.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover Curated Collections'**
+  String get discoverOfficialCollections;
+
+  /// No description provided for @discoverEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No curated collections yet'**
+  String get discoverEmpty;
+
+  /// No description provided for @discoverLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load, tap to retry'**
+  String get discoverLoadFailed;
+
+  /// No description provided for @discoverRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get discoverRetry;
+
+  /// No description provided for @officialBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Curated'**
+  String get officialBadge;
+
+  /// No description provided for @officialDeprecatedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get officialDeprecatedBadge;
+
+  /// No description provided for @addToMyCollections.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to My Collections'**
+  String get addToMyCollections;
+
+  /// No description provided for @goLearn.
+  ///
+  /// In en, this message translates to:
+  /// **'Go Learn'**
+  String get goLearn;
+
+  /// No description provided for @removeFromMyCollections.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from My Collections'**
+  String get removeFromMyCollections;
+
+  /// No description provided for @enrollNeededTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Collection First'**
+  String get enrollNeededTitle;
+
+  /// No description provided for @enrollNeededMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this collection to your library, then you can start learning.'**
+  String get enrollNeededMessage;
+
+  /// No description provided for @enrollSucceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to My Collections'**
+  String get enrollSucceeded;
+
+  /// No description provided for @enrollFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add, please check your network and retry'**
+  String get enrollFailed;
+
+  /// No description provided for @removeOfficialConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\"?'**
+  String removeOfficialConfirmTitle(String name);
+
+  /// No description provided for @removeOfficialConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'All audios, subtitles, and learning records in this collection will be deleted. This cannot be undone.'**
+  String get removeOfficialConfirmMessage;
+
+  /// No description provided for @removeOfficialConfirmConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeOfficialConfirmConfirm;
+
+  /// No description provided for @officialCollectionDeprecated.
+  ///
+  /// In en, this message translates to:
+  /// **'This collection has been removed by the publisher. Your local copy remains available.'**
+  String get officialCollectionDeprecated;
+
+  /// No description provided for @preparingLearningMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing Learning Material'**
+  String get preparingLearningMaterial;
+
+  /// No description provided for @downloadingAudioAndSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading audio and subtitle...'**
+  String get downloadingAudioAndSubtitle;
+
+  /// No description provided for @downloadCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Download'**
+  String get downloadCancel;
+
+  /// No description provided for @downloadLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get downloadLater;
+
+  /// No description provided for @downloadCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} downloaded'**
+  String downloadCompleted(String name);
+
+  /// No description provided for @downloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} download failed, please retry'**
+  String downloadFailed(String name);
+
+  /// No description provided for @downloadInProgressSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {name}, please wait'**
+  String downloadInProgressSnackbar(String name);
+
+  /// No description provided for @downloadLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get downloadLoading;
+
+  /// No description provided for @audioListColumnName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get audioListColumnName;
+
+  /// No description provided for @audioListColumnDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get audioListColumnDuration;
 }
 
 class _AppLocalizationsDelegate

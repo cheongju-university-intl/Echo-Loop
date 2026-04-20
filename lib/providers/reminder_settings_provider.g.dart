@@ -7,7 +7,7 @@ part of 'reminder_settings_provider.dart';
 // **************************************************************************
 
 String _$reminderSettingsNotifierHash() =>
-    r'8d86f3e824612bd2623c9f177eee032ed93242dd';
+    r'9dca92bcdb9efd21b6062a7954137fcf9edca60e';
 
 /// 提醒设置 Notifier
 ///

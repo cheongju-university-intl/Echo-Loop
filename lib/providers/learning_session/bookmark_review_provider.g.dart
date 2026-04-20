@@ -6,7 +6,7 @@ part of 'bookmark_review_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$bookmarkReviewHash() => r'94fcb73f2658a83ae42bbd26984d2b5c9ab65cf7';
+String _$bookmarkReviewHash() => r'11159bd88c9a6bcfe7604528db450e3fcb2ee349';
 
 /// 收藏复习 Provider
 ///

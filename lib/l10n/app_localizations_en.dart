@@ -364,6 +364,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sortByDateDesc => 'Newest First';
 
   @override
+  String get sortDefault => 'Default';
+
+  @override
+  String get sortByOriginalDateAsc => 'Oldest Published';
+
+  @override
+  String get sortByOriginalDateDesc => 'Latest Published';
+
+  @override
+  String publishedOn(String date) {
+    return 'Published $date';
+  }
+
+  @override
+  String get discoverEntryTitleA => 'Discover Curated Collections';
+
+  @override
+  String get discoverEntrySubtitleA => 'TOEFL · IELTS · TEM · VOA…';
+
+  @override
+  String get discoverEntryTitleB => 'See what\'s new';
+
+  @override
+  String get discoverEntrySubtitleB => 'Fresh picks from our catalog';
+
+  @override
+  String get officialCollectionEmpty => 'This collection has no audios yet';
+
+  @override
   String get sortCollections => 'Sort';
 
   @override
@@ -2637,4 +2666,97 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetNewUserGuideDone => 'New user guide has been reset';
+
+  @override
+  String get discoverOfficialCollections => 'Discover Curated Collections';
+
+  @override
+  String get discoverEmpty => 'No curated collections yet';
+
+  @override
+  String get discoverLoadFailed => 'Failed to load, tap to retry';
+
+  @override
+  String get discoverRetry => 'Retry';
+
+  @override
+  String get officialBadge => 'Curated';
+
+  @override
+  String get officialDeprecatedBadge => 'Removed';
+
+  @override
+  String get addToMyCollections => 'Add to My Collections';
+
+  @override
+  String get goLearn => 'Go Learn';
+
+  @override
+  String get removeFromMyCollections => 'Remove from My Collections';
+
+  @override
+  String get enrollNeededTitle => 'Add Collection First';
+
+  @override
+  String get enrollNeededMessage =>
+      'Add this collection to your library, then you can start learning.';
+
+  @override
+  String get enrollSucceeded => 'Added to My Collections';
+
+  @override
+  String get enrollFailed =>
+      'Failed to add, please check your network and retry';
+
+  @override
+  String removeOfficialConfirmTitle(String name) {
+    return 'Remove \"$name\"?';
+  }
+
+  @override
+  String get removeOfficialConfirmMessage =>
+      'All audios, subtitles, and learning records in this collection will be deleted. This cannot be undone.';
+
+  @override
+  String get removeOfficialConfirmConfirm => 'Remove';
+
+  @override
+  String get officialCollectionDeprecated =>
+      'This collection has been removed by the publisher. Your local copy remains available.';
+
+  @override
+  String get preparingLearningMaterial => 'Preparing Learning Material';
+
+  @override
+  String get downloadingAudioAndSubtitle => 'Downloading audio and subtitle...';
+
+  @override
+  String get downloadCancel => 'Cancel Download';
+
+  @override
+  String get downloadLater => 'Later';
+
+  @override
+  String downloadCompleted(String name) {
+    return '$name downloaded';
+  }
+
+  @override
+  String downloadFailed(String name) {
+    return '$name download failed, please retry';
+  }
+
+  @override
+  String downloadInProgressSnackbar(String name) {
+    return 'Downloading $name, please wait';
+  }
+
+  @override
+  String get downloadLoading => 'Loading';
+
+  @override
+  String get audioListColumnName => 'Name';
+
+  @override
+  String get audioListColumnDuration => 'Duration';
 }

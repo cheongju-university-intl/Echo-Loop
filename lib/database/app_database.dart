@@ -81,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 28;
+  static const currentSchemaVersion = 31;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -336,6 +336,72 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE collections RENAME COLUMN is_starred TO is_pinned',
           );
         }
+        // v30→v31：audio_items 加 original_date（音频原始发布/播出日期，官方合集用）
+        if (from < 31) {
+          await _addColumnIfNotExists(
+            'audio_items',
+            'original_date',
+            'INTEGER',
+          );
+        }
+        // v29→v30：audio_path 改 nullable，删除 is_audio_downloaded 字段
+        // - 单一真实来源：audioPath != null ↔ 文件已下载
+        // - 先按 is_audio_downloaded=0 把预置但文件不存在的 path 清成 NULL
+        // - 然后走 Drift alterTable 重建表（nullable audio_path + 去掉 is_audio_downloaded 列）
+        if (from < 30) {
+          await m.alterTable(
+            TableMigration(
+              audioItems,
+              columnTransformer: {
+                audioItems.audioPath: const CustomExpression<String>(
+                  'CASE WHEN is_audio_downloaded = 0 THEN NULL ELSE audio_path END',
+                ),
+                audioItems.transcriptPath: const CustomExpression<String>(
+                  'CASE WHEN is_audio_downloaded = 0 THEN NULL ELSE transcript_path END',
+                ),
+              },
+            ),
+          );
+          // alterTable 重建表后索引需要重建
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
+            ON audio_items(remote_audio_id)
+            WHERE remote_audio_id IS NOT NULL
+          ''');
+        }
+        // v28→v29：官方合集支持字段
+        // - collections 加：source / remoteId / coverUrl / description / deprecatedAt
+        // - audio_items 加：remoteAudioId / isAudioDownloaded（默认 true 兼容老数据）
+        // - 唯一索引：(remote_id) WHERE source='official' AND remote_id IS NOT NULL
+        if (from < 29) {
+          await _addColumnIfNotExists(
+            'collections',
+            'source',
+            "TEXT NOT NULL DEFAULT 'local'",
+          );
+          await _addColumnIfNotExists('collections', 'remote_id', 'TEXT');
+          await _addColumnIfNotExists('collections', 'cover_url', 'TEXT');
+          await _addColumnIfNotExists('collections', 'description', 'TEXT');
+          await _addColumnIfNotExists('collections', 'deprecated_at', 'INTEGER');
+          await _addColumnIfNotExists('audio_items', 'remote_audio_id', 'TEXT');
+          await _addColumnIfNotExists(
+            'audio_items',
+            'is_audio_downloaded',
+            'INTEGER NOT NULL DEFAULT 1',
+          );
+          // 避免并发 enroll 写入重复的官方合集行
+          await customStatement('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_remote_id_official
+            ON collections(remote_id)
+            WHERE source = 'official' AND remote_id IS NOT NULL
+          ''');
+          // 同步时按 remoteAudioId 反查
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
+            ON audio_items(remote_audio_id)
+            WHERE remote_audio_id IS NOT NULL
+          ''');
+        }
         // v5→v6：audio_items 新增 sentenceCount、wordCount 列
         if (from < 6) {
           await customStatement(
@@ -486,6 +552,22 @@ class AppDatabase extends _$AppDatabase {
     await customStatement('''
       CREATE INDEX IF NOT EXISTS idx_learned_word_forms_first_learned_at
       ON learned_word_forms(first_learned_at DESC)
+    ''');
+
+    // 官方合集 remoteId 唯一（防并发 enroll 重复）
+    await customStatement('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_remote_id_official
+      ON collections(remote_id)
+      WHERE source = 'official'
+        AND remote_id IS NOT NULL
+        AND deleted_at IS NULL
+    ''');
+
+    // 同步时按 remoteAudioId 反查 audio_items
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
+      ON audio_items(remote_audio_id)
+      WHERE remote_audio_id IS NOT NULL
     ''');
   }
 }

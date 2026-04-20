@@ -1,17 +1,74 @@
+/// 合集来源。
+///
+/// 决定 UI（官方 badge、菜单裁剪）与业务流程（enroll / remove / sync）。
+/// 字段值对齐 Drift `collections.source` 列的字符串：`local` / `official`。
+enum CollectionSource {
+  /// 用户在本地自建的合集
+  local,
+
+  /// 从后端加入的官方合集（需要 sync、按需下载音频、移除时彻底清空）
+  official;
+
+  /// 反序列化辅助；未知字符串回退到 [local] 避免炸。
+  static CollectionSource fromString(String? raw) {
+    return switch (raw) {
+      'official' => CollectionSource.official,
+      _ => CollectionSource.local,
+    };
+  }
+
+  String get storageValue => switch (this) {
+    CollectionSource.local => 'local',
+    CollectionSource.official => 'official',
+  };
+}
+
 /// 合集数据模型
-/// audioItemIds 已移至 Drift junction 表（collection_audio_items）
+///
+/// audioItemIds 已移至 Drift junction 表（`collection_audio_items`）。
+///
+/// 官方合集字段（source=official 时有效）：
+/// - [remoteId]：后端 collection.id（UUID）
+/// - [coverUrl] / [description]：后端 detail 返回的元信息
+/// - [deprecatedAt]：后端下架后的本地标记时间
 class Collection {
   final String id;
   final String name;
   final DateTime createdDate;
   final bool isPinned;
 
+  /// 合集来源；默认 [CollectionSource.local] 兼容老数据
+  final CollectionSource source;
+
+  /// 官方合集在后端的 UUID；source=local 时为 null
+  final String? remoteId;
+
+  /// 合集封面图；用户自建合集目前为 null
+  final String? coverUrl;
+
+  /// 合集描述；用户自建合集目前为 null
+  final String? description;
+
+  /// 官方合集被标记下架的时间；非 null 时 UI 置灰，sync 不再请求
+  final DateTime? deprecatedAt;
+
   Collection({
     required this.id,
     required this.name,
     required this.createdDate,
     this.isPinned = false,
+    this.source = CollectionSource.local,
+    this.remoteId,
+    this.coverUrl,
+    this.description,
+    this.deprecatedAt,
   });
+
+  /// 方便判断：是否为官方合集
+  bool get isOfficial => source == CollectionSource.official;
+
+  /// 方便判断：官方合集是否已下架
+  bool get isDeprecated => deprecatedAt != null;
 
   /// 用于 SP → Drift 迁移时读取旧格式的 JSON
   factory Collection.fromJson(Map<String, dynamic> json) => Collection(
@@ -19,6 +76,13 @@ class Collection {
     name: json['name'],
     createdDate: DateTime.parse(json['createdDate']),
     isPinned: json['isPinned'] ?? json['isStarred'] ?? false,
+    source: CollectionSource.fromString(json['source'] as String?),
+    remoteId: json['remoteId'] as String?,
+    coverUrl: json['coverUrl'] as String?,
+    description: json['description'] as String?,
+    deprecatedAt: json['deprecatedAt'] != null
+        ? DateTime.parse(json['deprecatedAt'] as String)
+        : null,
   );
 
   /// 从旧 JSON 中提取 audioItemIds（仅迁移用）
@@ -31,12 +95,22 @@ class Collection {
     String? name,
     DateTime? createdDate,
     bool? isPinned,
+    CollectionSource? source,
+    String? remoteId,
+    String? coverUrl,
+    String? description,
+    DateTime? deprecatedAt,
   }) {
     return Collection(
       id: id ?? this.id,
       name: name ?? this.name,
       createdDate: createdDate ?? this.createdDate,
       isPinned: isPinned ?? this.isPinned,
+      source: source ?? this.source,
+      remoteId: remoteId ?? this.remoteId,
+      coverUrl: coverUrl ?? this.coverUrl,
+      description: description ?? this.description,
+      deprecatedAt: deprecatedAt ?? this.deprecatedAt,
     );
   }
 }

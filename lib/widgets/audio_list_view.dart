@@ -19,13 +19,33 @@ import 'edit_collection_membership_sheet.dart';
 import 'edit_tag_membership_sheet.dart';
 import 'guide_flow.dart';
 
-/// 按排序类型排序音频列表（置顶项固定在前，不参与排序）
+/// 按排序类型排序音频列表（置顶项固定在前，不参与排序）。
+///
+/// [AudioSortType.custom] 保持传入顺序不变（置顶项仍然提前）。
+/// [AudioSortType.originalDateAsc/Desc] 中 `originalDate == null` 统一排到末尾。
 List<AudioItem> sortAudioItems(List<AudioItem> items, AudioSortType sortType) {
   final pinned = items.where((i) => i.isPinned).toList();
   final unpinned = items.where((i) => !i.isPinned).toList();
 
+  // custom：保持原顺序，仅做 pinned 前置
+  if (sortType == AudioSortType.custom) {
+    return [...pinned, ...unpinned];
+  }
+
+  // originalDate 比较：null 统一排到末尾
+  int cmpByOriginalDate(AudioItem a, AudioItem b, {required bool asc}) {
+    final da = a.originalDate;
+    final db = b.originalDate;
+    if (da == null && db == null) return 0;
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return asc ? da.compareTo(db) : db.compareTo(da);
+  }
+
   int Function(AudioItem, AudioItem) comparator;
   switch (sortType) {
+    case AudioSortType.custom:
+      comparator = (_, __) => 0; // 上面已 return，这里只为穷举
     case AudioSortType.nameAsc:
       comparator = (a, b) => a.name.compareTo(b.name);
     case AudioSortType.nameDesc:
@@ -34,6 +54,10 @@ List<AudioItem> sortAudioItems(List<AudioItem> items, AudioSortType sortType) {
       comparator = (a, b) => a.addedDate.compareTo(b.addedDate);
     case AudioSortType.dateDesc:
       comparator = (a, b) => b.addedDate.compareTo(a.addedDate);
+    case AudioSortType.originalDateAsc:
+      comparator = (a, b) => cmpByOriginalDate(a, b, asc: true);
+    case AudioSortType.originalDateDesc:
+      comparator = (a, b) => cmpByOriginalDate(a, b, asc: false);
   }
 
   pinned.sort((a, b) => b.addedDate.compareTo(a.addedDate));
@@ -61,6 +85,11 @@ class AudioListView extends ConsumerStatefulWidget {
   /// 当前音频列表是否允许启动页面引导。
   final bool guideEnabled;
 
+  /// 覆盖全局 [audioListSettingsProvider] 的排序类型。
+  /// 非 null 时：使用此值排序，不再 watch provider（适用于官方合集详情页等
+  /// 需要独立 sort state 的场景）。
+  final AudioSortType? overrideSortType;
+
   const AudioListView({
     super.key,
     this.items,
@@ -69,6 +98,7 @@ class AudioListView extends ConsumerStatefulWidget {
     this.guideFirstAudioMenu = false,
     this.guideLeadingItems = false,
     this.guideEnabled = true,
+    this.overrideSortType,
   });
 
   @override
@@ -90,10 +120,13 @@ class _AudioListViewState extends ConsumerState<AudioListView> {
         widget.items ??
         ref.watch(audioLibraryProvider.select((s) => s.audioItems));
 
-    final settings = ref.watch(audioListSettingsProvider);
+    // 受控模式（overrideSortType 非 null）下不再 watch provider，避免全局排序
+    // 变化把官方合集详情页的独立 sort state 误刷。
+    final AudioSortType sortType = widget.overrideSortType ??
+        ref.watch(audioListSettingsProvider).sortType;
 
     // 排序
-    final sortedItems = _sortItems(audioItems, settings.sortType);
+    final sortedItems = _sortItems(audioItems, sortType);
 
     if (sortedItems.isEmpty) {
       return widget.emptyState ?? _DefaultEmptyState(l10n: l10n);
@@ -236,25 +269,83 @@ class _DefaultEmptyState extends StatelessWidget {
   }
 }
 
-/// 音频排序按钮 — 公开组件，可在多处复用
+/// 音频排序按钮 — 公开组件，可在多处复用。
+///
+/// **默认模式**（无参）：菜单固定 4 项（名称 ×2 + 日期 ×2），读写全局
+/// `audioListSettingsProvider`。
+///
+/// **受控模式**（`allowedTypes` + `current` + `onChanged` 三者非 null）：
+/// 菜单内容完全由调用方决定，状态也由调用方管理，provider 不参与。
+/// 官方合集详情页用此模式避免全局 sort 被污染。
 class AudioSortButton extends ConsumerWidget {
-  const AudioSortButton({super.key});
+  /// 受控模式：显示的选项子集（按数组顺序）。为 null 走默认模式。
+  final List<AudioSortType>? allowedTypes;
+
+  /// 受控模式当前选中值。
+  final AudioSortType? current;
+
+  /// 受控模式的选中回调。
+  final ValueChanged<AudioSortType>? onChanged;
+
+  const AudioSortButton({
+    super.key,
+    this.allowedTypes,
+    this.current,
+    this.onChanged,
+  });
+
+  bool get _isControlled =>
+      allowedTypes != null && current != null && onChanged != null;
+
+  /// 每种 SortType 对应的 i18n 标签
+  String _labelFor(AudioSortType t, AppLocalizations l10n) {
+    switch (t) {
+      case AudioSortType.custom:
+        return l10n.sortDefault;
+      case AudioSortType.nameAsc:
+        return l10n.sortByNameAsc;
+      case AudioSortType.nameDesc:
+        return l10n.sortByNameDesc;
+      case AudioSortType.dateAsc:
+        return l10n.sortByDateAsc;
+      case AudioSortType.dateDesc:
+        return l10n.sortByDateDesc;
+      case AudioSortType.originalDateAsc:
+        return l10n.sortByOriginalDateAsc;
+      case AudioSortType.originalDateDesc:
+        return l10n.sortByOriginalDateDesc;
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+
+    if (_isControlled) {
+      final types = allowedTypes!;
+      final cur = current!;
+      return PopupMenuButton<AudioSortType>(
+        icon: const Icon(Icons.sort),
+        onSelected: (t) => onChanged!(t),
+        itemBuilder: (context) => [
+          for (final t in types) _sortMenuItem(_labelFor(t, l10n), t, cur),
+        ],
+      );
+    }
+
+    // 默认模式：读写全局 provider，固定 4 项
     return PopupMenuButton<AudioSortType>(
       icon: const Icon(Icons.sort),
       onSelected: (type) {
         ref.read(audioListSettingsProvider.notifier).setSortType(type);
       },
       itemBuilder: (context) {
-        final current = ref.read(audioListSettingsProvider).sortType;
+        final cur = ref.read(audioListSettingsProvider).sortType;
         return [
-          _sortMenuItem(l10n.sortByNameAsc, AudioSortType.nameAsc, current),
-          _sortMenuItem(l10n.sortByNameDesc, AudioSortType.nameDesc, current),
-          _sortMenuItem(l10n.sortByDateAsc, AudioSortType.dateAsc, current),
-          _sortMenuItem(l10n.sortByDateDesc, AudioSortType.dateDesc, current),
+          _sortMenuItem(l10n.sortByNameAsc, AudioSortType.nameAsc, cur),
+          _sortMenuItem(l10n.sortByNameDesc, AudioSortType.nameDesc, cur),
+          _sortMenuItem(l10n.sortByDateAsc, AudioSortType.dateAsc, cur),
+          _sortMenuItem(l10n.sortByDateDesc, AudioSortType.dateDesc, cur),
         ];
       },
     );

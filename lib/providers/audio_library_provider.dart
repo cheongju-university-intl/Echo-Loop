@@ -61,6 +61,8 @@ class AudioLibrary extends _$AudioLibrary {
             transcriptSource: TranscriptSource.fromIndex(row.transcriptSource),
             audioSha256: row.audioSha256,
             transcriptLanguage: row.transcriptLanguage,
+            remoteAudioId: row.remoteAudioId,
+            originalDate: row.originalDate,
           ),
         )
         .toList();
@@ -71,7 +73,15 @@ class AudioLibrary extends _$AudioLibrary {
     for (final item in allItems) {
       AudioItem processedItem = item;
 
-      if (item.audioPath.startsWith('/')) {
+      // audioPath=null → 未就绪（官方合集未下载）；直接保留为合法条目
+      final currentAudioPath = item.audioPath;
+      if (currentAudioPath == null) {
+        validItems.add(processedItem);
+        continue;
+      }
+
+      // 老数据绝对路径 → 相对路径迁移（仅对已就绪音频做）
+      if (currentAudioPath.startsWith('/')) {
         final migratedItem = await _migrateToRelativePath(item);
         if (migratedItem != null) {
           processedItem = migratedItem;
@@ -83,42 +93,13 @@ class AudioLibrary extends _$AudioLibrary {
         } else {
           AppLogger.log(
             'AudioLib',
-            'Failed to migrate ${item.name}, marking as invalid',
+            'Failed to migrate ${item.name}, skipping',
           );
           continue;
         }
       }
 
-      final fullAudioPath = await processedItem.getFullAudioPath();
-      final audioFile = File(fullAudioPath);
-      final audioExists = await audioFile.exists();
-
-      // 验证字幕文件是否存在，不存在则清除路径
-      if (audioExists && processedItem.hasTranscript) {
-        final fullTranscriptPath = await processedItem.getFullTranscriptPath();
-        if (fullTranscriptPath != null) {
-          final transcriptFile = File(fullTranscriptPath);
-          if (!await transcriptFile.exists()) {
-            processedItem = processedItem.copyWith(
-              transcriptPath: null,
-              sentenceCount: 0,
-              wordCount: 0,
-            );
-            hasMigratedItems = true;
-          }
-        }
-      }
-
-      if (audioExists) {
-        validItems.add(processedItem);
-      } else {
-        // 软删除无效音频
-        await dao.softDelete(item.id);
-        AppLogger.log(
-          'AudioLib',
-          'Removed invalid audio item: ${processedItem.name} (audio file not found at: $fullAudioPath)',
-        );
-      }
+      validItems.add(processedItem);
     }
 
     state = state.copyWith(audioItems: validItems, isLoading: false);
@@ -140,21 +121,19 @@ class AudioLibrary extends _$AudioLibrary {
       final dataDir = await getAppDataDirectory();
       final docsPath = dataDir.path;
 
-      if (!item.audioPath.startsWith(docsPath)) {
+      final absAudio = item.audioPath;
+      if (absAudio == null || !absAudio.startsWith(docsPath)) {
         return null;
       }
 
-      final relativeAudioPath = item.audioPath.substring(docsPath.length + 1);
+      final relativeAudioPath = absAudio.substring(docsPath.length + 1);
 
       String? relativeTranscriptPath;
-      if (item.transcriptPath != null &&
-          item.transcriptPath!.startsWith(docsPath)) {
-        relativeTranscriptPath = item.transcriptPath!.substring(
-          docsPath.length + 1,
-        );
-      } else if (item.transcriptPath != null &&
-          !item.transcriptPath!.startsWith('/')) {
-        relativeTranscriptPath = item.transcriptPath;
+      final transcript = item.transcriptPath;
+      if (transcript != null && transcript.startsWith(docsPath)) {
+        relativeTranscriptPath = transcript.substring(docsPath.length + 1);
+      } else if (transcript != null && !transcript.startsWith('/')) {
+        relativeTranscriptPath = transcript;
       }
 
       return item.copyWith(
@@ -186,10 +165,12 @@ class AudioLibrary extends _$AudioLibrary {
 
     try {
       final audioPath = await item.getFullAudioPath();
-      final audioFile = File(audioPath);
-      if (await audioFile.exists()) {
-        await audioFile.delete();
-        AppLogger.log('AudioLib', 'Deleted audio file: $audioPath');
+      if (audioPath != null) {
+        final audioFile = File(audioPath);
+        if (await audioFile.exists()) {
+          await audioFile.delete();
+          AppLogger.log('AudioLib', 'Deleted audio file: $audioPath');
+        }
       }
     } catch (e) {
       AppLogger.log('AudioLib', 'Error deleting audio file: $e');
@@ -267,13 +248,13 @@ class AudioLibrary extends _$AudioLibrary {
     }
   }
 
-  /// 补填缺失时长 — 对 totalDuration == 0 的音频逐个提取并持久化
+  /// 补填缺失时长 — 对已就绪且 totalDuration == 0 的音频逐个提取并持久化
   Future<void> backfillDurations() async {
     final missing = state.audioItems
-        .where((item) => item.totalDuration == 0)
+        .where((item) => item.totalDuration == 0 && item.isAudioReady)
         .toList();
     for (final item in missing) {
-      final seconds = await getAudioDurationSeconds(item.audioPath);
+      final seconds = await getAudioDurationSeconds(item.audioPath!);
       if (seconds > 0) {
         updateAudioItem(item.copyWith(totalDuration: seconds));
       }
@@ -312,6 +293,8 @@ class AudioLibrary extends _$AudioLibrary {
         transcriptSource: Value(item.transcriptSource?.index),
         audioSha256: Value(item.audioSha256),
         transcriptLanguage: Value(item.transcriptLanguage),
+        remoteAudioId: Value(item.remoteAudioId),
+        originalDate: Value(item.originalDate),
         updatedAt: Value(DateTime.now()),
       ),
     );

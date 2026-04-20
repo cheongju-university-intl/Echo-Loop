@@ -12,6 +12,7 @@ import '../providers/new_user_guide_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../widgets/add_audio_dialog.dart';
+import '../providers/audio_list_settings_provider.dart';
 import '../widgets/audio_list_view.dart';
 import '../widgets/guide_flow.dart';
 import '../widgets/manage_subtitles_sheet.dart';
@@ -30,6 +31,19 @@ class CollectionDetailScreen extends ConsumerStatefulWidget {
 class _CollectionDetailScreenState
     extends ConsumerState<CollectionDetailScreen> {
   final _keyUpload = GlobalKey();
+
+  /// 官方合集的排序状态，页面内独立持有（不走全局 audioListSettingsProvider，
+  /// 避免污染资源库 / 用户自建合集的排序偏好）。首次打开默认「官方编排顺序」。
+  AudioSortType _officialSort = AudioSortType.custom;
+
+  /// 官方合集排序菜单的可选项
+  static const _officialAllowedSorts = [
+    AudioSortType.custom,
+    AudioSortType.nameAsc,
+    AudioSortType.nameDesc,
+    AudioSortType.originalDateAsc,
+    AudioSortType.originalDateDesc,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -73,15 +87,25 @@ class _CollectionDetailScreenState
         appBar: AppBar(
           title: Text(collection.name),
           actions: [
-            // 排序按钮（复用公开的 AudioSortButton）
-            const AudioSortButton(),
-            GuideTarget(
-              step: stepUpload,
-              child: IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () => _showAddAudioDialog(context, collection),
+            // 官方合集：独立 sort state + 5 项菜单（默认 / 名称×2 / 原始发布×2）
+            // 用户合集：保持现状 —— 4 项默认菜单 + 全局 provider
+            if (collection.isOfficial)
+              AudioSortButton(
+                allowedTypes: _officialAllowedSorts,
+                current: _officialSort,
+                onChanged: (t) => setState(() => _officialSort = t),
+              )
+            else
+              const AudioSortButton(),
+            // 官方合集禁止手动添加/删除音频，按钮隐藏
+            if (!collection.isOfficial)
+              GuideTarget(
+                step: stepUpload,
+                child: IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showAddAudioDialog(context, collection),
+                ),
               ),
-            ),
           ],
         ),
         body: AudioListView(
@@ -89,10 +113,22 @@ class _CollectionDetailScreenState
           collectionId: widget.collectionId,
           guideFirstAudioMenu: hasAudioItems,
           guideLeadingItems: hasAudioItems,
-          emptyState: _CollectionEmptyState(
-            l10n: l10n,
-            onAdd: () => _showAddAudioDialog(context, collection),
-          ),
+          overrideSortType: collection.isOfficial ? _officialSort : null,
+          emptyState: collection.isOfficial
+              ? Center(
+                  child: Text(
+                    // 区分「已下架」vs「暂无音频」：前者是后端主动下线，后者
+                    // 是合集刚建还没上内容，两种文案语义不同不能复用。
+                    collection.isDeprecated
+                        ? l10n.officialCollectionDeprecated
+                        : l10n.officialCollectionEmpty,
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              : _CollectionEmptyState(
+                  l10n: l10n,
+                  onAdd: () => _showAddAudioDialog(context, collection),
+                ),
         ),
       ),
     );

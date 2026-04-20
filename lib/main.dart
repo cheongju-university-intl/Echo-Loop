@@ -35,6 +35,9 @@ import 'services/asr/offline_asr_engine.dart';
 import 'services/app_logger.dart';
 import 'services/speech_practice_platform.dart';
 import 'services/storage_migration_service.dart';
+import 'features/official_collections/data/official_catalog_service.dart';
+import 'features/official_collections/data/trigger_official_sync.dart';
+import 'features/official_collections/download/official_download_notifier.dart';
 
 /// 通过原生网络栈连接后端服务器。
 ///
@@ -179,6 +182,9 @@ void main() async {
     unawaited(modelManager.cleanupUnusedModels(recommendedAsrModel.id));
   }
 
+  // 清理上次运行残留的官方合集音频下载 tmp 文件（异步）
+  unawaited(cleanupOfficialDownloadTmp());
+
   runApp(
     ProviderScope(
       overrides: [
@@ -203,13 +209,16 @@ class FluencyApp extends ConsumerStatefulWidget {
   ConsumerState<FluencyApp> createState() => _FluencyAppState();
 }
 
-class _FluencyAppState extends ConsumerState<FluencyApp> {
+class _FluencyAppState extends ConsumerState<FluencyApp>
+    with WidgetsBindingObserver {
   StreamSubscription<NotificationIntent>? _intentSubscription;
   late final ShowcaseView _showcase;
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     // 新手引导 showcase 控制器全局注册（替代旧的 ShowCaseWidget InheritedWidget）。
     // 整段 tour 走完或被 dismiss 时，通过 GuideShowcaseBus 触发 controller 的
@@ -223,6 +232,12 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
     // 预加载词典（触发下载或打开本地词典）
     ref.read(dictionaryProvider);
 
+    // 启动时先尝试从磁盘加载已缓存的 catalog（让 Discover 页一进来就有数据）。
+    // 失败静默，下面的 syncAll 会按需重新拉网络。
+    unawaited(
+      ref.read(officialCatalogServiceProvider).loadCachedCatalog(),
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final bridge = ref.read(notificationTapRouterBridgeProvider);
       _intentSubscription = bridge.intents.listen(_handleNotificationIntent);
@@ -232,13 +247,36 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
         _handleNotificationIntent(pendingIntent);
       }
     });
+
+    // 冷启动后异步触发 catalog 同步：inflight 防重入 + 10min 节流自动管理
+    Future.delayed(const Duration(seconds: 3), _triggerCatalogSync);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _intentSubscription?.cancel();
     _showcase.unregister();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _triggerCatalogSync();
+    }
+  }
+
+  /// 全局唯一同步入口；inflight + 10min 节流防止重复请求。
+  /// updated 时由 helper 自动 loadLibrary + loadCollections + invalidate catalog。
+  void _triggerCatalogSync() {
+    if (!mounted) return;
+    unawaited(
+      triggerOfficialSync(ref).then((outcome) {
+        AppLogger.log('main', 'OfficialSync outcome=$outcome');
+      }),
+    );
   }
 
   void _handleNotificationIntent(NotificationIntent intent) {
@@ -275,6 +313,7 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: router,
+      scaffoldMessengerKey: officialDownloadScaffoldMessengerKey,
     );
   }
 }

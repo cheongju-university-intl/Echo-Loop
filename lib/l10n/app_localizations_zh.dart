@@ -362,6 +362,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sortByDateDesc => '最近创建';
 
   @override
+  String get sortDefault => '默认';
+
+  @override
+  String get sortByOriginalDateAsc => '最早发布';
+
+  @override
+  String get sortByOriginalDateDesc => '最新发布';
+
+  @override
+  String publishedOn(String date) {
+    return '发布于 $date';
+  }
+
+  @override
+  String get discoverEntryTitleA => '发现精选合集';
+
+  @override
+  String get discoverEntrySubtitleA => '托福 · 雅思 · 专四专八 · VOA…';
+
+  @override
+  String get discoverEntryTitleB => '看看新上架';
+
+  @override
+  String get discoverEntrySubtitleB => '精选合集持续更新';
+
+  @override
+  String get officialCollectionEmpty => '该合集暂无音频';
+
+  @override
   String get sortCollections => '排序';
 
   @override
@@ -2552,4 +2581,93 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetNewUserGuideDone => '新手引导已重置';
+
+  @override
+  String get discoverOfficialCollections => '发现精选合集';
+
+  @override
+  String get discoverEmpty => '暂无精选合集';
+
+  @override
+  String get discoverLoadFailed => '加载失败，点击重试';
+
+  @override
+  String get discoverRetry => '重试';
+
+  @override
+  String get officialBadge => '精选';
+
+  @override
+  String get officialDeprecatedBadge => '已下架';
+
+  @override
+  String get addToMyCollections => '添加到我的合集';
+
+  @override
+  String get goLearn => '去学习';
+
+  @override
+  String get removeFromMyCollections => '从我的合集移除';
+
+  @override
+  String get enrollNeededTitle => '需要先添加合集';
+
+  @override
+  String get enrollNeededMessage => '添加到我的合集后，就可以开始学习这条音频。';
+
+  @override
+  String get enrollSucceeded => '已添加到我的合集';
+
+  @override
+  String get enrollFailed => '添加失败，请检查网络后重试';
+
+  @override
+  String removeOfficialConfirmTitle(String name) {
+    return '移除《$name》？';
+  }
+
+  @override
+  String get removeOfficialConfirmMessage => '将删除本合集所有音频、字幕和相关学习记录，此操作不可恢复。';
+
+  @override
+  String get removeOfficialConfirmConfirm => '确认移除';
+
+  @override
+  String get officialCollectionDeprecated => '该合集已下架，本地副本仍可继续使用。';
+
+  @override
+  String get preparingLearningMaterial => '准备学习材料';
+
+  @override
+  String get downloadingAudioAndSubtitle => '正在下载音频和字幕…';
+
+  @override
+  String get downloadCancel => '取消下载';
+
+  @override
+  String get downloadLater => '先不管';
+
+  @override
+  String downloadCompleted(String name) {
+    return '《$name》下载完成';
+  }
+
+  @override
+  String downloadFailed(String name) {
+    return '《$name》下载失败，请重试';
+  }
+
+  @override
+  String downloadInProgressSnackbar(String name) {
+    return '正在下载《$name》，完成后再开始这条';
+  }
+
+  @override
+  String get downloadLoading => '加载中';
+
+  @override
+  String get audioListColumnName => '名称';
+
+  @override
+  String get audioListColumnDuration => '时长';
 }

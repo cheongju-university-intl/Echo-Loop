@@ -41,6 +41,16 @@ class AudioItemDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// 根据官方合集中的 remoteAudioId 反查本地行。
+  ///
+  /// 同步时用于判断"远端新增音频在本地是否已存在"。
+  Future<AudioItem?> getByRemoteAudioId(String remoteAudioId) {
+    return (select(audioItems)
+          ..where((t) => t.remoteAudioId.equals(remoteAudioId))
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// 插入或更新音频项
   Future<void> upsert(AudioItemsCompanion entry) {
     return into(audioItems).insertOnConflictUpdate(entry);

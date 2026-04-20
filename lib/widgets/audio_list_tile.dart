@@ -19,6 +19,9 @@ import '../l10n/app_localizations.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
+import '../features/official_collections/download/download_progress.dart';
+import '../features/official_collections/download/official_download_notifier.dart';
+import '../features/official_collections/widgets/prepare_learning_dialog.dart';
 import 'guide_flow.dart';
 import 'learning_progress_icon.dart';
 import '../providers/transcription_task_provider.dart';
@@ -128,7 +131,7 @@ class AudioListTile extends ConsumerWidget {
               : null,
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _handleTap(context, l10n),
+            onTap: () => _handleTap(context, ref, l10n),
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -154,7 +157,7 @@ class AudioListTile extends ConsumerWidget {
                                   audioItem.name,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
-                                    fontSize: 16,
+                                    fontSize: 15,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -259,7 +262,17 @@ class AudioListTile extends ConsumerWidget {
     if (audioItem.hasTranscript && !isTranscribing) {
       metaParts.add(l10n.transcript);
     }
-    metaParts.add(l10n.addedOn(_formatDate(context, audioItem.addedDate)));
+    // 日期 meta：
+    // - 用户自建音频：显示「添加于 X」（addedDate 是 import 时间，有意义）
+    // - 官方合集音频：显示「发布于 yyyy/M/d」（originalDate 是后端运营录入的原始播出日期）；
+    //   originalDate 未录入则跳过
+    if (audioItem.remoteAudioId == null) {
+      metaParts.add(l10n.addedOn(_formatDate(context, audioItem.addedDate)));
+    } else if (audioItem.originalDate != null) {
+      metaParts.add(
+        l10n.publishedOn(_formatAbsoluteDate(audioItem.originalDate!)),
+      );
+    }
 
     final metaStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -416,6 +429,11 @@ class AudioListTile extends ConsumerWidget {
       ),
     );
 
+    // 官方合集音频：name / 字幕 / 合集归属 / 文件本体都由后端决定并在 sync 时回写，
+    // 因此隐藏 rename / manageSubtitles / manage / export / delete 这几项写操作，
+    // manageTags 也一并隐藏（官方内容场景下打 tag 诉求极低）。
+    // 仅保留 pin（纯本地 UI 偏好）+ resetProgress（学习进度重置）。
+    final isOfficial = audioItem.remoteAudioId != null;
     return SizedBox.expand(
       child: PopupMenuButton<String>(
         key: _kMenuHitAreaKey,
@@ -430,41 +448,46 @@ class AudioListTile extends ConsumerWidget {
               audioItem.isPinned ? l10n.unpinAudio : l10n.pinAudio,
             ),
           ),
-          PopupMenuItem(
-            value: 'rename',
-            child: _buildMenuItemRow(
-              const Icon(Icons.edit, size: 20),
-              l10n.renameAudio,
+          if (!isOfficial)
+            PopupMenuItem(
+              value: 'rename',
+              child: _buildMenuItemRow(
+                const Icon(Icons.edit, size: 20),
+                l10n.renameAudio,
+              ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'manageSubtitles',
-            child: _buildMenuItemRow(
-              const Icon(Icons.subtitles_outlined, size: 20),
-              l10n.manageSubtitles,
+          if (!isOfficial)
+            PopupMenuItem(
+              value: 'manageSubtitles',
+              child: _buildMenuItemRow(
+                const Icon(Icons.subtitles_outlined, size: 20),
+                l10n.manageSubtitles,
+              ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'manage',
-            child: _buildMenuItemRow(
-              const Icon(Icons.folder_outlined, size: 20),
-              l10n.manageCollections,
+          if (!isOfficial)
+            PopupMenuItem(
+              value: 'manage',
+              child: _buildMenuItemRow(
+                const Icon(Icons.folder_outlined, size: 20),
+                l10n.manageCollections,
+              ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'manageTags',
-            child: _buildMenuItemRow(
-              const Icon(Icons.label_outline, size: 20),
-              l10n.manageTags,
+          if (!isOfficial)
+            PopupMenuItem(
+              value: 'manageTags',
+              child: _buildMenuItemRow(
+                const Icon(Icons.label_outline, size: 20),
+                l10n.manageTags,
+              ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'export',
-            child: _buildMenuItemRow(
-              const Icon(Icons.ios_share, size: 20),
-              l10n.exportAudio,
+          if (!isOfficial)
+            PopupMenuItem(
+              value: 'export',
+              child: _buildMenuItemRow(
+                const Icon(Icons.ios_share, size: 20),
+                l10n.exportAudio,
+              ),
             ),
-          ),
           // 仅在有学习进度时显示重置选项
           if (hasProgress)
             PopupMenuItem(
@@ -478,13 +501,14 @@ class AudioListTile extends ConsumerWidget {
                 l10n.resetLearningProgress,
               ),
             ),
-          PopupMenuItem(
-            value: 'delete',
-            child: _buildMenuItemRow(
-              Icon(Icons.delete, size: 20, color: theme.colorScheme.error),
-              l10n.delete,
+          if (!isOfficial)
+            PopupMenuItem(
+              value: 'delete',
+              child: _buildMenuItemRow(
+                Icon(Icons.delete, size: 20, color: theme.colorScheme.error),
+                l10n.delete,
+              ),
             ),
-          ),
         ],
         onSelected: (value) {
           if (value == 'togglePin') {
@@ -510,11 +534,20 @@ class AudioListTile extends ConsumerWidget {
   }
 
   /// 处理点击 — 验证文件后导航
-  Future<void> _handleTap(BuildContext context, AppLocalizations l10n) async {
+  Future<void> _handleTap(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) async {
+    // 音频未就绪（audioPath=null）= 官方合集未下载 → 走按需下载流程
+    if (!audioItem.isAudioReady) {
+      await _handleOfficialDownloadTap(context, ref, l10n);
+      return;
+    }
+
     // 验证音频文件是否存在
     final fullAudioPath = await audioItem.getFullAudioPath();
-    final audioFile = File(fullAudioPath);
-    if (!await audioFile.exists()) {
+    if (fullAudioPath == null || !await File(fullAudioPath).exists()) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -534,9 +567,69 @@ class AudioListTile extends ConsumerWidget {
     }
   }
 
-  /// 格式化添加日期为 M/d/yyyy
+  /// 官方合集未下载音频的点击行为：
+  /// - 若已有别的下载任务在跑 → snackbar 提示
+  /// - 若该音频已是"下载中" → 重新打开对话框显示当前进度
+  /// - 否则启动下载 + 打开对话框
+  Future<void> _handleOfficialDownloadTap(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) async {
+    final notifier = ref.read(officialDownloadProvider.notifier);
+    final progress = ref.read(officialDownloadProvider);
+
+    // 已在下载该音频 → 直接打开对话框
+    if (progress is DownloadInProgress &&
+        progress.audioItemId == audioItem.id) {
+      _showDownloadDialog(context, audioItem.id);
+      return;
+    }
+
+    final result = await notifier.start(
+      audioItemId: audioItem.id,
+      displayName: audioItem.name,
+    );
+    if (!context.mounted) return;
+    switch (result) {
+      case StartResult.started:
+        _showDownloadDialog(context, audioItem.id);
+      case StartResult.busy:
+        final activeName =
+            (ref.read(officialDownloadProvider) as DownloadInProgress?)
+                ?.displayName ??
+            '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.downloadInProgressSnackbar(activeName)),
+          ),
+        );
+      case StartResult.alreadyDownloaded:
+        // 极端情况：点击间隙被其它路径标记为已下载；按已下载走常规路径
+        if (_isCollectionContext) {
+          context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
+        } else {
+          context.push(AppRoutes.audioLearningPlan(audioItem.id));
+        }
+    }
+  }
+
+  void _showDownloadDialog(BuildContext context, String audioItemId) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => PrepareLearningDialog(audioItemId: audioItemId),
+    );
+  }
+
+  /// 用户自建音频：相对时间（如「8 分钟前」）。
   String _formatDate(BuildContext context, DateTime date) {
     return formatTimeAgo(context, date);
+  }
+
+  /// 官方音频原始发布日期：绝对日期 `yyyy/M/d`（历史日期相对时间没意义）。
+  String _formatAbsoluteDate(DateTime date) {
+    return '${date.year}/${date.month}/${date.day}';
   }
 
   /// 格式化音频时长（秒 → mm:ss 或 h:mm:ss）
@@ -613,6 +706,14 @@ class AudioListTile extends ConsumerWidget {
     try {
       // 2. 解析文件绝对路径
       final audioPath = await audioItem.getFullAudioPath();
+      if (audioPath == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.audioFileNotFound)),
+          );
+        }
+        return;
+      }
       final transcriptPath = await audioItem.getFullTranscriptPath();
 
       // 3. 调用导出服务生成临时文件

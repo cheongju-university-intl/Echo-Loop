@@ -11,6 +11,8 @@ import 'package:go_router/go_router.dart';
 
 import '../analytics/analytics_observer.dart';
 import '../analytics/analytics_providers.dart';
+import '../features/official_collections/screens/discover_collections_screen.dart';
+import '../features/official_collections/screens/official_collection_detail_screen.dart';
 import '../screens/library_screen.dart';
 import '../screens/collection_detail_screen.dart';
 import '../screens/study_screen.dart';
@@ -202,6 +204,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/activity-calendar',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const ActivityCalendarScreen(),
+      ),
+      // 发现官方合集（全屏）
+      GoRoute(
+        path: '/discover',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const DiscoverCollectionsScreen(),
+        routes: [
+          GoRoute(
+            path: ':remoteId',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) {
+              final remoteId = state.pathParameters['remoteId']!;
+              return OfficialCollectionDetailScreen(remoteId: remoteId);
+            },
+          ),
+        ],
       ),
       // 独立音频路由（不依赖合集）
       GoRoute(

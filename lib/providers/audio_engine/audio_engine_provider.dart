@@ -48,6 +48,13 @@ class AudioEngine extends _$AudioEngine {
       state = state.copyWith(isLoading: true, errorMessage: null);
 
       final fullAudioPath = await item.getFullAudioPath();
+      if (fullAudioPath == null) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: '音频文件不可用（未下载）',
+        );
+        return null;
+      }
       final fileExists = File(fullAudioPath).existsSync();
       AppLogger.log(
         'AudioEngine',

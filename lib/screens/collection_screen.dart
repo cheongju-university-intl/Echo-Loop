@@ -3,13 +3,17 @@
 // 原 CollectionScreen 保留用于 import，
 // 内部组件（排序按钮、列表/网格视图、空状态、对话框）
 // 导出供 LibraryScreen 复用。
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../features/official_collections/providers/official_enrollment_provider.dart';
+import '../features/official_collections/widgets/official_badge.dart';
 import '../models/collection.dart';
 import '../providers/collection_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
+import '../services/app_network_image_cache.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dialogs/confirm_dialog.dart';
 import '../widgets/dialogs/text_input_dialog.dart';
@@ -132,7 +136,9 @@ class CollectionListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.all(8),
+      // 横向 padding 为 0：卡片自己有 horizontal 12 的 margin，避免 8+12=20
+      // 的双重内缩导致和顶部 DiscoverEntryBanner（horizontal 12）错位
+      padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: collections.length,
       itemBuilder: (context, index) {
         final isFirst = index == 0;
@@ -222,7 +228,8 @@ class _CollectionListTile extends ConsumerWidget {
       alpha: 0.06,
     );
     final card = Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      // margin 与 Discover 卡片保持一致
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       color: collection.isPinned ? pinnedHighlightColor : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -233,30 +240,43 @@ class _CollectionListTile extends ConsumerWidget {
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 0, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.folder,
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 16),
+                      _buildLeadingIcon(theme),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              collection.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                              ),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    collection.name,
+                                    style: theme.textTheme.titleMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (collection.isOfficial) ...[
+                                  const SizedBox(width: 6),
+                                  const OfficialBadge(),
+                                ],
+                                if (collection.isDeprecated) ...[
+                                  const SizedBox(width: 4),
+                                  const OfficialDeprecatedBadge(),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '${l10n.audioCount(collectionState.getAudioCount(collection.id))} · ${l10n.addedOn(_formatDate(collection.createdDate))}',
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -282,33 +302,9 @@ class _CollectionListTile extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'togglePin',
-                        child: _buildCollectionMenuItemRow(
-                          _buildCollectionPinIcon(
-                            isPinned: collection.isPinned,
-                          ),
-                          collection.isPinned
-                              ? l10n.unpinCollection
-                              : l10n.pinCollection,
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'rename',
-                        child: _buildCollectionMenuItemRow(
-                          const Icon(Icons.edit),
-                          l10n.renameCollection,
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: _buildCollectionMenuItemRow(
-                          Icon(Icons.delete, color: theme.colorScheme.error),
-                          l10n.delete,
-                        ),
-                      ),
-                    ],
+                    itemBuilder: (context) => collection.isOfficial
+                        ? _buildOfficialMenuItems(collection, l10n, theme)
+                        : _buildLocalMenuItems(collection, l10n, theme),
                     onSelected: (value) {
                       if (value == 'togglePin') {
                         ref
@@ -318,6 +314,12 @@ class _CollectionListTile extends ConsumerWidget {
                         _showRenameCollectionDialog(context, ref, collection);
                       } else if (value == 'delete') {
                         _showDeleteConfirmDialog(context, ref, collection);
+                      } else if (value == 'removeOfficial') {
+                        _showRemoveOfficialConfirmDialog(
+                          context,
+                          ref,
+                          collection,
+                        );
                       }
                     },
                   ),
@@ -337,6 +339,59 @@ class _CollectionListTile extends ConsumerWidget {
 
   void _openCollection(BuildContext context) {
     context.push(AppRoutes.collectionDetail(collection.id));
+  }
+
+  /// 左侧 leading（尺寸 / 样式与 Discover 卡片完全一致）：
+  /// - 官方合集且有 coverUrl：网络封面图（BoxFit.contain）
+  /// - 其它情况：渐变背景 + 合集名首字母
+  Widget _buildLeadingIcon(ThemeData theme) {
+    const size = 56.0;
+    final coverUrl = collection.coverUrl;
+    if (collection.isOfficial && coverUrl != null && coverUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CachedNetworkImage(
+          imageUrl: coverUrl,
+          cacheManager: AppNetworkImageCache.instance,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          placeholder: (_, __) => _letterPlaceholder(theme, size),
+          errorWidget: (_, __, ___) => _letterPlaceholder(theme, size),
+        ),
+      );
+    }
+    return _letterPlaceholder(theme, size);
+  }
+
+  /// 渐变背景 + 合集名首字母占位（与官方合集卡片 `_coverPlaceholder` 同款）。
+  Widget _letterPlaceholder(ThemeData theme, double size) {
+    final letter = collection.name.isEmpty
+        ? '?'
+        : collection.name.characters.first;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.primaryContainer,
+            theme.colorScheme.tertiaryContainer,
+          ],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        letter,
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 }
 
@@ -372,7 +427,7 @@ void _showRenameCollectionDialog(
   }
 }
 
-/// 删除确认对话框
+/// 删除确认对话框（local 合集专用）
 void _showDeleteConfirmDialog(
   BuildContext context,
   WidgetRef ref,
@@ -393,4 +448,85 @@ void _showDeleteConfirmDialog(
   if (confirmed == true) {
     ref.read(collectionListProvider.notifier).deleteCollection(collection.id);
   }
+}
+
+/// 从我的合集移除官方合集（彻底清空音频/字幕/学习记录）
+void _showRemoveOfficialConfirmDialog(
+  BuildContext context,
+  WidgetRef ref,
+  Collection collection,
+) async {
+  final l10n = AppLocalizations.of(context)!;
+
+  final confirmed = await showConfirmDialog(
+    context: context,
+    title: l10n.removeOfficialConfirmTitle(collection.name),
+    message: l10n.removeOfficialConfirmMessage,
+    icon: Icons.warning_amber_rounded,
+    isDestructive: true,
+    confirmLabel: l10n.removeOfficialConfirmConfirm,
+    cancelLabel: l10n.cancel,
+  );
+
+  if (confirmed == true) {
+    await ref
+        .read(officialEnrollmentProvider.notifier)
+        .remove(collection.id);
+  }
+}
+
+/// 本地合集（source='local'）的菜单项：pin/unpin 切换 / 重命名 / 删除。
+List<PopupMenuEntry<String>> _buildLocalMenuItems(
+  Collection collection,
+  AppLocalizations l10n,
+  ThemeData theme,
+) {
+  return [
+    PopupMenuItem(
+      value: 'togglePin',
+      child: _buildCollectionMenuItemRow(
+        _buildCollectionPinIcon(isPinned: collection.isPinned),
+        collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
+      ),
+    ),
+    PopupMenuItem(
+      value: 'rename',
+      child: _buildCollectionMenuItemRow(
+        const Icon(Icons.edit),
+        l10n.renameCollection,
+      ),
+    ),
+    PopupMenuItem(
+      value: 'delete',
+      child: _buildCollectionMenuItemRow(
+        Icon(Icons.delete, color: theme.colorScheme.error),
+        l10n.delete,
+      ),
+    ),
+  ];
+}
+
+/// 官方合集菜单项：pin（允许）/ 从我的合集移除（彻底清空）；
+/// 不允许重命名、不允许删除合集内的音频。
+List<PopupMenuEntry<String>> _buildOfficialMenuItems(
+  Collection collection,
+  AppLocalizations l10n,
+  ThemeData theme,
+) {
+  return [
+    PopupMenuItem(
+      value: 'togglePin',
+      child: _buildCollectionMenuItemRow(
+        _buildCollectionPinIcon(isPinned: collection.isPinned),
+        collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
+      ),
+    ),
+    PopupMenuItem(
+      value: 'removeOfficial',
+      child: _buildCollectionMenuItemRow(
+        Icon(Icons.remove_circle_outline, color: theme.colorScheme.error),
+        l10n.removeFromMyCollections,
+      ),
+    ),
+  ];
 }

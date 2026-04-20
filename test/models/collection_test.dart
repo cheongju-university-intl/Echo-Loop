@@ -85,5 +85,99 @@ void main() {
         expect(copied.id, col.id);
       });
     });
+
+    group('官方合集字段', () {
+      test('默认 source=local，isOfficial=false', () {
+        final col = createSample();
+        expect(col.source, CollectionSource.local);
+        expect(col.isOfficial, isFalse);
+        expect(col.remoteId, isNull);
+        expect(col.coverUrl, isNull);
+        expect(col.description, isNull);
+        expect(col.deprecatedAt, isNull);
+        expect(col.isDeprecated, isFalse);
+      });
+
+      test('官方合集字段齐备时 isOfficial=true', () {
+        final col = Collection(
+          id: 'col-1',
+          name: 'TED 精选',
+          createdDate: now,
+          source: CollectionSource.official,
+          remoteId: 'remote-uuid-1',
+          coverUrl: 'https://cdn/x.png',
+          description: '精选演讲',
+        );
+        expect(col.isOfficial, isTrue);
+        expect(col.remoteId, 'remote-uuid-1');
+      });
+
+      test('deprecatedAt 非 null → isDeprecated=true', () {
+        final col = Collection(
+          id: 'col-1',
+          name: 'TED 精选',
+          createdDate: now,
+          source: CollectionSource.official,
+          remoteId: 'remote-uuid-1',
+          deprecatedAt: now,
+        );
+        expect(col.isDeprecated, isTrue);
+      });
+
+      test('CollectionSource.fromString 解析未知值回退到 local', () {
+        expect(CollectionSource.fromString(null), CollectionSource.local);
+        expect(CollectionSource.fromString('official'), CollectionSource.official);
+        expect(CollectionSource.fromString('local'), CollectionSource.local);
+        expect(CollectionSource.fromString('unknown'), CollectionSource.local);
+      });
+
+      test('CollectionSource.storageValue 与后端/DB 字符串对齐', () {
+        expect(CollectionSource.local.storageValue, 'local');
+        expect(CollectionSource.official.storageValue, 'official');
+      });
+
+      test('fromJson 处理官方合集新字段', () {
+        final json = {
+          'id': 'col-1',
+          'name': 'TED',
+          'createdDate': now.toIso8601String(),
+          'source': 'official',
+          'remoteId': 'r1',
+          'coverUrl': 'https://cdn/x.png',
+          'description': 'desc',
+          'deprecatedAt': now.toIso8601String(),
+        };
+        final col = Collection.fromJson(json);
+        expect(col.source, CollectionSource.official);
+        expect(col.remoteId, 'r1');
+        expect(col.coverUrl, 'https://cdn/x.png');
+        expect(col.description, 'desc');
+        expect(col.deprecatedAt, now);
+      });
+
+      test('fromJson 老数据无 source 字段默认 local', () {
+        final json = {
+          'id': 'col-1',
+          'name': '旧',
+          'createdDate': now.toIso8601String(),
+        };
+        final col = Collection.fromJson(json);
+        expect(col.source, CollectionSource.local);
+      });
+
+      test('copyWith 能独立覆盖官方合集字段', () {
+        final col = createSample();
+        final copied = col.copyWith(
+          source: CollectionSource.official,
+          remoteId: 'r1',
+          coverUrl: 'c',
+          description: 'd',
+        );
+        expect(copied.isOfficial, isTrue);
+        expect(copied.remoteId, 'r1');
+        expect(copied.coverUrl, 'c');
+        expect(copied.description, 'd');
+      });
+    });
   });
 }

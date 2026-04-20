@@ -143,6 +143,20 @@
   "sortByNameDesc": "Name (Z-A)",
   "sortByDateAsc": "Oldest First",
   "sortByDateDesc": "Newest First",
+  "sortDefault": "Default",
+  "sortByOriginalDateAsc": "Oldest Published",
+  "sortByOriginalDateDesc": "Latest Published",
+  "publishedOn": "Published {date}",
+  "@publishedOn": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "discoverEntryTitleA": "Discover Curated Collections",
+  "discoverEntrySubtitleA": "TOEFL · IELTS · TEM · VOA…",
+  "discoverEntryTitleB": "See what's new",
+  "discoverEntrySubtitleB": "Fresh picks from our catalog",
+  "officialCollectionEmpty": "This collection has no audios yet",
   "sortCollections": "Sort",
   "gridView": "Grid View",
   "listView": "List View",
@@ -1394,5 +1408,53 @@
   "guideSentenceAnnotationAnalysisDescription": "Check the grammar, key phrases and listening tips for this sentence.",
   "resetNewUserGuide": "Reset New User Guide",
   "resetNewUserGuideSubtitle": "Clear all guide seen states for testing",
-  "resetNewUserGuideDone": "New user guide has been reset"
+  "resetNewUserGuideDone": "New user guide has been reset",
+
+  "discoverOfficialCollections": "Discover Curated Collections",
+  "discoverEmpty": "No curated collections yet",
+  "discoverLoadFailed": "Failed to load, tap to retry",
+  "discoverRetry": "Retry",
+  "officialBadge": "Curated",
+  "officialDeprecatedBadge": "Removed",
+  "addToMyCollections": "Add to My Collections",
+  "goLearn": "Go Learn",
+  "removeFromMyCollections": "Remove from My Collections",
+  "enrollNeededTitle": "Add Collection First",
+  "enrollNeededMessage": "Add this collection to your library, then you can start learning.",
+  "enrollSucceeded": "Added to My Collections",
+  "enrollFailed": "Failed to add, please check your network and retry",
+  "removeOfficialConfirmTitle": "Remove \"{name}\"?",
+  "@removeOfficialConfirmTitle": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "removeOfficialConfirmMessage": "All audios, subtitles, and learning records in this collection will be deleted. This cannot be undone.",
+  "removeOfficialConfirmConfirm": "Remove",
+  "officialCollectionDeprecated": "This collection has been removed by the publisher. Your local copy remains available.",
+  "preparingLearningMaterial": "Preparing Learning Material",
+  "downloadingAudioAndSubtitle": "Downloading audio and subtitle...",
+  "downloadCancel": "Cancel Download",
+  "downloadLater": "Later",
+  "downloadCompleted": "{name} downloaded",
+  "@downloadCompleted": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "downloadFailed": "{name} download failed, please retry",
+  "@downloadFailed": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "downloadInProgressSnackbar": "Downloading {name}, please wait",
+  "@downloadInProgressSnackbar": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "downloadLoading": "Loading",
+  "audioListColumnName": "Name",
+  "audioListColumnDuration": "Duration"
 }

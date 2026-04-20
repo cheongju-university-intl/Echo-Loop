@@ -52,7 +52,7 @@ class DemoDataSeeder {
           AudioItemsCompanion.insert(
             id: audio.id,
             name: audio.title,
-            audioPath: 'demo/audio_${i + 1}.wav',
+            audioPath: Value('demo/audio_${i + 1}.wav'),
             transcriptPath: Value('demo/audio_${i + 1}.srt'),
             addedDate: addedDate,
             totalDuration: Value(audio.durationSeconds),

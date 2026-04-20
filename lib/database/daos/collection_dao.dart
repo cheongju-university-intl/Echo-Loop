@@ -42,6 +42,21 @@ class CollectionDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// 根据官方合集 remoteId 反查本地行（供 enroll 防重入和 sync 使用）。
+  ///
+  /// 仅匹配未软删且 source='official' 的行，避免与本地合集的意外碰撞。
+  Future<Collection?> getByRemoteId(String remoteId) {
+    return (select(collections)
+          ..where(
+            (t) =>
+                t.remoteId.equals(remoteId) &
+                t.source.equals('official') &
+                t.deletedAt.isNull(),
+          )
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// 插入或更新合集
   Future<void> upsert(CollectionsCompanion entry) {
     return into(collections).insertOnConflictUpdate(entry);

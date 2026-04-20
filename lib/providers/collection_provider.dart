@@ -5,7 +5,6 @@ import '../analytics/models/event_names.dart';
 import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/collection.dart';
-import 'audio_library_provider.dart';
 
 part 'collection_provider.g.dart';
 
@@ -105,6 +104,11 @@ class CollectionList extends _$CollectionList {
             name: row.name,
             createdDate: row.createdDate,
             isPinned: row.isPinned,
+            source: CollectionSource.fromString(row.source),
+            remoteId: row.remoteId,
+            coverUrl: row.coverUrl,
+            description: row.description,
+            deprecatedAt: row.deprecatedAt,
           ),
         )
         .toList();
@@ -120,26 +124,6 @@ class CollectionList extends _$CollectionList {
       isLoading: false,
       audioIdsMap: audioIdsMap,
     );
-
-    // 清理合集中引用了已不存在的音频 ID
-    await _cleanupStaleAudioIds();
-  }
-
-  /// 清理合集中引用了已不存在的音频 ID
-  Future<void> _cleanupStaleAudioIds() async {
-    final libraryNotifier = ref.read(audioLibraryProvider.notifier);
-    final collectionDao = ref.read(collectionDaoProvider);
-
-    for (final collection in state.rawCollections) {
-      final audioIds = await collectionDao.getAudioIds(collection.id);
-      final invalidIds = audioIds
-          .where((id) => libraryNotifier.getItemById(id) == null)
-          .toList();
-
-      for (final invalidId in invalidIds) {
-        await collectionDao.removeAudio(collection.id, invalidId);
-      }
-    }
   }
 
   Future<void> createCollection(String name) async {
@@ -282,6 +266,11 @@ class CollectionList extends _$CollectionList {
         name: Value(collection.name),
         createdDate: Value(collection.createdDate),
         isPinned: Value(collection.isPinned),
+        source: Value(collection.source.storageValue),
+        remoteId: Value(collection.remoteId),
+        coverUrl: Value(collection.coverUrl),
+        description: Value(collection.description),
+        deprecatedAt: Value(collection.deprecatedAt),
         updatedAt: Value(DateTime.now()),
       ),
     );

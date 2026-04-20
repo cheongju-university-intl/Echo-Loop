@@ -34,9 +34,9 @@ class $AudioItemsTable extends AudioItems
   late final GeneratedColumn<String> audioPath = GeneratedColumn<String>(
     'audio_path',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _transcriptPathMeta = const VerificationMeta(
     'transcriptPath',
@@ -189,6 +189,28 @@ class $AudioItemsTable extends AudioItems
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _remoteAudioIdMeta = const VerificationMeta(
+    'remoteAudioId',
+  );
+  @override
+  late final GeneratedColumn<String> remoteAudioId = GeneratedColumn<String>(
+    'remote_audio_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originalDateMeta = const VerificationMeta(
+    'originalDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> originalDate = GeneratedColumn<DateTime>(
+    'original_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -207,6 +229,8 @@ class $AudioItemsTable extends AudioItems
     deletedAt,
     wordTimestampsJson,
     syncStatus,
+    remoteAudioId,
+    originalDate,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -238,8 +262,6 @@ class $AudioItemsTable extends AudioItems
         _audioPathMeta,
         audioPath.isAcceptableOrUnknown(data['audio_path']!, _audioPathMeta),
       );
-    } else if (isInserting) {
-      context.missing(_audioPathMeta);
     }
     if (data.containsKey('transcript_path')) {
       context.handle(
@@ -344,6 +366,24 @@ class $AudioItemsTable extends AudioItems
         syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
       );
     }
+    if (data.containsKey('remote_audio_id')) {
+      context.handle(
+        _remoteAudioIdMeta,
+        remoteAudioId.isAcceptableOrUnknown(
+          data['remote_audio_id']!,
+          _remoteAudioIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('original_date')) {
+      context.handle(
+        _originalDateMeta,
+        originalDate.isAcceptableOrUnknown(
+          data['original_date']!,
+          _originalDateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -364,7 +404,7 @@ class $AudioItemsTable extends AudioItems
       audioPath: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}audio_path'],
-      )!,
+      ),
       transcriptPath: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}transcript_path'],
@@ -417,6 +457,14 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.int,
         data['${effectivePrefix}sync_status'],
       )!,
+      remoteAudioId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_audio_id'],
+      ),
+      originalDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}original_date'],
+      ),
     );
   }
 
@@ -433,10 +481,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 音频名称
   final String name;
 
-  /// 音频文件相对路径
-  final String audioPath;
+  /// 音频文件相对路径。
+  ///
+  /// NULL 表示音频尚未就绪（官方合集加入后、下载完成前）；非 NULL 表示文件已在本地。
+  /// 是「音频是否可用」的单一真实来源。
+  final String? audioPath;
 
-  /// 字幕文件相对路径（可选）
+  /// 字幕文件相对路径。
+  ///
+  /// NULL 表示无字幕或尚未下载；非 NULL 表示文件已在本地。
   final String? transcriptPath;
 
   /// 添加时间
@@ -474,10 +527,18 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
 
   /// 同步状态：0=synced, 1=pendingUpload, 2=pendingDelete
   final int syncStatus;
+
+  /// 官方合集中该音频在后端的 UUID；仅官方合集音频有值。
+  /// 用于同步比对（通过 remoteAudioId 反查本地行）。
+  final String? remoteAudioId;
+
+  /// 原始发布/播出日期。官方合集音频从后端 catalog 同步（如 VOA 某期的播出日期）；
+  /// 用户自建音频保持 NULL。用于官方合集详情页「最早/最新发布」排序。
+  final DateTime? originalDate;
   const AudioItem({
     required this.id,
     required this.name,
-    required this.audioPath,
+    this.audioPath,
     this.transcriptPath,
     required this.addedDate,
     required this.totalDuration,
@@ -491,13 +552,17 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     this.deletedAt,
     this.wordTimestampsJson,
     required this.syncStatus,
+    this.remoteAudioId,
+    this.originalDate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    map['audio_path'] = Variable<String>(audioPath);
+    if (!nullToAbsent || audioPath != null) {
+      map['audio_path'] = Variable<String>(audioPath);
+    }
     if (!nullToAbsent || transcriptPath != null) {
       map['transcript_path'] = Variable<String>(transcriptPath);
     }
@@ -523,6 +588,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       map['word_timestamps_json'] = Variable<String>(wordTimestampsJson);
     }
     map['sync_status'] = Variable<int>(syncStatus);
+    if (!nullToAbsent || remoteAudioId != null) {
+      map['remote_audio_id'] = Variable<String>(remoteAudioId);
+    }
+    if (!nullToAbsent || originalDate != null) {
+      map['original_date'] = Variable<DateTime>(originalDate);
+    }
     return map;
   }
 
@@ -530,7 +601,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     return AudioItemsCompanion(
       id: Value(id),
       name: Value(name),
-      audioPath: Value(audioPath),
+      audioPath: audioPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioPath),
       transcriptPath: transcriptPath == null && nullToAbsent
           ? const Value.absent()
           : Value(transcriptPath),
@@ -556,6 +629,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ? const Value.absent()
           : Value(wordTimestampsJson),
       syncStatus: Value(syncStatus),
+      remoteAudioId: remoteAudioId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteAudioId),
+      originalDate: originalDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originalDate),
     );
   }
 
@@ -567,7 +646,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     return AudioItem(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      audioPath: serializer.fromJson<String>(json['audioPath']),
+      audioPath: serializer.fromJson<String?>(json['audioPath']),
       transcriptPath: serializer.fromJson<String?>(json['transcriptPath']),
       addedDate: serializer.fromJson<DateTime>(json['addedDate']),
       totalDuration: serializer.fromJson<int>(json['totalDuration']),
@@ -585,6 +664,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
         json['wordTimestampsJson'],
       ),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
+      remoteAudioId: serializer.fromJson<String?>(json['remoteAudioId']),
+      originalDate: serializer.fromJson<DateTime?>(json['originalDate']),
     );
   }
   @override
@@ -593,7 +674,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'audioPath': serializer.toJson<String>(audioPath),
+      'audioPath': serializer.toJson<String?>(audioPath),
       'transcriptPath': serializer.toJson<String?>(transcriptPath),
       'addedDate': serializer.toJson<DateTime>(addedDate),
       'totalDuration': serializer.toJson<int>(totalDuration),
@@ -607,13 +688,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'wordTimestampsJson': serializer.toJson<String?>(wordTimestampsJson),
       'syncStatus': serializer.toJson<int>(syncStatus),
+      'remoteAudioId': serializer.toJson<String?>(remoteAudioId),
+      'originalDate': serializer.toJson<DateTime?>(originalDate),
     };
   }
 
   AudioItem copyWith({
     String? id,
     String? name,
-    String? audioPath,
+    Value<String?> audioPath = const Value.absent(),
     Value<String?> transcriptPath = const Value.absent(),
     DateTime? addedDate,
     int? totalDuration,
@@ -627,10 +710,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     Value<DateTime?> deletedAt = const Value.absent(),
     Value<String?> wordTimestampsJson = const Value.absent(),
     int? syncStatus,
+    Value<String?> remoteAudioId = const Value.absent(),
+    Value<DateTime?> originalDate = const Value.absent(),
   }) => AudioItem(
     id: id ?? this.id,
     name: name ?? this.name,
-    audioPath: audioPath ?? this.audioPath,
+    audioPath: audioPath.present ? audioPath.value : this.audioPath,
     transcriptPath: transcriptPath.present
         ? transcriptPath.value
         : this.transcriptPath,
@@ -652,6 +737,10 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
         ? wordTimestampsJson.value
         : this.wordTimestampsJson,
     syncStatus: syncStatus ?? this.syncStatus,
+    remoteAudioId: remoteAudioId.present
+        ? remoteAudioId.value
+        : this.remoteAudioId,
+    originalDate: originalDate.present ? originalDate.value : this.originalDate,
   );
   AudioItem copyWithCompanion(AudioItemsCompanion data) {
     return AudioItem(
@@ -687,6 +776,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
           : this.syncStatus,
+      remoteAudioId: data.remoteAudioId.present
+          ? data.remoteAudioId.value
+          : this.remoteAudioId,
+      originalDate: data.originalDate.present
+          ? data.originalDate.value
+          : this.originalDate,
     );
   }
 
@@ -708,7 +803,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('wordTimestampsJson: $wordTimestampsJson, ')
-          ..write('syncStatus: $syncStatus')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('remoteAudioId: $remoteAudioId, ')
+          ..write('originalDate: $originalDate')
           ..write(')'))
         .toString();
   }
@@ -731,6 +828,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     deletedAt,
     wordTimestampsJson,
     syncStatus,
+    remoteAudioId,
+    originalDate,
   );
   @override
   bool operator ==(Object other) =>
@@ -751,13 +850,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.wordTimestampsJson == this.wordTimestampsJson &&
-          other.syncStatus == this.syncStatus);
+          other.syncStatus == this.syncStatus &&
+          other.remoteAudioId == this.remoteAudioId &&
+          other.originalDate == this.originalDate);
 }
 
 class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<String> id;
   final Value<String> name;
-  final Value<String> audioPath;
+  final Value<String?> audioPath;
   final Value<String?> transcriptPath;
   final Value<DateTime> addedDate;
   final Value<int> totalDuration;
@@ -771,6 +872,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<DateTime?> deletedAt;
   final Value<String?> wordTimestampsJson;
   final Value<int> syncStatus;
+  final Value<String?> remoteAudioId;
+  final Value<DateTime?> originalDate;
   final Value<int> rowid;
   const AudioItemsCompanion({
     this.id = const Value.absent(),
@@ -789,12 +892,14 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.deletedAt = const Value.absent(),
     this.wordTimestampsJson = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.remoteAudioId = const Value.absent(),
+    this.originalDate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AudioItemsCompanion.insert({
     required String id,
     required String name,
-    required String audioPath,
+    this.audioPath = const Value.absent(),
     this.transcriptPath = const Value.absent(),
     required DateTime addedDate,
     this.totalDuration = const Value.absent(),
@@ -808,10 +913,11 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.deletedAt = const Value.absent(),
     this.wordTimestampsJson = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.remoteAudioId = const Value.absent(),
+    this.originalDate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
-       audioPath = Value(audioPath),
        addedDate = Value(addedDate),
        updatedAt = Value(updatedAt);
   static Insertable<AudioItem> custom({
@@ -831,6 +937,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<DateTime>? deletedAt,
     Expression<String>? wordTimestampsJson,
     Expression<int>? syncStatus,
+    Expression<String>? remoteAudioId,
+    Expression<DateTime>? originalDate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -851,6 +959,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (wordTimestampsJson != null)
         'word_timestamps_json': wordTimestampsJson,
       if (syncStatus != null) 'sync_status': syncStatus,
+      if (remoteAudioId != null) 'remote_audio_id': remoteAudioId,
+      if (originalDate != null) 'original_date': originalDate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -858,7 +968,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   AudioItemsCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
-    Value<String>? audioPath,
+    Value<String?>? audioPath,
     Value<String?>? transcriptPath,
     Value<DateTime>? addedDate,
     Value<int>? totalDuration,
@@ -872,6 +982,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<DateTime?>? deletedAt,
     Value<String?>? wordTimestampsJson,
     Value<int>? syncStatus,
+    Value<String?>? remoteAudioId,
+    Value<DateTime?>? originalDate,
     Value<int>? rowid,
   }) {
     return AudioItemsCompanion(
@@ -891,6 +1003,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       deletedAt: deletedAt ?? this.deletedAt,
       wordTimestampsJson: wordTimestampsJson ?? this.wordTimestampsJson,
       syncStatus: syncStatus ?? this.syncStatus,
+      remoteAudioId: remoteAudioId ?? this.remoteAudioId,
+      originalDate: originalDate ?? this.originalDate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -946,6 +1060,12 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     if (syncStatus.present) {
       map['sync_status'] = Variable<int>(syncStatus.value);
     }
+    if (remoteAudioId.present) {
+      map['remote_audio_id'] = Variable<String>(remoteAudioId.value);
+    }
+    if (originalDate.present) {
+      map['original_date'] = Variable<DateTime>(originalDate.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -971,6 +1091,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('deletedAt: $deletedAt, ')
           ..write('wordTimestampsJson: $wordTimestampsJson, ')
           ..write('syncStatus: $syncStatus, ')
+          ..write('remoteAudioId: $remoteAudioId, ')
+          ..write('originalDate: $originalDate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1061,6 +1183,60 @@ class $CollectionsTable extends Collections
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('local'),
+  );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _coverUrlMeta = const VerificationMeta(
+    'coverUrl',
+  );
+  @override
+  late final GeneratedColumn<String> coverUrl = GeneratedColumn<String>(
+    'cover_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deprecatedAtMeta = const VerificationMeta(
+    'deprecatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deprecatedAt = GeneratedColumn<DateTime>(
+    'deprecated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1070,6 +1246,11 @@ class $CollectionsTable extends Collections
     updatedAt,
     deletedAt,
     syncStatus,
+    source,
+    remoteId,
+    coverUrl,
+    description,
+    deprecatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1133,6 +1314,42 @@ class $CollectionsTable extends Collections
         syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
       );
     }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
+    if (data.containsKey('cover_url')) {
+      context.handle(
+        _coverUrlMeta,
+        coverUrl.isAcceptableOrUnknown(data['cover_url']!, _coverUrlMeta),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deprecated_at')) {
+      context.handle(
+        _deprecatedAtMeta,
+        deprecatedAt.isAcceptableOrUnknown(
+          data['deprecated_at']!,
+          _deprecatedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1170,6 +1387,26 @@ class $CollectionsTable extends Collections
         DriftSqlType.int,
         data['${effectivePrefix}sync_status'],
       )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_id'],
+      ),
+      coverUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_url'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      deprecatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deprecated_at'],
+      ),
     );
   }
 
@@ -1200,6 +1437,26 @@ class Collection extends DataClass implements Insertable<Collection> {
 
   /// 同步状态
   final int syncStatus;
+
+  /// 合集来源：`local`（用户自建）| `official`（从后端加入的官方合集）
+  ///
+  /// 老数据默认 `local`。不可变 —— 决定了 UI 是否显示官方 badge、
+  /// 长按菜单是否允许重命名/删除音频、移除流程是否彻底清空等。
+  final String source;
+
+  /// 官方合集在后端的 UUID；仅 source='official' 时有值。
+  /// 与 [source]=official 联合唯一（见 v29 迁移里的唯一索引）。
+  final String? remoteId;
+
+  /// 合集封面图 URL；用户自建合集目前为 null。
+  final String? coverUrl;
+
+  /// 合集描述；用户自建合集目前为 null。
+  final String? description;
+
+  /// 官方合集被后端标记下架的时间；非 null 时 UI 置灰、sync 不再请求。
+  /// source='local' 永远为 null。
+  final DateTime? deprecatedAt;
   const Collection({
     required this.id,
     required this.name,
@@ -1208,6 +1465,11 @@ class Collection extends DataClass implements Insertable<Collection> {
     required this.updatedAt,
     this.deletedAt,
     required this.syncStatus,
+    required this.source,
+    this.remoteId,
+    this.coverUrl,
+    this.description,
+    this.deprecatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1221,6 +1483,19 @@ class Collection extends DataClass implements Insertable<Collection> {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
     map['sync_status'] = Variable<int>(syncStatus);
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
+    }
+    if (!nullToAbsent || coverUrl != null) {
+      map['cover_url'] = Variable<String>(coverUrl);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || deprecatedAt != null) {
+      map['deprecated_at'] = Variable<DateTime>(deprecatedAt);
+    }
     return map;
   }
 
@@ -1235,6 +1510,19 @@ class Collection extends DataClass implements Insertable<Collection> {
           ? const Value.absent()
           : Value(deletedAt),
       syncStatus: Value(syncStatus),
+      source: Value(source),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      coverUrl: coverUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverUrl),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      deprecatedAt: deprecatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deprecatedAt),
     );
   }
 
@@ -1251,6 +1539,11 @@ class Collection extends DataClass implements Insertable<Collection> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
+      source: serializer.fromJson<String>(json['source']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
+      coverUrl: serializer.fromJson<String?>(json['coverUrl']),
+      description: serializer.fromJson<String?>(json['description']),
+      deprecatedAt: serializer.fromJson<DateTime?>(json['deprecatedAt']),
     );
   }
   @override
@@ -1264,6 +1557,11 @@ class Collection extends DataClass implements Insertable<Collection> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncStatus': serializer.toJson<int>(syncStatus),
+      'source': serializer.toJson<String>(source),
+      'remoteId': serializer.toJson<String?>(remoteId),
+      'coverUrl': serializer.toJson<String?>(coverUrl),
+      'description': serializer.toJson<String?>(description),
+      'deprecatedAt': serializer.toJson<DateTime?>(deprecatedAt),
     };
   }
 
@@ -1275,6 +1573,11 @@ class Collection extends DataClass implements Insertable<Collection> {
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncStatus,
+    String? source,
+    Value<String?> remoteId = const Value.absent(),
+    Value<String?> coverUrl = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    Value<DateTime?> deprecatedAt = const Value.absent(),
   }) => Collection(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1283,6 +1586,11 @@ class Collection extends DataClass implements Insertable<Collection> {
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncStatus: syncStatus ?? this.syncStatus,
+    source: source ?? this.source,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
+    coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
+    description: description.present ? description.value : this.description,
+    deprecatedAt: deprecatedAt.present ? deprecatedAt.value : this.deprecatedAt,
   );
   Collection copyWithCompanion(CollectionsCompanion data) {
     return Collection(
@@ -1297,6 +1605,15 @@ class Collection extends DataClass implements Insertable<Collection> {
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
           : this.syncStatus,
+      source: data.source.present ? data.source.value : this.source,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      deprecatedAt: data.deprecatedAt.present
+          ? data.deprecatedAt.value
+          : this.deprecatedAt,
     );
   }
 
@@ -1309,7 +1626,12 @@ class Collection extends DataClass implements Insertable<Collection> {
           ..write('isPinned: $isPinned, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
-          ..write('syncStatus: $syncStatus')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('source: $source, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('coverUrl: $coverUrl, ')
+          ..write('description: $description, ')
+          ..write('deprecatedAt: $deprecatedAt')
           ..write(')'))
         .toString();
   }
@@ -1323,6 +1645,11 @@ class Collection extends DataClass implements Insertable<Collection> {
     updatedAt,
     deletedAt,
     syncStatus,
+    source,
+    remoteId,
+    coverUrl,
+    description,
+    deprecatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -1334,7 +1661,12 @@ class Collection extends DataClass implements Insertable<Collection> {
           other.isPinned == this.isPinned &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
-          other.syncStatus == this.syncStatus);
+          other.syncStatus == this.syncStatus &&
+          other.source == this.source &&
+          other.remoteId == this.remoteId &&
+          other.coverUrl == this.coverUrl &&
+          other.description == this.description &&
+          other.deprecatedAt == this.deprecatedAt);
 }
 
 class CollectionsCompanion extends UpdateCompanion<Collection> {
@@ -1345,6 +1677,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncStatus;
+  final Value<String> source;
+  final Value<String?> remoteId;
+  final Value<String?> coverUrl;
+  final Value<String?> description;
+  final Value<DateTime?> deprecatedAt;
   final Value<int> rowid;
   const CollectionsCompanion({
     this.id = const Value.absent(),
@@ -1354,6 +1691,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.source = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.coverUrl = const Value.absent(),
+    this.description = const Value.absent(),
+    this.deprecatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CollectionsCompanion.insert({
@@ -1364,6 +1706,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.source = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.coverUrl = const Value.absent(),
+    this.description = const Value.absent(),
+    this.deprecatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1377,6 +1724,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncStatus,
+    Expression<String>? source,
+    Expression<String>? remoteId,
+    Expression<String>? coverUrl,
+    Expression<String>? description,
+    Expression<DateTime>? deprecatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1387,6 +1739,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
+      if (source != null) 'source': source,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (coverUrl != null) 'cover_url': coverUrl,
+      if (description != null) 'description': description,
+      if (deprecatedAt != null) 'deprecated_at': deprecatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1399,6 +1756,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncStatus,
+    Value<String>? source,
+    Value<String?>? remoteId,
+    Value<String?>? coverUrl,
+    Value<String?>? description,
+    Value<DateTime?>? deprecatedAt,
     Value<int>? rowid,
   }) {
     return CollectionsCompanion(
@@ -1409,6 +1771,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncStatus: syncStatus ?? this.syncStatus,
+      source: source ?? this.source,
+      remoteId: remoteId ?? this.remoteId,
+      coverUrl: coverUrl ?? this.coverUrl,
+      description: description ?? this.description,
+      deprecatedAt: deprecatedAt ?? this.deprecatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1437,6 +1804,21 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     if (syncStatus.present) {
       map['sync_status'] = Variable<int>(syncStatus.value);
     }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
+    }
+    if (coverUrl.present) {
+      map['cover_url'] = Variable<String>(coverUrl.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (deprecatedAt.present) {
+      map['deprecated_at'] = Variable<DateTime>(deprecatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1453,6 +1835,11 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus, ')
+          ..write('source: $source, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('coverUrl: $coverUrl, ')
+          ..write('description: $description, ')
+          ..write('deprecatedAt: $deprecatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9581,7 +9968,7 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
     AudioItemsCompanion Function({
       required String id,
       required String name,
-      required String audioPath,
+      Value<String?> audioPath,
       Value<String?> transcriptPath,
       required DateTime addedDate,
       Value<int> totalDuration,
@@ -9595,13 +9982,15 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<DateTime?> deletedAt,
       Value<String?> wordTimestampsJson,
       Value<int> syncStatus,
+      Value<String?> remoteAudioId,
+      Value<DateTime?> originalDate,
       Value<int> rowid,
     });
 typedef $$AudioItemsTableUpdateCompanionBuilder =
     AudioItemsCompanion Function({
       Value<String> id,
       Value<String> name,
-      Value<String> audioPath,
+      Value<String?> audioPath,
       Value<String?> transcriptPath,
       Value<DateTime> addedDate,
       Value<int> totalDuration,
@@ -9615,6 +10004,8 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<DateTime?> deletedAt,
       Value<String?> wordTimestampsJson,
       Value<int> syncStatus,
+      Value<String?> remoteAudioId,
+      Value<DateTime?> originalDate,
       Value<int> rowid,
     });
 
@@ -9891,6 +10282,16 @@ class $$AudioItemsTableFilterComposer
 
   ColumnFilters<int> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteAudioId => $composableBuilder(
+    column: $table.remoteAudioId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get originalDate => $composableBuilder(
+    column: $table.originalDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10183,6 +10584,16 @@ class $$AudioItemsTableOrderingComposer
     column: $table.syncStatus,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get remoteAudioId => $composableBuilder(
+    column: $table.remoteAudioId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get originalDate => $composableBuilder(
+    column: $table.originalDate,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AudioItemsTableAnnotationComposer
@@ -10255,6 +10666,16 @@ class $$AudioItemsTableAnnotationComposer
 
   GeneratedColumn<int> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get remoteAudioId => $composableBuilder(
+    column: $table.remoteAudioId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get originalDate => $composableBuilder(
+    column: $table.originalDate,
     builder: (column) => column,
   );
 
@@ -10500,7 +10921,7 @@ class $$AudioItemsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<String> audioPath = const Value.absent(),
+                Value<String?> audioPath = const Value.absent(),
                 Value<String?> transcriptPath = const Value.absent(),
                 Value<DateTime> addedDate = const Value.absent(),
                 Value<int> totalDuration = const Value.absent(),
@@ -10514,6 +10935,8 @@ class $$AudioItemsTableTableManager
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<String?> wordTimestampsJson = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
+                Value<String?> remoteAudioId = const Value.absent(),
+                Value<DateTime?> originalDate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AudioItemsCompanion(
                 id: id,
@@ -10532,13 +10955,15 @@ class $$AudioItemsTableTableManager
                 deletedAt: deletedAt,
                 wordTimestampsJson: wordTimestampsJson,
                 syncStatus: syncStatus,
+                remoteAudioId: remoteAudioId,
+                originalDate: originalDate,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
                 required String name,
-                required String audioPath,
+                Value<String?> audioPath = const Value.absent(),
                 Value<String?> transcriptPath = const Value.absent(),
                 required DateTime addedDate,
                 Value<int> totalDuration = const Value.absent(),
@@ -10552,6 +10977,8 @@ class $$AudioItemsTableTableManager
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<String?> wordTimestampsJson = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
+                Value<String?> remoteAudioId = const Value.absent(),
+                Value<DateTime?> originalDate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AudioItemsCompanion.insert(
                 id: id,
@@ -10570,6 +10997,8 @@ class $$AudioItemsTableTableManager
                 deletedAt: deletedAt,
                 wordTimestampsJson: wordTimestampsJson,
                 syncStatus: syncStatus,
+                remoteAudioId: remoteAudioId,
+                originalDate: originalDate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10814,6 +11243,11 @@ typedef $$CollectionsTableCreateCompanionBuilder =
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
+      Value<String> source,
+      Value<String?> remoteId,
+      Value<String?> coverUrl,
+      Value<String?> description,
+      Value<DateTime?> deprecatedAt,
       Value<int> rowid,
     });
 typedef $$CollectionsTableUpdateCompanionBuilder =
@@ -10825,6 +11259,11 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
+      Value<String> source,
+      Value<String?> remoteId,
+      Value<String?> coverUrl,
+      Value<String?> description,
+      Value<DateTime?> deprecatedAt,
       Value<int> rowid,
     });
 
@@ -10905,6 +11344,31 @@ class $$CollectionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coverUrl => $composableBuilder(
+    column: $table.coverUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deprecatedAt => $composableBuilder(
+    column: $table.deprecatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> collectionAudioItemsRefs(
     Expression<bool> Function($$CollectionAudioItemsTableFilterComposer f) f,
   ) {
@@ -10974,6 +11438,31 @@ class $$CollectionsTableOrderingComposer
     column: $table.syncStatus,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get coverUrl => $composableBuilder(
+    column: $table.coverUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deprecatedAt => $composableBuilder(
+    column: $table.deprecatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CollectionsTableAnnotationComposer
@@ -11007,6 +11496,25 @@ class $$CollectionsTableAnnotationComposer
 
   GeneratedColumn<int> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get coverUrl =>
+      $composableBuilder(column: $table.coverUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get deprecatedAt => $composableBuilder(
+    column: $table.deprecatedAt,
     builder: (column) => column,
   );
 
@@ -11072,6 +11580,11 @@ class $$CollectionsTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
+                Value<String?> coverUrl = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<DateTime?> deprecatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CollectionsCompanion(
                 id: id,
@@ -11081,6 +11594,11 @@ class $$CollectionsTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
+                source: source,
+                remoteId: remoteId,
+                coverUrl: coverUrl,
+                description: description,
+                deprecatedAt: deprecatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11092,6 +11610,11 @@ class $$CollectionsTableTableManager
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
+                Value<String?> coverUrl = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<DateTime?> deprecatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CollectionsCompanion.insert(
                 id: id,
@@ -11101,6 +11624,11 @@ class $$CollectionsTableTableManager
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
+                source: source,
+                remoteId: remoteId,
+                coverUrl: coverUrl,
+                description: description,
+                deprecatedAt: deprecatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

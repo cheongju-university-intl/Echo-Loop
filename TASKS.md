@@ -1,7 +1,62 @@
 # Fluency 任务清单
 
-> 最后更新：2026-04-17
-> 当前焦点：页面级新用户引导
+> 最后更新：2026-04-19
+> 当前焦点：官方合集功能（MVP）
+
+## 已完成：官方合集功能（MVP）
+
+跨前后端特性：官方在后端维护一批英语合集，用户在资源库浏览并"添加到我的合集"，点击音频时按需下载。已下载内容永不被 sync 覆盖（本地不变性），移除合集彻底清空。
+
+### 后端（fluency-frontend）
+- [x] Schema：`collections` 加 status/description/coverUrl/publishedAt/updatedAt + 2 索引；`audio_collections` 加 sortOrder（drizzle-kit 自动生成 migration `0024_fast_manta.sql`）
+- [x] 3 个公共 API：`GET /api/v1/collections`、`GET /api/v1/collections/:id`、`GET /api/v1/audios/:id/content`（unstable_cache(120s) + tag 'collections'）
+- [x] 纯查询层 `apps/app/lib/collections/queries.ts` + 对应 DTO；域错误类（404 → CollectionNotFound、410 → CollectionDeprecated、422 → NoTranscriptError）
+- [x] `packages/transcription/utils/srt-builder.ts` — sentences → SRT 字符串工具
+- [x] 单测：srt-builder 10 + collection-queries 13（错误分支 + DTO 映射）
+
+### Flutter 数据层
+- [x] Drift v28→v29：collections 加 5 列（source/remoteId/coverUrl/description/deprecatedAt），audio_items 加 2 列（remoteAudioId/isAudioDownloaded，默认 true 兼容老数据），2 个条件索引
+- [x] `Collection` 模型加 `CollectionSource` enum + `isOfficial`/`isDeprecated` getter
+- [x] `AudioItem` 模型加 `remoteAudioId`/`isAudioDownloaded`
+- [x] `CollectionDao.getByRemoteId` + `AudioItemDao.getByRemoteAudioId`
+- [x] `audio_library_provider` 跳过 `!isAudioDownloaded` 的文件存在性校验（避免误软删）
+
+### Flutter feature 层（`lib/features/official_collections/`）
+- [x] API client（3 个错误类型）
+- [x] Repository：enroll 防重入（DB 唯一索引 + AlreadyEnrolledError）+ remove 彻底清空（collections + audio_items + junction + learning_progresses 等所有按 audioItemId 关联的表 + 本地文件）
+- [x] Sync service：三条路径（新增 / 远端移除保留已下载 / 元信息更新）+ 410/404 → deprecatedAt + 单集异常不阻塞
+- [x] Download notifier（Riverpod Notifier）：sealed class state（Idle/InProgress/Failed）、单任务并发约束、sessionId 防竞态、CancelToken
+- [x] PrepareLearningDialog（非阻塞，可关闭后下载继续）
+- [x] Discover 页 + 官方合集详情页（三态显式：loading/error/empty/data）
+- [x] OfficialCollectionCard + OfficialBadge + OfficialDeprecatedBadge
+- [x] Enrollment provider：enroll/remove 入口
+
+### UI 集成
+- [x] Library Collections 视图 AppBar 加 `compass` 入口 → /discover
+- [x] `_CollectionListTile` 显示 badges + 菜单按 source 裁剪（official 仅 pin + 移除）
+- [x] `CollectionDetailScreen` source='official' 时隐藏添加音频按钮
+- [x] `AudioListTile._handleTap` 官方合集未下载分支触发下载对话框
+- [x] 路由 `/discover` 和 `/discover/:remoteId`
+- [x] `main.dart` 注册全局 `scaffoldMessengerKey`（下载完成 snackbar 任何页面可见）
+- [x] 启动时清 `documents/tmp/official_audio/*.m4a.part` 残留
+- [x] 启动 3s 后 fire-and-forget 调 `OfficialSyncService.syncAll()`
+
+### 国际化
+- [x] 新增 23 个 i18n key（中英文）
+
+### 测试覆盖
+- [x] Collection 模型 8 个新测试
+- [x] AudioItem 模型 5 个新测试
+- [x] OfficialCollectionRepository 9 个测试（enroll/remove/防重入/彻底清空）
+- [x] OfficialSyncService 10 个测试（新增/远端移除 + 已下载保留不变性/元信息变化/410 → deprecated/容错）
+- [x] OfficialDownloadNotifier 6 个测试（already/busy/cancel/防竞态）
+
+### 范围内不做（MVP 明确排除）
+- 搜索 / 难度筛选 / 红点 / 埋点专项 / 迁移降级 / 多粒度版本 / manifest diff API / 后台续传 / 下载队列
+
+**完成时间**: 2026-04-19
+
+---
 
 ## 已完成：页面级新用户引导（showcaseview）
 

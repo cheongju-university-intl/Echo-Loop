@@ -123,6 +123,32 @@ void main() {
         final item = createSample(transcriptPath: '');
         expect(item.hasTranscript, isFalse);
       });
+
+      test('transcriptPath 为 null 时 isAudioReady 仍可为 true（有音频但没字幕）', () {
+        final item = createSample(transcriptPath: null);
+        expect(item.hasTranscript, isFalse);
+        expect(item.isAudioReady, isTrue);
+      });
+    });
+
+    group('isAudioReady', () {
+      test('audioPath 非空 → true', () {
+        final item = createSample();
+        expect(item.isAudioReady, isTrue);
+      });
+
+      test('audioPath=null → false（官方合集未下载占位行）', () {
+        final item = AudioItem(
+          id: 'oc-1',
+          name: '官方音频',
+          audioPath: null,
+          transcriptPath: null,
+          addedDate: now,
+          remoteAudioId: 'r-1',
+        );
+        expect(item.isAudioReady, isFalse);
+        expect(item.hasTranscript, isFalse);
+      });
     });
 
     test('fromJson 处理缺失 totalDuration 字段（默认 0）', () {
@@ -322,6 +348,89 @@ void main() {
       expect(item.transcriptSource, isNull);
       expect(item.audioSha256, isNull);
       expect(item.transcriptLanguage, isNull);
+    });
+
+    group('官方合集字段（remoteAudioId）+ audioPath nullable', () {
+      test('默认 remoteAudioId=null（用户自建音频）', () {
+        final item = AudioItem(
+          id: 'audio-1',
+          name: '测试',
+          audioPath: 'audios/test.mp3',
+          addedDate: now,
+        );
+        expect(item.remoteAudioId, isNull);
+        expect(item.isAudioReady, isTrue);
+      });
+
+      test('官方合集未下载音频：remoteAudioId 有值，audioPath=null', () {
+        final item = AudioItem(
+          id: 'audio-1',
+          name: 'Day 1',
+          audioPath: null,
+          addedDate: now,
+          remoteAudioId: 'remote-audio-1',
+        );
+        expect(item.remoteAudioId, 'remote-audio-1');
+        expect(item.isAudioReady, isFalse);
+      });
+
+      test('toJson / fromJson 往返一致（audioPath=null 场景）', () {
+        final item = AudioItem(
+          id: 'a1',
+          name: 'n',
+          audioPath: null,
+          addedDate: now,
+          remoteAudioId: 'r1',
+        );
+        final restored = AudioItem.fromJson(item.toJson());
+        expect(restored.remoteAudioId, 'r1');
+        expect(restored.audioPath, isNull);
+        expect(restored.isAudioReady, isFalse);
+      });
+
+      test('copyWith 能覆盖 audioPath（从 null 变成非 null，模拟下载完成）', () {
+        final item = AudioItem(
+          id: 'a1',
+          name: 'n',
+          audioPath: null,
+          addedDate: now,
+          remoteAudioId: 'r1',
+        );
+        final copied = item.copyWith(
+          audioPath: 'audios/official/hash.m4a',
+          transcriptPath: 'transcripts/official_a1.srt',
+        );
+        expect(copied.isAudioReady, isTrue);
+        expect(copied.hasTranscript, isTrue);
+      });
+
+      test('copyWith 能把 audioPath 显式传 null（模拟重置）', () {
+        final item = createSample();
+        final copied = item.copyWith(audioPath: null);
+        expect(copied.audioPath, isNull);
+        expect(copied.isAudioReady, isFalse);
+      });
+    });
+
+    group('originalDate', () {
+      test('默认 null（用户自建音频）', () {
+        expect(createSample().originalDate, isNull);
+      });
+
+      test('toJson / fromJson 往返一致', () {
+        final date = DateTime.utc(2020, 5, 1);
+        final item = createSample().copyWith(originalDate: date);
+        final restored = AudioItem.fromJson(item.toJson());
+        expect(restored.originalDate, date);
+      });
+
+      test('copyWith 能显式覆盖为 null', () {
+        final item = createSample().copyWith(
+          originalDate: DateTime.utc(2020, 5, 1),
+        );
+        final reset = item.copyWith(originalDate: null);
+        expect(reset.originalDate, isNull);
+      });
     });
   });
 }
