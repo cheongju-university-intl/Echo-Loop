@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'l10n/app_localizations.dart';
@@ -186,18 +187,24 @@ void main() async {
   unawaited(cleanupOfficialDownloadTmp());
 
   runApp(
-    ProviderScope(
-      overrides: [
-        packageInfoProvider.overrideWithValue(packageInfo),
-        isFirstLaunchProvider.overrideWithValue(isFirstLaunch),
-        if (recommendedAsrModel != null)
-          recommendedAsrModelProvider.overrideWithValue(recommendedAsrModel),
-        if (initialOfflineAsrSettingsState != null)
-          initialOfflineAsrSettingsStateProvider.overrideWithValue(
-            initialOfflineAsrSettingsState,
-          ),
-      ],
-      child: const FluencyApp(),
+    // PostHogWidget：posthog_flutter 5.x Session Replay 必需的根包装。
+    // 负责 Flutter 端变更检测 + 截图并桥接原生 SDK 上报 $snapshot 事件；
+    // 不包的话即便 PostHogConfig.sessionReplay=true 也不会生成录像。
+    // 当前通道非 PostHog 时 Posthog().config 为 null，此组件会直接跳过，不影响其他通道。
+    PostHogWidget(
+      child: ProviderScope(
+        overrides: [
+          packageInfoProvider.overrideWithValue(packageInfo),
+          isFirstLaunchProvider.overrideWithValue(isFirstLaunch),
+          if (recommendedAsrModel != null)
+            recommendedAsrModelProvider.overrideWithValue(recommendedAsrModel),
+          if (initialOfflineAsrSettingsState != null)
+            initialOfflineAsrSettingsStateProvider.overrideWithValue(
+              initialOfflineAsrSettingsState,
+            ),
+        ],
+        child: const FluencyApp(),
+      ),
     ),
   );
 }
