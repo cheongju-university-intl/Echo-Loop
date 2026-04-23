@@ -58,6 +58,19 @@
 
 ---
 
+## 已完成：用户音频 AI 字幕自动校准（Apple 首版）
+
+- [x] 新增统一上层接口 `NativeAudioDecoder` / `DecodedAudioData`，`iOS + macOS` 走同一 `MethodChannel`，其他平台安全回退
+- [x] 新增 `SubtitleAutoAlignService`，将 web 自动校准核心规则移植到 Dart，基于本地 PCM 静音区间微调句边界
+- [x] 在 `TranscriptionTaskManager._saveTranscriptAndFinish(...)` 接入自动校准，仅对“用户自己的音频 + AI 字幕 + 词级时间戳齐全”生效
+- [x] 官方合集/远端音频（`remoteAudioId != null`）不尝试自动校准，继续直接使用后端分句结果
+- [x] Apple 原生解码失败时仅记录日志并回退到原始字幕，不影响转录完成态，也不向用户报错
+- [x] 补充 provider/service 测试，覆盖成功校准、平台不支持、解码异常回退、用户音频触发、官方音频跳过
+
+**完成时间**: 2026-04-23
+
+---
+
 ## 已完成：页面级新用户引导（showcaseview）
 
 - [x] 接入 `showcaseview`，新增可复用 `GuideFlowHost` / `GuideTarget` / `GuideRegistry`，每个 flow 独立用 SharedPreferences 记录 seen 状态

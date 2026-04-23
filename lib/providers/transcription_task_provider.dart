@@ -16,6 +16,8 @@ import '../database/providers.dart';
 import '../models/audio_item.dart';
 import '../models/word_timestamp.dart';
 import '../providers/audio_library_provider.dart';
+import '../services/app_logger.dart';
+import '../services/subtitle_auto_align_service.dart';
 import '../services/transcription_api_client.dart';
 import '../utils/audio_fingerprint.dart';
 import '../utils/srt_generator.dart';
@@ -342,7 +344,11 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
     }
 
     final fileOps = ref.read(transcriptionFileOpsProvider);
-    final srtContent = generateSrtContent(transcript.sentences);
+    final alignedSentences = await _alignSentencesIfPossible(
+      audioItem,
+      transcript,
+    );
+    final srtContent = generateSrtContent(alignedSentences);
     final relativePath = await fileOps.saveSrt(audioItem.id, srtContent);
 
     // 获取 SRT 统计
@@ -389,6 +395,61 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
         clearState(audioItem.id);
       }
     });
+  }
+
+  /// 在 AI 转录完成后尝试用本地音频静音区间微调句边界。
+  ///
+  /// 仅对“用户自己的音频 + AI 词级时间戳齐全”生效。
+  /// 任意失败都只记录日志并回退到原始句边界。
+  Future<List<TranscriptSentence>> _alignSentencesIfPossible(
+    AudioItem audioItem,
+    TranscriptResult transcript,
+  ) async {
+    if (audioItem.remoteAudioId != null ||
+        audioItem.audioPath == null ||
+        audioItem.audioPath!.isEmpty ||
+        transcript.words == null ||
+        transcript.words!.isEmpty ||
+        transcript.sentences.isEmpty) {
+      return transcript.sentences;
+    }
+
+    final fileOps = ref.read(transcriptionFileOpsProvider);
+    final fullAudioPath = await _resolveAudioPath(audioItem, fileOps);
+    if (fullAudioPath == null) {
+      AppLogger.log(
+        'SubtitleAutoAlign',
+        'skip auto-align: audio path unavailable for ${audioItem.id}',
+      );
+      return transcript.sentences;
+    }
+
+    try {
+      final autoAlignService = ref.read(subtitleAutoAlignServiceProvider);
+      return await autoAlignService.alignIfPossible(
+        audioPath: fullAudioPath,
+        sentences: transcript.sentences,
+        words: transcript.words!,
+      );
+    } catch (error) {
+      AppLogger.log(
+        'SubtitleAutoAlign',
+        'skip auto-align in transcription flow: $error',
+      );
+      return transcript.sentences;
+    }
+  }
+
+  Future<String?> _resolveAudioPath(
+    AudioItem audioItem,
+    TranscriptionFileOps fileOps,
+  ) async {
+    final audioPath = audioItem.audioPath;
+    if (audioPath == null || audioPath.isEmpty) return null;
+    if (p.isAbsolute(audioPath)) return audioPath;
+
+    final dataDir = await fileOps.getDataDir();
+    return p.join(dataDir.path, audioPath);
   }
 
   /// 测试入口：根据文件扩展名推断 MIME 类型

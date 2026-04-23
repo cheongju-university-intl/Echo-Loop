@@ -10,8 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:fluency/models/audio_item.dart';
+import 'package:fluency/models/word_timestamp.dart';
 import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/transcription_task_provider.dart';
+import 'package:fluency/services/subtitle_auto_align_service.dart';
 import 'package:fluency/services/transcription_api_client.dart';
 import 'package:fluency/utils/srt_generator.dart';
 
@@ -23,6 +25,9 @@ class MockTranscriptionApiClient extends Mock
     implements TranscriptionApiClient {}
 
 class MockTranscriptionFileOps extends Mock implements TranscriptionFileOps {}
+
+class MockSubtitleAutoAlignService extends Mock
+    implements SubtitleAutoAlignService {}
 
 class FakeAudioItem extends Fake implements AudioItem {}
 
@@ -53,15 +58,21 @@ AudioItem _testAudioItem({
 ProviderContainer _createContainer({
   required MockTranscriptionApiClient mockApi,
   required MockTranscriptionFileOps mockFileOps,
+  MockSubtitleAutoAlignService? mockAutoAlignService,
   List<AudioItem>? audioItems,
 }) {
-  final container = ProviderContainer(
-    overrides: [
-      transcriptionApiClientProvider.overrideWithValue(mockApi),
-      transcriptionFileOpsProvider.overrideWithValue(mockFileOps),
-      audioLibraryProvider.overrideWith(TestAudioLibrary.new),
-    ],
-  );
+  final overrides = <Override>[
+    transcriptionApiClientProvider.overrideWithValue(mockApi),
+    transcriptionFileOpsProvider.overrideWithValue(mockFileOps),
+    audioLibraryProvider.overrideWith(TestAudioLibrary.new),
+    analyticsOverride(),
+  ];
+  if (mockAutoAlignService != null) {
+    overrides.add(
+      subtitleAutoAlignServiceProvider.overrideWithValue(mockAutoAlignService),
+    );
+  }
+  final container = ProviderContainer(overrides: overrides);
   // 初始化音频库
   (container.read(audioLibraryProvider.notifier) as TestAudioLibrary).setItems(
     audioItems ?? [_testAudioItem()],
@@ -72,6 +83,7 @@ ProviderContainer _createContainer({
 void main() {
   late MockTranscriptionApiClient mockApi;
   late MockTranscriptionFileOps mockFileOps;
+  late MockSubtitleAutoAlignService mockAutoAlignService;
 
   setUpAll(() {
     registerFallbackValue(FakeAudioItem());
@@ -80,11 +92,22 @@ void main() {
   setUp(() {
     mockApi = MockTranscriptionApiClient();
     mockFileOps = MockTranscriptionFileOps();
+    mockAutoAlignService = MockSubtitleAutoAlignService();
 
     // 所有调用 startTranscription 的测试都需要 getDataDir
     when(
       () => mockFileOps.getDataDir(),
     ).thenAnswer((_) async => Directory.systemTemp);
+    when(
+      () => mockAutoAlignService.alignIfPossible(
+        audioPath: any(named: 'audioPath'),
+        sentences: any(named: 'sentences'),
+        words: any(named: 'words'),
+      ),
+    ).thenAnswer(
+      (invocation) async =>
+          invocation.namedArguments[#sentences]! as List<TranscriptSentence>,
+    );
   });
 
   group('TranscriptionTaskManager', () {
@@ -393,6 +416,182 @@ void main() {
       expect(
         notifier.getTaskState('test-audio-1'),
         isA<TranscriptionCompleted>(),
+      );
+
+      container.dispose();
+    });
+
+    test('用户自己的 AI 字幕会尝试自动校准', () async {
+      final audioItem = _testAudioItem(audioSha256: 'abc123');
+
+      when(() => mockFileOps.getFileSize(any())).thenAnswer((_) async => 1024);
+      when(
+        () => mockFileOps.saveSrt(any(), any()),
+      ).thenAnswer((_) async => 'transcripts/test_ai.srt');
+      when(() => mockFileOps.getStats(any())).thenAnswer((_) async => (1, 2));
+
+      when(
+        () => mockApi.getUploadUrl(
+          sha256: any(named: 'sha256'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+        ),
+      ).thenAnswer(
+        (_) async => const UploadUrlResponse(
+          audioExists: true,
+          objectName: 'user-audio/abc123.mp3',
+          publicUrl: 'https://example.com/abc123.mp3',
+        ),
+      );
+      when(
+        () => mockApi.submitTranscription(
+          sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
+          objectName: any(named: 'objectName'),
+          publicUrl: any(named: 'publicUrl'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+          language: any(named: 'language'),
+        ),
+      ).thenAnswer(
+        (_) async => SubmitTranscriptionResponse(
+          cached: true,
+          transcript: TranscriptResult(
+            sentences: [
+              TranscriptSentence(
+                text: 'Hello world',
+                startTime: const Duration(milliseconds: 200),
+                endTime: const Duration(milliseconds: 800),
+                startWordIndex: 0,
+                endWordIndex: 1,
+              ),
+            ],
+            words: const [
+              WordTimestamp(
+                word: 'Hello',
+                startTime: Duration(milliseconds: 250),
+                endTime: Duration(milliseconds: 500),
+                confidence: 0.9,
+              ),
+              WordTimestamp(
+                word: 'world',
+                startTime: Duration(milliseconds: 520),
+                endTime: Duration(milliseconds: 760),
+                confidence: 0.9,
+              ),
+            ],
+            fullText: 'Hello world',
+          ),
+        ),
+      );
+
+      final container = _createContainer(
+        mockApi: mockApi,
+        mockFileOps: mockFileOps,
+        mockAutoAlignService: mockAutoAlignService,
+        audioItems: [audioItem],
+      );
+      final notifier = container.read(
+        transcriptionTaskManagerProvider.notifier,
+      );
+
+      await notifier.startTranscription(audioItem, 'en');
+
+      verify(
+        () => mockAutoAlignService.alignIfPossible(
+          audioPath: any(named: 'audioPath'),
+          sentences: any(named: 'sentences'),
+          words: any(named: 'words'),
+        ),
+      ).called(1);
+
+      container.dispose();
+    });
+
+    test('官方音频 AI 字幕不会尝试自动校准', () async {
+      final audioItem = _testAudioItem(
+        audioSha256: 'abc123',
+      ).copyWith(remoteAudioId: 'remote-1');
+
+      when(() => mockFileOps.getFileSize(any())).thenAnswer((_) async => 1024);
+      when(
+        () => mockFileOps.saveSrt(any(), any()),
+      ).thenAnswer((_) async => 'transcripts/test_ai.srt');
+      when(() => mockFileOps.getStats(any())).thenAnswer((_) async => (1, 2));
+
+      when(
+        () => mockApi.getUploadUrl(
+          sha256: any(named: 'sha256'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+        ),
+      ).thenAnswer(
+        (_) async => const UploadUrlResponse(
+          audioExists: true,
+          objectName: 'user-audio/abc123.mp3',
+          publicUrl: 'https://example.com/abc123.mp3',
+        ),
+      );
+      when(
+        () => mockApi.submitTranscription(
+          sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
+          objectName: any(named: 'objectName'),
+          publicUrl: any(named: 'publicUrl'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+          language: any(named: 'language'),
+        ),
+      ).thenAnswer(
+        (_) async => SubmitTranscriptionResponse(
+          cached: true,
+          transcript: TranscriptResult(
+            sentences: [
+              TranscriptSentence(
+                text: 'Hello world',
+                startTime: const Duration(milliseconds: 200),
+                endTime: const Duration(milliseconds: 800),
+                startWordIndex: 0,
+                endWordIndex: 1,
+              ),
+            ],
+            words: const [
+              WordTimestamp(
+                word: 'Hello',
+                startTime: Duration(milliseconds: 250),
+                endTime: Duration(milliseconds: 500),
+                confidence: 0.9,
+              ),
+              WordTimestamp(
+                word: 'world',
+                startTime: Duration(milliseconds: 520),
+                endTime: Duration(milliseconds: 760),
+                confidence: 0.9,
+              ),
+            ],
+            fullText: 'Hello world',
+          ),
+        ),
+      );
+
+      final container = _createContainer(
+        mockApi: mockApi,
+        mockFileOps: mockFileOps,
+        mockAutoAlignService: mockAutoAlignService,
+        audioItems: [audioItem],
+      );
+      final notifier = container.read(
+        transcriptionTaskManagerProvider.notifier,
+      );
+
+      await notifier.startTranscription(audioItem, 'en');
+
+      verifyNever(
+        () => mockAutoAlignService.alignIfPossible(
+          audioPath: any(named: 'audioPath'),
+          sentences: any(named: 'sentences'),
+          words: any(named: 'words'),
+        ),
       );
 
       container.dispose();

@@ -15,6 +15,7 @@ enum SpeechPracticeMacError: String {
 
 private let trimLeadingPaddingMs = 120.0
 private let trimTrailingPaddingMs = 180.0
+private let autoAlignTargetSampleRate = 1000.0
 
 final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   private let methodChannel: FlutterMethodChannel
@@ -1035,6 +1036,245 @@ final class MacTextEmbeddingHandler: NSObject {
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+}
+
+/// Apple 原生音频解码桥接，为 Flutter 字幕自动校准提供低采样率 PCM 数据。
+private struct MacAudioDecodeError: Error {
+  let code: String
+  let message: String
+  let details: Any?
+
+  func asFlutterError() -> FlutterError {
+    FlutterError(code: code, message: message, details: details)
+  }
+}
+
+final class MacAudioDecodeHandler: NSObject {
+  private let methodChannel: FlutterMethodChannel
+
+  init(binaryMessenger: FlutterBinaryMessenger) {
+    methodChannel = FlutterMethodChannel(
+      name: "top.echo-loop/audio_decode",
+      binaryMessenger: binaryMessenger
+    )
+    super.init()
+    methodChannel.setMethodCallHandler(handle)
+  }
+
+  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "decode":
+      guard let args = call.arguments as? [String: Any],
+            let audioPath = args["audioPath"] as? String,
+            !audioPath.isEmpty
+      else {
+        result(FlutterError(
+          code: "invalidArguments",
+          message: "Missing 'audioPath' parameter",
+          details: nil
+        ))
+        return
+      }
+
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let payload = try self.decodeAudio(atPath: audioPath)
+          DispatchQueue.main.async {
+            result(payload)
+          }
+        } catch let error as MacAudioDecodeError {
+          DispatchQueue.main.async {
+            result(error.asFlutterError())
+          }
+        } catch {
+          DispatchQueue.main.async {
+            result(FlutterError(
+              code: "decodeFailed",
+              message: error.localizedDescription,
+              details: nil
+            ))
+          }
+        }
+      }
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private func decodeAudio(atPath audioPath: String) throws -> [String: Any] {
+    let fileURL = URL(fileURLWithPath: audioPath)
+    guard FileManager.default.fileExists(atPath: fileURL.path) else {
+      throw MacAudioDecodeError(
+        code: "fileNotFound",
+        message: "Audio file does not exist",
+        details: audioPath
+      )
+    }
+
+    let asset = AVURLAsset(url: fileURL)
+    guard let track = asset.tracks(withMediaType: .audio).first else {
+      throw MacAudioDecodeError(
+        code: "notAvailable",
+        message: "Audio asset has no readable audio track",
+        details: nil
+      )
+    }
+
+    let reader = try AVAssetReader(asset: asset)
+    let outputSettings: [String: Any] = [
+      AVFormatIDKey: kAudioFormatLinearPCM,
+      AVLinearPCMIsFloatKey: true,
+      AVLinearPCMBitDepthKey: 32,
+      AVLinearPCMIsBigEndianKey: false,
+      AVLinearPCMIsNonInterleaved: false
+    ]
+    let output = AVAssetReaderTrackOutput(
+      track: track,
+      outputSettings: outputSettings
+    )
+    output.alwaysCopiesSampleData = false
+    guard reader.canAdd(output) else {
+      throw MacAudioDecodeError(
+        code: "notAvailable",
+        message: "Failed to attach audio track output",
+        details: nil
+      )
+    }
+    reader.add(output)
+    guard reader.startReading() else {
+      throw MacAudioDecodeError(
+        code: "decodeFailed",
+        message: reader.error?.localizedDescription ?? "Failed to start asset reader",
+        details: nil
+      )
+    }
+
+    guard let formatDescription = track.formatDescriptions.first else {
+      throw MacAudioDecodeError(
+        code: "notAvailable",
+        message: "Audio track missing format description",
+        details: nil
+      )
+    }
+    guard let streamDescription = CMAudioFormatDescriptionGetStreamBasicDescription(
+      formatDescription as! CMAudioFormatDescription
+    ) else {
+      throw MacAudioDecodeError(
+        code: "notAvailable",
+        message: "Failed to read audio stream description",
+        details: nil
+      )
+    }
+
+    let inputSampleRate = streamDescription.pointee.mSampleRate
+    let channelCount = Int(streamDescription.pointee.mChannelsPerFrame)
+    guard channelCount > 0 else {
+      throw MacAudioDecodeError(
+        code: "notAvailable",
+        message: "Audio file has no channels",
+        details: nil
+      )
+    }
+
+    var outputSamples = [Float]()
+    let estimatedFrames = max(
+      0,
+      Int(CMTimeGetSeconds(asset.duration) * inputSampleRate)
+    )
+    let estimatedOutputSamples = max(
+      1,
+      Int(Double(estimatedFrames) * autoAlignTargetSampleRate / inputSampleRate)
+    )
+    outputSamples.reserveCapacity(estimatedOutputSamples)
+
+    let resampleRatio = inputSampleRate / autoAlignTargetSampleRate
+    var nextOutputSourceFrame = 0.0
+    var processedSourceFrames = 0.0
+
+    while true {
+      guard let sampleBuffer = output.copyNextSampleBuffer() else {
+        break
+      }
+
+      guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else {
+        CMSampleBufferInvalidate(sampleBuffer)
+        throw MacAudioDecodeError(
+          code: "decodeFailed",
+          message: "Decoded sample buffer missing block buffer",
+          details: nil
+        )
+      }
+
+      let blockLength = CMBlockBufferGetDataLength(blockBuffer)
+      var bytes = [UInt8](repeating: 0, count: blockLength)
+      let copyStatus = CMBlockBufferCopyDataBytes(
+        blockBuffer,
+        atOffset: 0,
+        dataLength: blockLength,
+        destination: &bytes
+      )
+      if copyStatus != noErr {
+        CMSampleBufferInvalidate(sampleBuffer)
+        throw MacAudioDecodeError(
+          code: "decodeFailed",
+          message: "Failed to copy decoded PCM bytes: \(copyStatus)",
+          details: nil
+        )
+      }
+
+      let frameLength = blockLength / (MemoryLayout<Float>.size * channelCount)
+      let chunkStartFrame = processedSourceFrames
+      let chunkEndFrame = chunkStartFrame + Double(frameLength)
+
+      bytes.withUnsafeBytes { rawBuffer in
+        let samples = rawBuffer.bindMemory(to: Float.self)
+        while nextOutputSourceFrame < chunkEndFrame {
+          let localFrame = min(
+            max(0, Int(nextOutputSourceFrame - chunkStartFrame)),
+            frameLength - 1
+          )
+          let frameOffset = localFrame * channelCount
+          var mixed = 0.0 as Float
+          for channel in 0..<channelCount {
+            mixed += samples[frameOffset + channel]
+          }
+          outputSamples.append(mixed / Float(channelCount))
+          nextOutputSourceFrame += resampleRatio
+        }
+      }
+
+      processedSourceFrames = chunkEndFrame
+      CMSampleBufferInvalidate(sampleBuffer)
+    }
+
+    if reader.status == .failed {
+      throw MacAudioDecodeError(
+        code: "decodeFailed",
+        message: reader.error?.localizedDescription ?? "Asset reader failed",
+        details: nil
+      )
+    }
+
+    guard !outputSamples.isEmpty else {
+      return [
+        "sampleRate": Int(autoAlignTargetSampleRate.rounded()),
+        "pcmBytes": FlutterStandardTypedData(bytes: Data())
+      ]
+    }
+
+    var pcmBytes = Data(capacity: outputSamples.count * MemoryLayout<UInt32>.size)
+    for sample in outputSamples {
+      var bits = sample.bitPattern.littleEndian
+      withUnsafeBytes(of: &bits) { rawBuffer in
+        pcmBytes.append(contentsOf: rawBuffer)
+      }
+    }
+
+    return [
+      "sampleRate": Int(autoAlignTargetSampleRate.rounded()),
+      "pcmBytes": FlutterStandardTypedData(bytes: pcmBytes)
+    ]
   }
 }
 
