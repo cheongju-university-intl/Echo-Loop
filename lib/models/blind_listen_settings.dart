@@ -14,10 +14,10 @@ class BlindListenSettings {
   /// 停顿模式（默认 multiplier）
   final PauseMode pauseMode;
 
-  /// 固定间隔秒数（默认 15）
+  /// 固定间隔秒数（默认 10）
   final int fixedPauseSeconds;
 
-  /// 段长倍数（默认 1.5）
+  /// 段长倍数（默认 0.5）
   final double pauseMultiplier;
 
   /// 控制模式（默认 auto）
@@ -37,8 +37,8 @@ class BlindListenSettings {
   const BlindListenSettings({
     this.repeatCount = 1,
     this.pauseMode = PauseMode.multiplier,
-    this.fixedPauseSeconds = 15,
-    this.pauseMultiplier = 1.5,
+    this.fixedPauseSeconds = 10,
+    this.pauseMultiplier = 0.5,
     this.controlMode = ShadowingControlMode.auto,
   });
 
@@ -54,18 +54,19 @@ class BlindListenSettings {
 
   /// 根据段落时长计算段间停顿时长
   ///
-  /// - 自动模式: max(3s, 1.5×段长)，最长 180s
+  /// 全模式统一 clamp 到 [3s, 30s]：
+  /// - 自动模式: 0.5 × 段长
   /// - 固定模式: fixedPauseSeconds
-  /// - 倍数模式: max(3s, pauseMultiplier×段长)
+  /// - 倍数模式: pauseMultiplier × 段长
   Duration calculatePauseDuration(Duration paragraphDuration) {
     final ms = switch (pauseMode) {
       PauseMode.smart =>
-        (paragraphDuration.inMilliseconds * 1.5).round().clamp(3000, 180000),
+        (paragraphDuration.inMilliseconds * 0.5).round(),
       PauseMode.fixed => fixedPauseSeconds * 1000,
       PauseMode.multiplier =>
         (paragraphDuration.inMilliseconds * pauseMultiplier).round(),
     };
-    return Duration(milliseconds: ms < 3000 ? 3000 : ms);
+    return Duration(milliseconds: ms.clamp(3000, 30000));
   }
 
   BlindListenSettings copyWith({

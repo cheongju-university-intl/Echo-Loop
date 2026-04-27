@@ -282,7 +282,7 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
       PauseMode.fixed => () {
         final options = BlindListenSettings.fixedPauseOptions;
         var idx = options.indexOf(settings.fixedPauseSeconds);
-        if (idx < 0) idx = 2; // 回退到 15s
+        if (idx < 0) idx = 1; // 回退到 10s（默认值）
         return Row(
           children: [
             Expanded(

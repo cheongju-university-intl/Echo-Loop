@@ -229,8 +229,8 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
               ],
             ),
 
-            // 段间停顿行（仅盲听显示）
-            if (widget.showPauseMultiplier) ...[
+            // 段间停顿行（仅盲听显示，且不分段时无段间隔可言，隐藏）
+            if (widget.showPauseMultiplier && _targetSeconds != -1) ...[
               const SizedBox(height: AppSpacing.s),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -273,16 +273,17 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
               ),
             ],
 
-            const SizedBox(height: AppSpacing.m),
-
-            // 段落数预览
-            Text(
-              l10n.blindListenParagraphCount(_paragraphCount),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w500,
+            // 段落数预览（不分段时无意义，隐藏）
+            if (_targetSeconds != -1) ...[
+              const SizedBox(height: AppSpacing.m),
+              Text(
+                l10n.blindListenParagraphCount(_paragraphCount),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
+            ],
 
             const SizedBox(height: AppSpacing.l),
 
