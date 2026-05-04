@@ -217,7 +217,13 @@ log "Artifacts kept in: $WORK_DIR"
 
 # 复制到统一输出目录
 RELEASE_DIR="$ROOT_DIR/build/release"
-IPA_NAME="Echo-Loop-${BUILD_NAME}-ios.ipa"
+# 安装包名字包含构建号（构建号 > 0 时）
+if [[ -n "${BUILD_NUMBER:-}" && "$BUILD_NUMBER" != "0" ]]; then
+  IPA_VERSION="${BUILD_NAME}+${BUILD_NUMBER}"
+else
+  IPA_VERSION="$BUILD_NAME"
+fi
+IPA_NAME="Echo-Loop-${IPA_VERSION}-ios.ipa"
 mkdir -p "$RELEASE_DIR"
 cp "$IPA_PATH" "$RELEASE_DIR/$IPA_NAME"
 log "Copied to: build/release/$IPA_NAME"

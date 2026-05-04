@@ -63,7 +63,12 @@ if [[ -z "$BUILD_NUMBER" ]]; then
   calculate_build_number "$BUILD_NAME"
 fi
 
-VERSION="$BUILD_NAME"
+# 安装包名字包含构建号（构建号 > 0 时）
+if [[ -n "${BUILD_NUMBER:-}" && "$BUILD_NUMBER" != "0" ]]; then
+  VERSION="${BUILD_NAME}+${BUILD_NUMBER}"
+else
+  VERSION="$BUILD_NAME"
+fi
 APP_NAME="Echo-Loop-${VERSION}-macos"
 
 log "Version: $VERSION"
@@ -80,7 +85,8 @@ FLUTTER_ARGS=(
   macos
   --release
   "--flavor=prod"
-  "--build-name=$VERSION"
+  # --build-name 只传版本号，不含构建号
+  "--build-name=$BUILD_NAME"
 )
 if [[ -n "${BUILD_NUMBER:-}" ]]; then
   FLUTTER_ARGS+=("--build-number=$BUILD_NUMBER")

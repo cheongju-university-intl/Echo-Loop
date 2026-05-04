@@ -103,7 +103,12 @@ if [[ -z "$BUILD_NUMBER" ]]; then
   calculate_build_number "$BUILD_NAME"
 fi
 
-VERSION="$BUILD_NAME"
+# 安装包名字包含构建号（构建号 > 0 时）
+if [[ -n "${BUILD_NUMBER:-}" && "$BUILD_NUMBER" != "0" ]]; then
+  VERSION="${BUILD_NAME}+${BUILD_NUMBER}"
+else
+  VERSION="$BUILD_NAME"
+fi
 ARCH="arm64"
 APK_NAME="Echo-Loop-${VERSION}-${ARCH}.apk"
 APK_PATH="build/release/$APK_NAME"
@@ -135,7 +140,8 @@ if [[ "$SKIP_BUILD" == false ]]; then
     "--flavor=$FLAVOR"
     --target-platform
     android-arm64
-    "--build-name=$VERSION"
+    # --build-name 只传版本号，不含构建号
+    "--build-name=$BUILD_NAME"
   )
   # 仅当有构建号时才传 --build-number
   if [[ -n "${BUILD_NUMBER:-}" ]]; then
