@@ -60,4 +60,61 @@ void main() {
       expect(compareVersions('2.0.0', '2.0.0'), 0);
     });
   });
+
+  group('构建号场景', () {
+    test('本地 1.0.9+1 与远程 1.0.9+1 相等，无需更新', () {
+      const info = AppUpdateInfo(
+        latestVersion: '1.0.9+1',
+        minimumVersion: '1.0.0',
+      );
+      expect(
+        AppUpdate.determineUpdateType('1.0.9+1', info),
+        AppUpdateType.none,
+      );
+    });
+
+    test('本地 1.0.9+1 与远程 1.0.9+0 相等，无需更新', () {
+      const info = AppUpdateInfo(
+        latestVersion: '1.0.9',
+        minimumVersion: '1.0.0',
+      );
+      expect(
+        AppUpdate.determineUpdateType('1.0.9+1', info),
+        AppUpdateType.none,
+      );
+    });
+
+    test('本地 1.0.9+1 低于远程 1.0.9+2，需要更新', () {
+      const info = AppUpdateInfo(
+        latestVersion: '1.0.9+2',
+        minimumVersion: '1.0.0',
+      );
+      expect(
+        AppUpdate.determineUpdateType('1.0.9+1', info),
+        AppUpdateType.softUpdate,
+      );
+    });
+
+    test('本地 1.0.9+2 高于远程 1.0.9+1，无需更新', () {
+      const info = AppUpdateInfo(
+        latestVersion: '1.0.9+1',
+        minimumVersion: '1.0.0',
+      );
+      expect(
+        AppUpdate.determineUpdateType('1.0.9+2', info),
+        AppUpdateType.none,
+      );
+    });
+
+    test('本地 1.0.9 高于远程 1.0.8+5，无需更新（patch 高于构建号）', () {
+      const info = AppUpdateInfo(
+        latestVersion: '1.0.8+5',
+        minimumVersion: '1.0.0',
+      );
+      expect(
+        AppUpdate.determineUpdateType('1.0.9', info),
+        AppUpdateType.none,
+      );
+    });
+  });
 }
