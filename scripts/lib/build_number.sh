@@ -5,7 +5,7 @@
 #       calculate_build_number "1.0.8"
 #
 # 输出变量：
-#   BUILD_NUMBER  - 构建号（空表示默认 0）
+#   BUILD_NUMBER  - 构建号（数字，首次构建为 0）
 #   TAG_NAME      - 要创建的 tag 名
 #   SKIP_TAG_CREATION - 是否跳过 tag 创建（当前 commit 已有同版本 tag）
 
@@ -32,9 +32,11 @@ calculate_build_number() {
   # 1. 检查当前 commit 是否已有同版本 tag
   local EXISTING_TAG="$(git tag --points-at HEAD | grep -E "^v${BUILD_NAME}([+][0-9]+)?$" || true)"
   if [[ -n "$EXISTING_TAG" ]]; then
-    # 提取构建号（无 + 后缀则默认空）
+    # 提取构建号（无 + 后缀则默认 0）
     if [[ "$EXISTING_TAG" =~ [+][0-9]+$ ]]; then
       BUILD_NUMBER="${BASH_REMATCH[0]#+}"
+    else
+      BUILD_NUMBER="0"
     fi
     SKIP_TAG_CREATION=1
     TAG_NAME="$EXISTING_TAG"
@@ -61,7 +63,7 @@ calculate_build_number() {
     TAG_NAME="v${BUILD_NAME}+1"
   else
     # 无任何同版本 tag，第一次构建
-    BUILD_NUMBER=""  # 不设置，Flutter 默认为 0
+    BUILD_NUMBER="0"  # 明确设置为 0，避免 iOS 用版本号作为构建号
     TAG_NAME="v${BUILD_NAME}"
   fi
 
@@ -86,11 +88,11 @@ parse_tag() {
   # v1.0.8 或 v1.0.8+2 → 提取 1.0.8 和构建号
   local build_name="${TAG#v}"
   build_name="${build_name%+*}"
-  local build_number=""
+  local build_number="0"  # 默认为 0（对应无 +N 的 tag）
   if [[ "$TAG" =~ [+][0-9]+$ ]]; then
     build_number="${BASH_REMATCH[0]#+}"
   fi
-  # 输出供 eval 解析，空值也要输出
+  # 输出供 eval 解析
   echo "BUILD_NAME=${build_name}"
-  echo "BUILD_NUMBER=${build_number:-}"
+  echo "BUILD_NUMBER=${build_number}"
 }
