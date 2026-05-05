@@ -81,10 +81,7 @@ if [[ $SKIP_TAG_CREATION -eq 1 ]]; then
   log "Current commit already has tag: $TAG_NAME, reusing"
 fi
 
-# 构建各平台
-FAILED=0
-BUILD_RESULTS=()
-
+# 构建各平台（任一失败立即退出）
 for PLATFORM in "${PLATFORMS[@]}"; do
   log "Building $PLATFORM..."
   case "$PLATFORM" in
@@ -93,12 +90,9 @@ for PLATFORM in "${PLATFORMS[@]}"; do
       export IOS_BUILD_NAME="$BUILD_NAME"
       export IOS_BUILD_NUMBER="${BUILD_NUMBER:-}"
       if scripts/release_ios.sh; then
-        BUILD_RESULTS+=("$PLATFORM: ✓")
         log "$PLATFORM build succeeded"
       else
-        BUILD_RESULTS+=("$PLATFORM: ✗")
-        log "$PLATFORM build FAILED"
-        FAILED=1
+        fail "$PLATFORM build FAILED, not creating tag"
       fi
       ;;
     android)
@@ -106,24 +100,18 @@ for PLATFORM in "${PLATFORMS[@]}"; do
       export ANDROID_BUILD_NAME="$BUILD_NAME"
       export ANDROID_BUILD_NUMBER="${BUILD_NUMBER:-}"
       if scripts/release_android.sh; then
-        BUILD_RESULTS+=("$PLATFORM: ✓")
         log "$PLATFORM build succeeded"
       else
-        BUILD_RESULTS+=("$PLATFORM: ✗")
-        log "$PLATFORM build FAILED"
-        FAILED=1
+        fail "$PLATFORM build FAILED, not creating tag"
       fi
       ;;
     macos)
       export MACOS_BUILD_NAME="$BUILD_NAME"
       export MACOS_BUILD_NUMBER="${BUILD_NUMBER:-}"
       if scripts/release_macos.sh; then
-        BUILD_RESULTS+=("$PLATFORM: ✓")
         log "$PLATFORM build succeeded"
       else
-        BUILD_RESULTS+=("$PLATFORM: ✗")
-        log "$PLATFORM build FAILED"
-        FAILED=1
+        fail "$PLATFORM build FAILED, not creating tag"
       fi
       ;;
     *)
@@ -132,15 +120,7 @@ for PLATFORM in "${PLATFORMS[@]}"; do
   esac
 done
 
-# 输出构建结果
-log "Build results:"
-for RESULT in "${BUILD_RESULTS[@]}"; do
-  log "  $RESULT"
-done
-
-if [[ $FAILED -eq 1 ]]; then
-  fail "CI failed, not creating tag"
-fi
+log "All platforms built successfully"
 
 # 全部成功，打 tag
 if [[ $SKIP_TAG_CREATION -eq 0 ]]; then
