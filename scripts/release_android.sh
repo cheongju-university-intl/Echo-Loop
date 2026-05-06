@@ -85,7 +85,7 @@ API_BASE_URL="${API_BASE_URL:-https://www.echo-loop.top}"
 POSTHOG_API_KEY="${POSTHOG_API_KEY:-}"
 POSTHOG_HOST="${POSTHOG_HOST:-https://us.i.posthog.com}"
 
-# 版本号来源优先级：命令行参数 > 环境变量 > 从 tag 解析
+# 版本号来源优先级：命令行参数 > 环境变量 > 从 tag/APK 解析
 if [[ -z "$BUILD_NAME" ]]; then
   BUILD_NAME="${ANDROID_BUILD_NAME:-}"
 fi
@@ -93,14 +93,45 @@ if [[ -z "$BUILD_NUMBER" ]]; then
   BUILD_NUMBER="${ANDROID_BUILD_NUMBER:-}"
 fi
 
-# 如果参数和环境变量都没提供，从当前 commit 的 tag 解析
-if [[ -z "$BUILD_NAME" || -z "$BUILD_NUMBER" ]]; then
+# 如果参数和环境变量都没提供，尝试从当前 commit 的 tag 或现有 APK 解析
+if [[ -z "$BUILD_NAME" && -z "$BUILD_NUMBER" ]]; then
+  # 先尝试 tag
   TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+[+][0-9]+$' | head -1 || true)"
-  if [[ -z "$TAG" ]]; then
+  if [[ -n "$TAG" ]]; then
+    log "Using tag: $TAG"
+    eval "$(parse_tag "$TAG")"
+  elif [[ "$SKIP_BUILD" == true ]]; then
+    # --skip-build 时从现有 APK 文件名推断
+    APK_PATTERN="build/release/Echo-Loop-*-arm64.apk"
+    EXISTING_APKS=()
+    for f in $APK_PATTERN; do
+      [[ -f "$f" ]] && EXISTING_APKS+=("$f")
+    done
+    if [[ ${#EXISTING_APKS[@]} -eq 0 ]]; then
+      fail "No APK found in build/release/. Run without --skip-build first, or provide --build-name and --build-number."
+    fi
+    # 多个 APK 时选最新的
+    if [[ ${#EXISTING_APKS[@]} -gt 1 ]]; then
+      LATEST_APK="$(ls -t "${EXISTING_APKS[@]}" | head -1)"
+      log "Multiple APKs found, using latest: $LATEST_APK"
+      APK_FILE="$(basename "$LATEST_APK")"
+    else
+      APK_FILE="$(basename "${EXISTING_APKS[0]}")"
+    fi
+    # 解析文件名: Echo-Loop-{version}+{number}-arm64.apk
+    if [[ "$APK_FILE" =~ ^Echo-Loop-([0-9]+\.[0-9]+\.[0-9]+)[+]([0-9]+)-arm64\.apk$ ]]; then
+      BUILD_NAME="${BASH_REMATCH[1]}"
+      BUILD_NUMBER="${BASH_REMATCH[2]}"
+      log "Inferred from APK: $BUILD_NAME+$BUILD_NUMBER"
+    else
+      fail "Cannot parse version from APK filename: $APK_FILE"
+    fi
+  else
     fail "No version tag on current commit. Run ci.sh first, or provide --build-name and --build-number."
   fi
-  log "Using tag: $TAG"
-  eval "$(parse_tag "$TAG")"
+elif [[ -z "$BUILD_NAME" || -z "$BUILD_NUMBER" ]]; then
+  # 只提供了一个，需要用户提供另一个
+  fail "Both --build-name and --build-number are required when one is provided via command line."
 fi
 
 # 安装包名字统一包含构建号
