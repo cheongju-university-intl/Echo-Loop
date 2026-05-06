@@ -43,7 +43,7 @@ void main() {
       // 验证 5 个难度选项
       expect(find.text('Very Easy'), findsOneWidget);
       expect(find.text('Easy'), findsOneWidget);
-      expect(find.text('Okay'), findsOneWidget);
+      expect(find.text('Medium'), findsOneWidget);
       expect(find.text('Hard'), findsOneWidget);
       expect(find.text('Very Hard'), findsOneWidget);
 
@@ -271,7 +271,7 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Okay'));
+      await tester.tap(find.text('Medium'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Complete Initial Learning'));

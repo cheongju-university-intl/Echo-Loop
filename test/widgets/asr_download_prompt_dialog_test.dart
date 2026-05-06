@@ -157,7 +157,7 @@ void main() {
       await tester.tap(find.text('start'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Speech Recognition Required'), findsOneWidget);
+      expect(find.text('Speech Recognition Model Required'), findsOneWidget);
 
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
@@ -177,7 +177,7 @@ void main() {
       await tester.tap(find.text('start'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Speech Recognition Required'), findsOneWidget);
+      expect(find.text('Speech Recognition Model Required'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
@@ -188,7 +188,7 @@ void main() {
       expect(notifier.state.enabled, isTrue);
     });
 
-    testWidgets('默认开启但未下载时点暂不启用后返回 false 但不关闭开关', (tester) async {
+    testWidgets('默认开启但未下载时点空白关闭后返回 false 且不改状态', (tester) async {
       final notifier = _TestOfflineAsrSettingsNotifier(
         OfflineAsrSettingsState(backend: AsrBackend.offline, recommendedModel: recommendedModel),
       );
@@ -197,12 +197,12 @@ void main() {
       await tester.tap(find.text('start'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Speech Recognition Required'), findsOneWidget);
+      expect(find.text('Speech Recognition Model Required'), findsOneWidget);
 
-      await tester.tap(find.text('Not Now'));
+      // 点击空白区域关闭对话框（"Download & Enable" 是唯一按钮，没有 "Not Now"）
+      await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
-      // 仅阻止本次进入，不修改设置
       expect(find.text('allowed=false'), findsOneWidget);
       expect(notifier.enableCallCount, 0);
       expect(notifier.disableCallCount, 0);
@@ -274,7 +274,7 @@ void main() {
       expect(notifier.disableCallCount, 0);
     });
 
-    testWidgets('已启用但下载失败时点暂不启用返回 false', (tester) async {
+    testWidgets('已启用但下载失败时点空白关闭返回 false', (tester) async {
       final notifier = _TestOfflineAsrSettingsNotifier(
         OfflineAsrSettingsState(
           backend: AsrBackend.offline,
@@ -291,7 +291,8 @@ void main() {
 
       expect(find.text('Download failed. Tap to retry.'), findsOneWidget);
 
-      await tester.tap(find.text('Not Now'));
+      // 点击空白区域关闭对话框（"Retry" 是唯一按钮，没有 "Not Now"）
+      await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
       expect(find.text('allowed=false'), findsOneWidget);

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -6,6 +7,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:echo_loop/services/asr/asr_model_manager.dart';
+
+/// Mock HTTP client adapter for Dio that returns predefined file payloads
+class MockHttpClientAdapter implements HttpClientAdapter {
+  final Map<String, List<int>> filePayloads;
+
+  MockHttpClientAdapter({required this.filePayloads});
+
+  @override
+  Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? requestStream, Future<void>? cancelFuture) async {
+    final fileName = options.path.split('/').last;
+    final payload = filePayloads[fileName];
+
+    if (payload == null) {
+      return ResponseBody(
+        Stream.empty(),
+        404,
+        headers: {},
+      );
+    }
+
+    return ResponseBody(
+      Stream.fromIterable([Uint8List.fromList(payload)]),
+      200,
+      headers: {
+        'content-length': [payload.length.toString()],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
 
 class _TestAsrModelManager extends AsrModelManager {
   _TestAsrModelManager(
@@ -82,36 +115,28 @@ void main() {
 
   test('downloadModel 会重新下载已存在但哈希不匹配的文件', () async {
     final rootDir = await Directory.systemTemp.createTemp('asr-redownload');
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    addTearDown(() async {
-      await server.close(force: true);
-      if (await rootDir.exists()) {
-        await rootDir.delete(recursive: true);
-      }
-    });
-
     final filePayloads = <String, List<int>>{
       'encoder.onnx': List<int>.filled(100, 1),
       'decoder.onnx': List<int>.filled(100, 2),
       'tokens.txt': List<int>.filled(50, 3),
     };
 
-    server.listen((request) async {
-      final fileName = request.uri.pathSegments.last;
-      final payload = filePayloads[fileName]!;
-      request.response.headers.contentLength = payload.length;
-      if (request.method == 'HEAD') {
-        await request.response.close();
-        return;
+    // 使用 mock Dio adapter 而非真实 HTTP server
+    final dio = Dio();
+    dio.httpClientAdapter = MockHttpClientAdapter(
+      filePayloads: filePayloads,
+    );
+
+    addTearDown(() async {
+      if (await rootDir.exists()) {
+        await rootDir.delete(recursive: true);
       }
-      request.response.add(payload);
-      await request.response.close();
     });
 
     final manager = _TestAsrModelManager(
       rootDir,
-      dio: Dio(),
-      baseUrlOverride: 'http://${server.address.host}:${server.port}',
+      dio: dio,
+      baseUrlOverride: 'http://mock.local',
       modelRegistryOverride: manifest,
     );
     final modelDir = Directory(await manager.modelDir('test-model'));

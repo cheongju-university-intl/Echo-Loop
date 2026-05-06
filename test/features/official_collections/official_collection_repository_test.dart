@@ -124,12 +124,12 @@ void main() {
       );
     });
 
-    test('软删后可再次 enroll', () async {
+    test('硬删后可再次 enroll', () async {
       fakeCatalog.seed(makeSnapshot(collections: [
         makeCatalogCollection(id: 'r1', audios: [makeCatalogAudio(id: 'a1')]),
       ]));
       final firstId = await repo.enroll('r1');
-      await db.collectionDao.softDelete(firstId);
+      await repo.remove(firstId);
 
       final secondId = await repo.enroll('r1');
       expect(secondId, isNot(firstId));

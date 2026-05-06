@@ -292,8 +292,8 @@ void main() {
 
       // FilledButton.tonal 类型的开始复习按钮
       expect(find.byType(FilledButton), findsAtLeast(1));
-      // 耳机图标（在按钮中）
-      expect(find.byIcon(Icons.headphones), findsAtLeast(1));
+      // 哑铃图标（练习按钮）
+      expect(find.byIcon(Icons.fitness_center), findsAtLeast(1));
     });
 
     testWidgets('展开音频组后显示句子', (tester) async {
@@ -344,8 +344,8 @@ void main() {
       await tester.tap(find.text('Audio One'));
       await tester.pumpAndSettle();
 
-      // 时间格式 MM:SS
-      expect(find.text('01:05 - 01:10'), findsOneWidget);
+      // 句子文本可见（当前 UI 不显示时间戳）
+      expect(find.text('Test.'), findsOneWidget);
     });
 
     testWidgets('句子项显示播放按钮', (tester) async {
@@ -397,8 +397,8 @@ void main() {
       wordController.add([]);
       await tester.pumpAndSettle();
 
-      // 每个音频组标题旁有耳机练习按钮 + 顶部复习按钮
-      expect(find.byIcon(Icons.headphones), findsAtLeast(3));
+      // 每个音频组标题旁有哑铃练习按钮 + 顶部复习按钮
+      expect(find.byIcon(Icons.fitness_center), findsAtLeast(3));
     });
   });
 
@@ -414,7 +414,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('No saved words yet'), findsOneWidget);
+      expect(find.text('No saved vocabulary yet'), findsOneWidget);
     });
 
     testWidgets('有数据时显示单词列表', (tester) async {
@@ -493,7 +493,7 @@ void main() {
 
       expect(find.text('收藏'), findsOneWidget);
       expect(find.text('句子'), findsOneWidget);
-      expect(find.text('单词'), findsOneWidget);
+      expect(find.text('词汇'), findsOneWidget);
     });
 
     testWidgets('中文句子空状态', (tester) async {

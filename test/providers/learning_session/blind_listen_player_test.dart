@@ -112,8 +112,8 @@ void main() {
 
       expect(settings.repeatCount, 1);
       expect(settings.pauseMode.name, 'multiplier');
-      expect(settings.pauseMultiplier, 1.5);
-      expect(settings.fixedPauseSeconds, 15);
+      expect(settings.pauseMultiplier, 0.5);
+      expect(settings.fixedPauseSeconds, 10);
     });
 
     test('calculatePauseDuration — multiplier 模式', () {

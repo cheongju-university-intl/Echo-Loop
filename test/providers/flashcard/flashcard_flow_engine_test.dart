@@ -455,7 +455,8 @@ void main() {
       // TTS 播放
       expect(h.phase, isA<FlashcardPlayingTts>());
       h.tts.completeSpeaking();
-      await Future<void>.delayed(Duration.zero);
+      // 等待 800ms 延迟后再检查句子播放
+      await Future<void>.delayed(const Duration(milliseconds: 900));
 
       // 句子播放
       expect(h.phase, isA<FlashcardPlayingSentence>());
@@ -509,7 +510,7 @@ void main() {
       unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(h.phase, isA<FlashcardPlayingSentence>());
 
       final stopBefore = h.stopCallCount;
@@ -592,7 +593,7 @@ void main() {
       unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(h.phase, isA<FlashcardPlayingSentence>());
 
       // 用户翻转

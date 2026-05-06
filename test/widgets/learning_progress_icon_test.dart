@@ -47,8 +47,8 @@ void main() {
         find.byType(CircularProgressIndicator),
       );
       expect(indicator.value, progress.progressPercent);
-      // 应显示 audiotrack 图标
-      expect(find.byIcon(Icons.audiotrack), findsOneWidget);
+      // 应显示 graphic_eq 图标
+      expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
     });
 
     testWidgets('已完成 → 显示 check icon + 绿色', (tester) async {

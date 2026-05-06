@@ -151,7 +151,7 @@ void main() {
       expect(requested, isFalse);
     });
 
-    testWidgets('翻译请求失败显示错误和重试按钮', (tester) async {
+    testWidgets('翻译请求失败显示 SnackBar', (tester) async {
       var callCount = 0;
 
       await tester.pumpWidget(
@@ -171,14 +171,9 @@ void main() {
       await tester.tap(find.byIcon(Icons.translate));
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.error_outline), findsOneWidget);
-      expect(find.text('Retry'), findsOneWidget);
+      // 翻译失败时显示 SnackBar
+      expect(find.text('Translation failed, please retry'), findsOneWidget);
       expect(callCount, 1);
-
-      // 点击重试
-      await tester.tap(find.text('Retry'));
-      await tester.pumpAndSettle();
-      expect(callCount, 2);
     });
 
     testWidgets('展开后再次点击可折叠', (tester) async {

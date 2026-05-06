@@ -11,8 +11,8 @@ void main() {
 
       expect(settings.repeatCount, 1);
       expect(settings.pauseMode, PauseMode.multiplier);
-      expect(settings.fixedPauseSeconds, 15);
-      expect(settings.pauseMultiplier, 1.5);
+      expect(settings.fixedPauseSeconds, 10);
+      expect(settings.pauseMultiplier, 0.5);
       expect(settings.controlMode, ShadowingControlMode.auto);
       expect(settings.isManualMode, false);
     });
@@ -94,8 +94,8 @@ void main() {
       // smart 模式
       const smart = BlindListenSettings(pauseMode: PauseMode.smart);
       final smartResult = smart.calculatePauseDuration(duration);
-      // smart = max(3s, 1.5 × 10s) = 15s
-      expect(smartResult, const Duration(seconds: 15));
+      // smart = 0.5 × 10s = 5s
+      expect(smartResult, const Duration(seconds: 5));
     });
 
     test('fromMultiplier 工厂正确创建', () {

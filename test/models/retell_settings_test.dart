@@ -6,32 +6,32 @@ import 'package:echo_loop/widgets/retell/retell_briefing_sheet.dart';
 
 void main() {
   group('retellDefaultSeconds', () {
-    test('null 阶段返回 0（逐句）', () {
-      expect(retellDefaultSeconds(null), 0);
+    test('null 阶段返回 10', () {
+      expect(retellDefaultSeconds(null), 10);
     });
 
-    test('首次学习返回 0（逐句）', () {
-      expect(retellDefaultSeconds(LearningStage.firstLearn), 0);
+    test('首次学习返回 10', () {
+      expect(retellDefaultSeconds(LearningStage.firstLearn), 10);
     });
 
-    test('首轮复习返回 0（逐句）', () {
-      expect(retellDefaultSeconds(LearningStage.review0), 0);
+    test('首轮复习返回 10', () {
+      expect(retellDefaultSeconds(LearningStage.review0), 10);
     });
 
     test('review1 返回 10', () {
       expect(retellDefaultSeconds(LearningStage.review1), 10);
     });
 
-    test('review2 返回 10', () {
-      expect(retellDefaultSeconds(LearningStage.review2), 10);
+    test('review2 返回 20', () {
+      expect(retellDefaultSeconds(LearningStage.review2), 20);
     });
 
     test('review4 返回 20', () {
       expect(retellDefaultSeconds(LearningStage.review4), 20);
     });
 
-    test('review7 返回 20', () {
-      expect(retellDefaultSeconds(LearningStage.review7), 20);
+    test('review7 返回 30', () {
+      expect(retellDefaultSeconds(LearningStage.review7), 30);
     });
 
     test('review14 返回 30', () {

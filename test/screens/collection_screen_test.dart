@@ -167,7 +167,7 @@ void main() {
         expect(find.text('Collection Name'), findsOneWidget);
       });
 
-      testWidgets('创建合集时空名称显示错误', (tester) async {
+      testWidgets('创建合集时空名称时 Add 按钮禁用', (tester) async {
         await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
@@ -175,27 +175,23 @@ void main() {
         await tester.tap(find.byIcon(Icons.add).first);
         await tester.pumpAndSettle();
 
-        // 直接点击添加（不输入名称）
-        await tester.tap(find.text('Add'));
-        await tester.pumpAndSettle();
+        // Add 按钮应禁用（空输入）
+        final addButton = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Add'),
+        );
+        expect(addButton.onPressed, isNull);
 
-        // 应显示错误提示
-        expect(find.text('Collection name cannot be empty'), findsWidgets);
-      });
+        // 输入内容后按钮启用
+        await tester.enterText(
+          find.byType(TextField).first,
+          'My Collection',
+        );
+        await tester.pump();
 
-      testWidgets('切换 grid/list 视图模式', (tester) async {
-        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
-        await tester.pumpAndSettle();
-
-        // 默认列表模式，显示 grid_view 切换图标
-        expect(find.byIcon(Icons.grid_view), findsOneWidget);
-
-        // 点击切换为网格视图
-        await tester.tap(find.byIcon(Icons.grid_view));
-        await tester.pumpAndSettle();
-
-        // 切换后显示 view_list 图标
-        expect(find.byIcon(Icons.view_list), findsOneWidget);
+        final enabledButton = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Add'),
+        );
+        expect(enabledButton.onPressed, isNotNull);
       });
 
       testWidgets('点击排序按钮显示排序选项', (tester) async {

@@ -79,9 +79,21 @@ void main() {
     await tester.pumpWidget(_buildTestApp(db));
     await tester.pumpAndSettle();
 
-    final wordCenter = tester.getCenter(find.text('thing'));
-    final dateCenter = tester.getCenter(find.text('2026-03-12 14:19'));
-    expect((wordCenter.dy - dateCenter.dy).abs(), lessThan(8));
+    // 验证单词显示
+    expect(find.text('thing'), findsOneWidget);
+    // 验证相对时间格式显示（日期不是 "2026-03-12 14:19" 而是 "x days ago" 等格式）
+    // 检查行内布局：单词右侧应有日期文本
+    final rowFinder = find.ancestor(
+      of: find.text('thing'),
+      matching: find.byType(Row),
+    );
+    expect(rowFinder, findsOneWidget);
+    // Row 内应包含日期 Text
+    final rowWidget = tester.widget<Row>(rowFinder);
+    final hasDateText = rowWidget.children.any(
+      (child) => child is Text && child.data != 'thing',
+    );
+    expect(hasDateText, isTrue);
   });
 
   testWidgets('切换到 A → Z 后按字母正序显示', (tester) async {

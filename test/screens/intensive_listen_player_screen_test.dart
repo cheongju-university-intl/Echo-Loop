@@ -137,6 +137,8 @@ void main() {
     Duration annotationReplayDuration = Duration.zero,
     Set<int> difficultSentences = const {},
     bool isCurrentSentenceAutoMarked = false,
+    bool isCountdownPaused = false,
+    bool isCountdownFastForward = false,
   }) {
     return IntensiveListenState(
       currentSentenceIndex: currentSentenceIndex,
@@ -155,6 +157,8 @@ void main() {
       annotationReplayDuration: annotationReplayDuration,
       difficultSentences: difficultSentences,
       isCurrentSentenceAutoMarked: isCurrentSentenceAutoMarked,
+      isCountdownPaused: isCountdownPaused,
+      isCountdownFastForward: isCountdownFastForward,
     );
   }
 
@@ -298,7 +302,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Auto · Play 1/1'), findsOneWidget);
+      expect(find.text('Auto · Round 1/1'), findsOneWidget);
     });
 
     testWidgets('自定义遍数正确显示', (tester) async {
@@ -312,7 +316,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Auto · Play 2/3'), findsOneWidget);
+      expect(find.text('Auto · Round 2/3'), findsOneWidget);
     });
 
     testWidgets('详情模式显示继续按钮', (tester) async {
@@ -381,6 +385,7 @@ void main() {
             isPlaying: false,
             pauseRemaining: const Duration(seconds: 3),
             pauseDuration: const Duration(seconds: 3),
+            isCountdownPaused: true,
           ),
         ),
       );
@@ -391,7 +396,7 @@ void main() {
       expect(find.text('Continue'), findsNothing);
     });
 
-    testWidgets('详情页倒计时剩余时间变化时数字和进度会刷新', (tester) async {
+    testWidgets('详情页倒计时使用 pauseDuration 作为总时长', (tester) async {
       late _MutableIntensiveListenPlayer player;
       await tester.pumpWidget(
         createTestWidget(
@@ -402,6 +407,7 @@ void main() {
             isPlaying: false,
             pauseRemaining: const Duration(seconds: 3),
             pauseDuration: const Duration(seconds: 5),
+            isCountdownPaused: true,
           ),
           playerFactory: (state, sentences) {
             player = _MutableIntensiveListenPlayer(state, sentences);
@@ -411,8 +417,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('3'), findsOneWidget);
+      // CountdownChip 使用 pauseDuration 作为总时长，初始显示 5s
+      expect(find.text('5'), findsOneWidget);
 
+      // 改变 pauseDuration 会触发 countdown 重建
       player.emit(
         createPlayerState(
           isAnnotationMode: true,
@@ -420,12 +428,14 @@ void main() {
           isPauseBetweenSentences: true,
           isPlaying: false,
           pauseRemaining: const Duration(seconds: 2),
-          pauseDuration: const Duration(seconds: 5),
+          pauseDuration: const Duration(seconds: 3),
+          isCountdownPaused: true,
         ),
       );
       await tester.pump();
 
-      expect(find.text('2'), findsOneWidget);
+      // 新的 pauseDuration 为 3s，显示 '3'
+      expect(find.text('3'), findsOneWidget);
     });
 
     testWidgets('显示播放/暂停和上下句按钮', (tester) async {

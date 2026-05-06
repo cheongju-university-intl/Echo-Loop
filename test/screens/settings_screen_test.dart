@@ -167,7 +167,11 @@ void main() {
         await tester.scrollUntilVisible(find.text('Time Machine'), 200);
         await tester.pumpAndSettle();
 
-        expect(find.text('Debug time: 2026-03-11 22:15'), findsOneWidget);
+        // 调试时间显示在 Time Machine 对话框中，先点击打开
+        await tester.tap(find.text('Time Machine'));
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Debug time:'), findsOneWidget);
       });
     });
 

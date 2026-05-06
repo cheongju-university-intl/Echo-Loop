@@ -114,7 +114,11 @@ void main() {
         await tester.tap(find.text('AI Transcription'));
         await tester.pumpAndSettle();
 
-        // AI 选中 + en 默认选中 → 按钮显示"已使用该选项转录"
+        // 切换语言到 English（与现有字幕语言相同）
+        await tester.tap(find.text('English'));
+        await tester.pumpAndSettle();
+
+        // AI 选中 + en 选中 → 按钮显示"已使用该选项转录"
         expect(
           find.text('Already transcribed with this option'),
           findsAtLeast(1),
@@ -131,19 +135,19 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
 
-        // 默认本地上传 → FilledButton 显示"上传字幕"
+        // 无字幕时默认 AI → FilledButton 显示"开始转录"
         expect(
-          find.widgetWithText(FilledButton, 'Upload Transcript'),
+          find.widgetWithText(FilledButton, 'Start Transcription'),
           findsOneWidget,
         );
 
-        // 切换到 AI 转录
-        await tester.tap(find.text('AI Transcription'));
+        // 切换到本地上传
+        await tester.tap(find.text('Local Upload'));
         await tester.pumpAndSettle();
 
-        // FilledButton 显示"开始转录"
+        // FilledButton 显示"上传字幕"
         expect(
-          find.widgetWithText(FilledButton, 'Start Transcription'),
+          find.widgetWithText(FilledButton, 'Upload Transcript'),
           findsOneWidget,
         );
       });
@@ -192,7 +196,7 @@ void main() {
         expect(find.byTooltip('Delete Subtitle'), findsOneWidget);
       });
 
-      testWidgets('AI(en) 已转录 + 选中 multi → 按钮可点击', (tester) async {
+      testWidgets('AI(en) 已转录 + 选中 auto → 按钮可点击', (tester) async {
         final item = createTestAudioItem().copyWith(
           transcriptSource: TranscriptSource.ai,
           transcriptLanguage: 'en',
@@ -207,11 +211,7 @@ void main() {
         await tester.tap(find.text('AI Transcription'));
         await tester.pumpAndSettle();
 
-        // 切换语言到 multi
-        await tester.tap(find.text('Mixed Languages'));
-        await tester.pumpAndSettle();
-
-        // 按钮显示"开始转录"且可点击
+        // 默认语言为 auto（与 en 不同） → 按钮可点击
         final filledButton = tester.widget<FilledButton>(
           find.widgetWithText(FilledButton, 'Start Transcription'),
         );
@@ -236,7 +236,7 @@ void main() {
         // 显示收藏句子删除警告
         expect(
           find.text(
-            'Deleting the subtitle will also remove all bookmarked sentences for this audio.',
+            'Deleting the subtitle will also clear all bookmarked sentences and learning progress for this audio.',
           ),
           findsOneWidget,
         );
@@ -252,16 +252,14 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
 
-        // 默认本地上传 → 语言选择隐藏
-        expect(find.text('Select Language'), findsNothing);
+        // 无字幕时默认选中 AI → 语言选择显示
+        expect(find.text('Select Language'), findsOneWidget);
 
-        // 切换到 AI → 语言选择显示
-        await tester.tap(find.text('AI Transcription'));
+        // 切换到本地上传 → 语言选择隐藏
+        await tester.tap(find.text('Local Upload'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Select Language'), findsOneWidget);
-        expect(find.text('English'), findsOneWidget);
-        expect(find.text('Mixed Languages'), findsOneWidget);
+        expect(find.text('Select Language'), findsNothing);
       });
 
       testWidgets('本地上传选中时隐藏语言选择', (tester) async {

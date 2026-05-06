@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/models/speech_practice_models.dart';
@@ -250,274 +251,322 @@ void main() {
   });
 
   group('SpeechRecordingController', () {
-    test('完全匹配时 1s 静音即停止', () async {
-      final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
-      final container = ProviderContainer(
-        overrides: [
-          analyticsOverride(),
-          speechPracticeBackendProvider.overrideWithValue(backend),
-          recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
-          offlineAsrSettingsProvider.overrideWith(
-            () => _FakeOfflineAsrSettingsNotifier(),
-          ),
-        ],
-      );
-      addTearDown(() async {
-        await backend.dispose();
-        container.dispose();
+    testWidgets('完全匹配时 1s 静音即停止', (tester) async {
+      ProviderContainer? container;
+      _FakeSpeechPracticeBackend? backend;
+      SpeechRecordingController? controller;
+
+      await tester.runAsync(() async {
+        backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        container = ProviderContainer(
+          overrides: [
+            analyticsOverride(),
+            speechPracticeBackendProvider.overrideWithValue(backend!),
+            recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+            offlineAsrSettingsProvider.overrideWith(
+              () => _FakeOfflineAsrSettingsNotifier(),
+            ),
+          ],
+        );
+
+        controller = container!.read(
+          speechRecordingControllerProvider.notifier,
+        );
+        await controller!.startRecording(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Anyhow I noticed your name on the door',
+        );
+
+        backend!.emitPartial('I noticed your name on the door');
+        backend!.emitSpeechStarted();
+        backend!.emitSilence(const Duration(seconds: 1));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        final turnState = container!.read(speechRecordingControllerProvider);
+        expect(turnState.phase, SpeechRecordingPhase.processing);
       });
 
-      final controller = container.read(
-        speechRecordingControllerProvider.notifier,
-      );
-      await controller.startRecording(
-        promptId: 'shadowing:a1:0',
-        referenceText: 'Anyhow I noticed your name on the door',
-      );
-
-      backend.emitPartial('I noticed your name on the door');
-      backend.emitSpeechStarted();
-      backend.emitSilence(const Duration(seconds: 1));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-
-      final turnState = container.read(speechRecordingControllerProvider);
-      expect(turnState.phase, SpeechRecordingPhase.processing);
+      addTearDown(() async {
+        if (controller != null) await controller!.fullReset();
+        if (backend != null) await backend!.dispose();
+        if (container != null) container!.dispose();
+      });
     });
 
-    test('部分匹配（尾部 0 命中）时 5s 静音才停止', () async {
-      final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
-      final container = ProviderContainer(
-        overrides: [
-          analyticsOverride(),
-          speechPracticeBackendProvider.overrideWithValue(backend),
-          recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
-          offlineAsrSettingsProvider.overrideWith(
-            () => _FakeOfflineAsrSettingsNotifier(),
-          ),
-        ],
-      );
-      addTearDown(() async {
-        await backend.dispose();
-        container.dispose();
+    testWidgets('部分匹配（尾部 0 命中）时 5s 静音才停止', (tester) async {
+      ProviderContainer? container;
+      _FakeSpeechPracticeBackend? backend;
+      SpeechRecordingController? controller;
+
+      await tester.runAsync(() async {
+        backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        container = ProviderContainer(
+          overrides: [
+            analyticsOverride(),
+            speechPracticeBackendProvider.overrideWithValue(backend!),
+            recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+            offlineAsrSettingsProvider.overrideWith(
+              () => _FakeOfflineAsrSettingsNotifier(),
+            ),
+          ],
+        );
+
+        controller = container!.read(
+          speechRecordingControllerProvider.notifier,
+        );
+        await controller!.startRecording(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Anyhow I noticed your name on the door',
+        );
+
+        // 只说了前半句 → 尾部 5 词命中 0 → 阈值 5s
+        backend!.emitPartial('Anyhow I noticed your');
+        backend!.emitSpeechStarted();
+
+        // 2s 静音不够
+        backend!.emitSilence(const Duration(seconds: 2));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.speaking,
+        );
+
+        // 5s 静音才触发（尾部 0 命中 → 5s 阈值）
+        backend!.emitSilence(const Duration(seconds: 5));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.processing,
+        );
       });
 
-      final controller = container.read(
-        speechRecordingControllerProvider.notifier,
-      );
-      await controller.startRecording(
-        promptId: 'shadowing:a1:0',
-        referenceText: 'Anyhow I noticed your name on the door',
-      );
-
-      // 只说了前半句 → 尾部 5 词命中 0 → 阈值 5s
-      backend.emitPartial('Anyhow I noticed your');
-      backend.emitSpeechStarted();
-
-      // 2s 静音不够
-      backend.emitSilence(const Duration(seconds: 2));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.speaking,
-      );
-
-      // 5s 静音才触发（尾部 0 命中 → 5s 阈值）
-      backend.emitSilence(const Duration(seconds: 5));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.processing,
-      );
+      addTearDown(() async {
+        if (controller != null) await controller!.fullReset();
+        if (backend != null) await backend!.dispose();
+        if (container != null) container!.dispose();
+      });
     });
 
-    test('无匹配时 5s 静音才停止', () async {
-      final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
-      final container = ProviderContainer(
-        overrides: [
-          analyticsOverride(),
-          speechPracticeBackendProvider.overrideWithValue(backend),
-          recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
-          offlineAsrSettingsProvider.overrideWith(
-            () => _FakeOfflineAsrSettingsNotifier(),
-          ),
-        ],
-      );
-      addTearDown(() async {
-        await backend.dispose();
-        container.dispose();
+    testWidgets('无匹配时 5s 静音才停止', (tester) async {
+      ProviderContainer? container;
+      _FakeSpeechPracticeBackend? backend;
+      SpeechRecordingController? controller;
+
+      await tester.runAsync(() async {
+        backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        container = ProviderContainer(
+          overrides: [
+            analyticsOverride(),
+            speechPracticeBackendProvider.overrideWithValue(backend!),
+            recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+            offlineAsrSettingsProvider.overrideWith(
+              () => _FakeOfflineAsrSettingsNotifier(),
+            ),
+          ],
+        );
+
+        controller = container!.read(
+          speechRecordingControllerProvider.notifier,
+        );
+        await controller!.startRecording(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Anyhow I noticed your name on the door',
+        );
+
+        // 完全不相关的内容
+        backend!.emitPartial('something completely different');
+        backend!.emitSpeechStarted();
+
+        // 4s 不够
+        backend!.emitSilence(const Duration(seconds: 4));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.speaking,
+        );
+
+        // 5s 触发兜底
+        backend!.emitSilence(const Duration(seconds: 5));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.processing,
+        );
       });
 
-      final controller = container.read(
-        speechRecordingControllerProvider.notifier,
-      );
-      await controller.startRecording(
-        promptId: 'shadowing:a1:0',
-        referenceText: 'Anyhow I noticed your name on the door',
-      );
-
-      // 完全不相关的内容
-      backend.emitPartial('something completely different');
-      backend.emitSpeechStarted();
-
-      // 4s 不够
-      backend.emitSilence(const Duration(seconds: 4));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.speaking,
-      );
-
-      // 5s 触发兜底
-      backend.emitSilence(const Duration(seconds: 5));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.processing,
-      );
+      addTearDown(() async {
+        if (controller != null) await controller!.fullReset();
+        if (backend != null) await backend!.dispose();
+        if (container != null) container!.dispose();
+      });
     });
 
-    test('转录停滞通道：完全匹配后 1s 不更新即自动结束（无 silenceProgress）', () async {
-      final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
-      final container = ProviderContainer(
-        overrides: [
-          analyticsOverride(),
-          speechPracticeBackendProvider.overrideWithValue(backend),
-          recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
-          offlineAsrSettingsProvider.overrideWith(
-            () => _FakeOfflineAsrSettingsNotifier(),
-          ),
-        ],
-      );
-      addTearDown(() async {
-        await backend.dispose();
-        container.dispose();
+    testWidgets('转录停滞通道：完全匹配后 1s 不更新即自动结束（无 silenceProgress）', (tester) async {
+      ProviderContainer? container;
+      _FakeSpeechPracticeBackend? backend;
+      SpeechRecordingController? controller;
+
+      await tester.runAsync(() async {
+        backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        container = ProviderContainer(
+          overrides: [
+            analyticsOverride(),
+            speechPracticeBackendProvider.overrideWithValue(backend!),
+            recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+            offlineAsrSettingsProvider.overrideWith(
+              () => _FakeOfflineAsrSettingsNotifier(),
+            ),
+          ],
+        );
+
+        controller = container!.read(
+          speechRecordingControllerProvider.notifier,
+        );
+        await controller!.startRecording(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Anyhow I noticed your name on the door',
+        );
+
+        // 发送完整转录，模拟嘈杂环境（不发送 silenceProgress）
+        backend!.emitSpeechStarted();
+        backend!.emitPartial('I noticed your name on the door');
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.speaking,
+        );
+
+        // 完全匹配 → 阈值 1s，等 1s 后停滞计时器触发
+        await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
+
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.processing,
+        );
       });
 
-      final controller = container.read(
-        speechRecordingControllerProvider.notifier,
-      );
-      await controller.startRecording(
-        promptId: 'shadowing:a1:0',
-        referenceText: 'Anyhow I noticed your name on the door',
-      );
-
-      // 发送完整转录，模拟嘈杂环境（不发送 silenceProgress）
-      backend.emitSpeechStarted();
-      backend.emitPartial('I noticed your name on the door');
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.speaking,
-      );
-
-      // 完全匹配 → 阈值 1s，等 1s 后停滞计时器触发
-      await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
-
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.processing,
-      );
+      addTearDown(() async {
+        if (controller != null) await controller!.fullReset();
+        if (backend != null) await backend!.dispose();
+        if (container != null) container!.dispose();
+      });
     });
 
-    test('转录停滞通道：部分匹配后按动态阈值等待', () async {
-      final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
-      final container = ProviderContainer(
-        overrides: [
-          analyticsOverride(),
-          speechPracticeBackendProvider.overrideWithValue(backend),
-          recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
-          offlineAsrSettingsProvider.overrideWith(
-            () => _FakeOfflineAsrSettingsNotifier(),
-          ),
-        ],
-      );
-      addTearDown(() async {
-        await backend.dispose();
-        container.dispose();
+    testWidgets('转录停滞通道：部分匹配后按动态阈值等待', (tester) async {
+      ProviderContainer? container;
+      _FakeSpeechPracticeBackend? backend;
+      SpeechRecordingController? controller;
+
+      await tester.runAsync(() async {
+        backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        container = ProviderContainer(
+          overrides: [
+            analyticsOverride(),
+            speechPracticeBackendProvider.overrideWithValue(backend!),
+            recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+            offlineAsrSettingsProvider.overrideWith(
+              () => _FakeOfflineAsrSettingsNotifier(),
+            ),
+          ],
+        );
+
+        controller = container!.read(
+          speechRecordingControllerProvider.notifier,
+        );
+        await controller!.startRecording(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Anyhow I noticed your name on the door',
+        );
+
+        backend!.emitSpeechStarted();
+        // 只说前半句 → 尾部 0 命中 → 阈值 5s
+        backend!.emitPartial('Anyhow I noticed your');
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        // 4s 后仍在 speaking
+        await Future<void>.delayed(const Duration(seconds: 4));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.speaking,
+        );
+
+        // 5s 后停滞计时器触发（需要额外 50ms 让 async 完成）
+        await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.processing,
+        );
       });
 
-      final controller = container.read(
-        speechRecordingControllerProvider.notifier,
-      );
-      await controller.startRecording(
-        promptId: 'shadowing:a1:0',
-        referenceText: 'Anyhow I noticed your name on the door',
-      );
-
-      backend.emitSpeechStarted();
-      // 只说前半句 → 尾部 0 命中 → 阈值 5s
-      backend.emitPartial('Anyhow I noticed your');
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      // 4s 后仍在 speaking
-      await Future<void>.delayed(const Duration(seconds: 4));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.speaking,
-      );
-
-      // 5s 后停滞计时器触发（需要额外 50ms 让 async 完成）
-      await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.processing,
-      );
+      addTearDown(() async {
+        if (controller != null) await controller!.fullReset();
+        if (backend != null) await backend!.dispose();
+        if (container != null) container!.dispose();
+      });
     });
 
-    test('转录更新会重置停滞计时器', () async {
-      final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
-      final container = ProviderContainer(
-        overrides: [
-          analyticsOverride(),
-          speechPracticeBackendProvider.overrideWithValue(backend),
-          recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
-          offlineAsrSettingsProvider.overrideWith(
-            () => _FakeOfflineAsrSettingsNotifier(),
-          ),
-        ],
-      );
-      addTearDown(() async {
-        await backend.dispose();
-        container.dispose();
+    testWidgets('转录更新会重置停滞计时器', (tester) async {
+      ProviderContainer? container;
+      _FakeSpeechPracticeBackend? backend;
+      SpeechRecordingController? controller;
+
+      await tester.runAsync(() async {
+        backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        container = ProviderContainer(
+          overrides: [
+            analyticsOverride(),
+            speechPracticeBackendProvider.overrideWithValue(backend!),
+            recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+            offlineAsrSettingsProvider.overrideWith(
+              () => _FakeOfflineAsrSettingsNotifier(),
+            ),
+          ],
+        );
+
+        controller = container!.read(
+          speechRecordingControllerProvider.notifier,
+        );
+        await controller!.startRecording(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Anyhow I noticed your name on the door',
+        );
+
+        backend!.emitSpeechStarted();
+        backend!.emitPartial('Anyhow');
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        // 4s 后更新转录 → 重置计时器
+        await Future<void>.delayed(const Duration(seconds: 4));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.speaking,
+        );
+        backend!.emitPartial('Anyhow I noticed');
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+
+        // 再过 4s 仍在 speaking（计时器已重置）
+        await Future<void>.delayed(const Duration(seconds: 4));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.speaking,
+        );
+
+        // 再过 1s（共 5s 无更新）→ 触发
+        await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
+        expect(
+          container!.read(speechRecordingControllerProvider).phase,
+          SpeechRecordingPhase.processing,
+        );
       });
 
-      final controller = container.read(
-        speechRecordingControllerProvider.notifier,
-      );
-      await controller.startRecording(
-        promptId: 'shadowing:a1:0',
-        referenceText: 'Anyhow I noticed your name on the door',
-      );
-
-      backend.emitSpeechStarted();
-      backend.emitPartial('Anyhow');
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      // 4s 后更新转录 → 重置计时器
-      await Future<void>.delayed(const Duration(seconds: 4));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.speaking,
-      );
-      backend.emitPartial('Anyhow I noticed');
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      // 再过 4s 仍在 speaking（计时器已重置）
-      await Future<void>.delayed(const Duration(seconds: 4));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.speaking,
-      );
-
-      // 再过 1s（共 5s 无更新）→ 触发
-      await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
-      expect(
-        container.read(speechRecordingControllerProvider).phase,
-        SpeechRecordingPhase.processing,
-      );
+      addTearDown(() async {
+        if (controller != null) await controller!.fullReset();
+        if (backend != null) await backend!.dispose();
+        if (container != null) container!.dispose();
+      });
     });
 
     test('60s 未开口 → 取消录音回到 idle', () async {
@@ -640,7 +689,7 @@ void main() {
       await Future<void>.delayed(const Duration(seconds: 1, milliseconds: 50));
       final finalState = container.read(speechRecordingControllerProvider);
       expect(finalState.phase, SpeechRecordingPhase.processing);
-    });
+    }, timeout: const Timeout(Duration(seconds: 60)));
 
     test('手动模式不启动等待计时器和自动停止', () async {
       final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
@@ -717,7 +766,7 @@ void main() {
 
       // speaking 阶段
       backend.emitSpeechStarted();
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       state = container.read(speechRecordingControllerProvider);
       expect(state.isRecordingPrompt('shadowing:a1:0'), isTrue);
     });

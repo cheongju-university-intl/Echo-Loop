@@ -3,12 +3,34 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:echo_loop/database/enums.dart';
 import 'package:echo_loop/models/speech_practice_models.dart';
 import 'package:echo_loop/models/study_stage.dart';
+import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
 import 'package:echo_loop/providers/retell_recording_controller_provider.dart';
+import 'package:echo_loop/services/asr/offline_asr_engine.dart';
 import 'package:echo_loop/services/speech_practice_platform.dart';
 import 'package:echo_loop/services/study_event_recorder.dart';
 import 'package:echo_loop/services/study_time_service.dart';
+
+import '../helpers/mock_providers.dart';
+
+const _testAsrModel = AsrModelInfo(
+  id: 'test-model',
+  displayName: 'Test Model',
+  type: AsrModelType.moonshine,
+);
+
+const _testAsrSettings = OfflineAsrSettingsState(
+  enabled: true,
+  backend: AsrBackend.platform,
+  recommendedModel: _testAsrModel,
+);
+
+class _FakeOfflineAsrSettingsNotifier extends OfflineAsrSettingsNotifier {
+  @override
+  OfflineAsrSettingsState build() => _testAsrSettings;
+}
 
 class _FakeSpeechPracticeBackend implements SpeechPracticeBackend {
   final _controller = StreamController<SpeechPracticeEvent>.broadcast();
@@ -139,7 +161,14 @@ void main() {
   test('RetellRecordingController 在停止录音后通过底层统一记录说的时长', () async {
     final backend = _FakeSpeechPracticeBackend();
     final container = ProviderContainer(
-      overrides: [speechPracticeBackendProvider.overrideWithValue(backend)],
+      overrides: [
+        analyticsOverride(),
+        speechPracticeBackendProvider.overrideWithValue(backend),
+        recommendedAsrModelProvider.overrideWithValue(_testAsrModel),
+        offlineAsrSettingsProvider.overrideWith(
+          () => _FakeOfflineAsrSettingsNotifier(),
+        ),
+      ],
     );
     addTearDown(() async {
       await backend.dispose();
