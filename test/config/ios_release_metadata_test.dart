@@ -17,8 +17,8 @@ void main() {
     final chinese =
         await File('ios/Runner/zh-Hans.lproj/InfoPlist.strings').readAsString();
 
-    expect(english, contains('"CFBundleDisplayName" = "Echo Loop";'));
-    expect(chinese, contains('"CFBundleDisplayName" = "Echo Loop";'));
+    expect(english, contains('"CFBundleName" = "Echo Loop";'));
+    expect(chinese, contains('"CFBundleName" = "Echo Loop";'));
   });
 
   test('iOS 字幕文档类型声明了 LSHandlerRank', () async {

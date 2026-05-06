@@ -180,9 +180,9 @@ void main() {
       expect(h.phase, isA<FlashcardPlayingTts>());
       expect(h.state.isShowingBack, true);
 
-      // TTS 完成 → 句子播放
+      // TTS 完成 → 等待 800ms 延迟 → 句子播放
       h.tts.completeSpeaking();
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(h.phase, isA<FlashcardPlayingSentence>());
 
       // 句子完成 → Countdown
@@ -266,7 +266,7 @@ void main() {
       unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(h.phase, isA<FlashcardPlayingSentence>());
 
       h.engine.enterWaitingForUser(FlashcardWaitingReason.appBackgrounded);
@@ -833,7 +833,7 @@ void main() {
       unawaited(h.engine.startBackAutoPlay(word: 'apple', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(h.phase, isA<FlashcardPlayingSentence>());
 
       // 切到卡片 B
