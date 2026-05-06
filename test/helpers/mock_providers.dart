@@ -50,6 +50,8 @@ import 'package:echo_loop/models/blind_listen_settings.dart';
 import 'package:echo_loop/models/sentence.dart';
 import 'package:echo_loop/providers/app_update_provider.dart';
 import 'package:echo_loop/providers/dictionary_provider.dart';
+import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
+import 'package:echo_loop/services/asr/offline_asr_engine.dart';
 
 // ========== 测试数据工厂 ==========
 
@@ -1684,6 +1686,7 @@ List<Override> studyTimeOverrides() {
     retellRecordingControllerProvider.overrideWith(
       TestRetellRecordingController.new,
     ),
+    offlineAsrOverride(),
   ];
 }
 
@@ -1750,4 +1753,69 @@ class _NoOpStudyTimeService implements StudyTimeService {
   ) async => [];
   @override
   Future<DailyTotalData?> getDayTotal(DateTime date) async => null;
+}
+
+/// 测试用 OfflineAsrSettings — 不执行模型下载/平台调用
+class TestOfflineAsrSettings extends OfflineAsrSettingsNotifier {
+  final OfflineAsrSettingsState _initialState;
+
+  TestOfflineAsrSettings([
+    this._initialState = const OfflineAsrSettingsState(
+      enabled: true,
+      backend: AsrBackend.platform,
+      engineReady: true,
+      recommendedModel: AsrModelInfo(
+        id: 'test-model',
+        displayName: 'Test Model',
+        type: AsrModelType.moonshine,
+      ),
+    ),
+  ]);
+
+  @override
+  OfflineAsrSettingsState build() => _initialState;
+
+  @override
+  Future<void> enable() async {
+    state = state.copyWith(enabled: true);
+  }
+
+  @override
+  Future<void> disable() async {
+    state = state.copyWith(enabled: false);
+  }
+
+  @override
+  Future<void> retryDownload() async {
+    // 测试中不执行下载
+  }
+
+  @override
+  Future<void> loadEngine() async {
+    state = state.copyWith(engineReady: true);
+  }
+}
+
+/// 返回 offlineAsrSettingsProvider 的 override（默认开启且就绪）
+Override offlineAsrOverride({
+  bool enabled = true,
+  AsrBackend backend = AsrBackend.platform,
+  bool engineReady = true,
+}) {
+  // 测试用默认模型
+  const testModel = AsrModelInfo(
+    id: 'test-model',
+    displayName: 'Test Model',
+    type: AsrModelType.moonshine,
+  );
+  return offlineAsrSettingsProvider.overrideWith(
+    () => TestOfflineAsrSettings(
+      OfflineAsrSettingsState(
+        enabled: enabled,
+        backend: backend,
+        engineReady: engineReady,
+        recommendedModel: testModel,
+      ),
+    ),
+  );
 }

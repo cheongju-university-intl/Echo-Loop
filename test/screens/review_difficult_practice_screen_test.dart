@@ -223,6 +223,8 @@ void main() {
 
     return ProviderScope(
       overrides: [
+        analyticsOverride(),
+        ...studyTimeOverrides(),
         listeningPracticeProvider.overrideWith(
           () => TestListeningPractice(
             ListeningPracticeState(sentences: sentences),
