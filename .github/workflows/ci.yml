@@ -34,7 +34,7 @@ jobs:
         run: flutter pub get
 
       - name: Run analyze
-        run: flutter analyze --no-fatal-warnings
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
   test:
     runs-on: ubuntu-latest

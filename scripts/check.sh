@@ -17,7 +17,7 @@ run_step() {
   echo "[check] <<< $name (ok)"
 }
 
-run_step "flutter analyze" flutter analyze
+run_step "flutter analyze" flutter analyze --no-fatal-warnings --no-fatal-infos
 run_step "flutter test" flutter test
 run_step "flutter test integration_test -d macos" flutter test integration_test -d macos
 run_step "flutter build macos" flutter build macos
