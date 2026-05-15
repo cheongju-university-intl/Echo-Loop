@@ -247,7 +247,7 @@
   "aiAnalysisFailed": "解析失败，请重试",
   "aiRetry": "重试",
   "aiGrammar": "语法",
-  "aiVocabulary": "词汇",
+  "aiVocabulary": "重点词汇",
   "aiListening": "听力提示",
   "intensiveListenWordDictNotFound": "未收录该单词",
   "intensiveListenContinue": "继续",

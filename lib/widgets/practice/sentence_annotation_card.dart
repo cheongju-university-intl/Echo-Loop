@@ -799,61 +799,230 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
 /// 解析内容结构化展示
 ///
 /// 使用 [SentenceAnalysis.parseDisplayString] 将内容按字段分隔符拆分为
-/// grammar / vocabulary / listening 三段，每段带标签标题。
-/// vocabulary 和 listening 字段内按 `\n` 拆分为多条，每条前加 bullet。
+/// grammar / vocabulary / listening 三段。每段带 icon 标题与彩色 IconBox，
+/// 段间以极浅分割线区隔。词汇段采用"词条加粗 + 释义"的字典式排版，
+/// 听力段中的 IPA 音标（如 /tə/）以 monospace chip 形式高亮。
 class _AnalysisContent extends StatelessWidget {
   final String content;
 
   const _AnalysisContent({required this.content});
+
+  /// 匹配文本中的 IPA 音标片段（如 /tə/、/ˈɪŋɡlɪʃ ɪnə ˈmɪnɪt/）
+  ///
+  /// 内容字符集合（CJK 已自然排除）：
+  /// - ASCII 字母（含 ŋ 之前的 g 等）
+  /// - Latin-1 / Latin Extended-A/B（U+00C0–U+024F）：覆盖 æ ð ŋ 等
+  /// - IPA 扩展 + 间隔修饰（U+0250–U+02FF）：覆盖 ɪ ə ʃ ɡ ˈ ˌ ː 等
+  /// - 组合附加符（U+0300–U+036F）
+  /// - 希腊字母（U+0370–U+03FF）：覆盖 θ
+  /// - 空白
+  ///
+  /// 同时要求至少出现一个 IPA 专属字符（U+0250–U+02FF），避免把诸如
+  /// `/中文/` `/hello/` `/path/` 这类普通文本误判为音标。
+  static final _ipaRegex = RegExp(
+    r'/(?=[^/]*[ɐ-˿])[a-zA-ZÀ-ɏɐ-˿̀-ͯͰ-Ͽ\s]{1,40}/',
+  );
+
+  /// "key：value" 拆分
+  ///
+  /// key 中允许英文标点（+ / ( )）和空格，但不允许中文句号/逗号/分号/感叹/问号，
+  /// 避免把长句子的内部冒号误判为 key/value 分隔；同时限制 key 长度 ≤ 80 字符。
+  static final _keyValueRegex = RegExp(
+    r'^\s*([^：:。，；！？]{1,80})[：:](.*)$',
+    dotAll: true,
+  );
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final fields = SentenceAnalysis.parseDisplayString(content);
-    final labels = [l10n.aiGrammar, l10n.aiVocabulary, l10n.aiListening];
 
-    final bodyStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-      height: 1.5,
-    );
+    // 展示顺序：语法 → 听力提示 → 重点词汇
+    // 字段索引固定为 [0=grammar, 1=vocabulary, 2=listening]，由 fieldIndex 关联
+    final sections = <_Section>[
+      _Section(0, l10n.aiGrammar, Icons.menu_book_outlined),
+      _Section(2, l10n.aiListening, Icons.hearing_outlined),
+      _Section(1, l10n.aiVocabulary, Icons.translate_outlined),
+    ];
+
+    // 仅渲染对应字段非空的段落
+    final visible = [
+      for (final s in sections)
+        if (s.fieldIndex < fields.length && fields[s.fieldIndex].trim().isNotEmpty) s,
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < fields.length && i < labels.length; i++) ...[
-          if (i > 0) const SizedBox(height: AppSpacing.s),
-          // 标签标题（primary 色 + w600）
-          Text(
-            labels[i],
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          // grammar（单行）直接展示；vocabulary / listening（多行）加 bullet
-          if (i == 0)
-            Text(fields[i], style: bodyStyle)
-          else
-            ..._buildBulletItems(fields[i], bodyStyle),
+        for (var idx = 0; idx < visible.length; idx++) ...[
+          if (idx > 0) const SizedBox(height: 18),
+          _buildSectionHeader(theme, visible[idx]),
+          const SizedBox(height: 10),
+          _buildSectionBody(theme, fields[visible[idx].fieldIndex]),
         ],
       ],
     );
   }
 
-  /// 将 `\n` 分隔的多条内容渲染为带 bullet 的列表
-  List<Widget> _buildBulletItems(String field, TextStyle? style) {
-    final items = field.split('\n').where((s) => s.trim().isNotEmpty).toList();
-    if (items.length <= 1) {
-      return [Text(field, style: style)];
-    }
-    return [
-      for (final item in items)
-        Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Text('· $item', style: style),
-        ),
-    ];
+  /// 段落标题：IconBox + 中文标签
+  Widget _buildSectionHeader(ThemeData theme, _Section s) {
+    final cs = theme.colorScheme;
+    return Semantics(
+      header: true,
+      label: s.label,
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(s.icon, size: 14, color: cs.primary),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            s.label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
+  /// 段落正文：拆分为多条 bullet（"key：value"），单条无 key 时降级为段落
+  Widget _buildSectionBody(ThemeData theme, String field) {
+    final cs = theme.colorScheme;
+    final body = theme.textTheme.bodySmall?.copyWith(
+      color: cs.onSurfaceVariant,
+      height: 1.55,
+    );
+
+    final items = field.split('\n').where((s) => s.trim().isNotEmpty).toList();
+    // 单条且无 key 时直接展示为段落
+    if (items.length == 1 && !_keyValueRegex.hasMatch(items.first)) {
+      return _richWithIpa(theme, items.first, body);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          _buildBulletItem(theme, items[i], body),
+        ],
+      ],
+    );
+  }
+
+  /// 统一 bullet 条目：▸ + 可选加粗 key + ": " + value（value 含 IPA chip）
+  Widget _buildBulletItem(ThemeData theme, String raw, TextStyle? body) {
+    final cs = theme.colorScheme;
+    final m = _keyValueRegex.firstMatch(raw);
+    final key = m?.group(1)?.trim();
+    final value = m?.group(2)?.trim();
+
+    final bullet = Padding(
+      padding: const EdgeInsets.only(top: 2, right: 8),
+      child: Text(
+        '▸',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: cs.primary,
+          height: 1,
+        ),
+      ),
+    );
+
+    final Widget content;
+    if (key == null || value == null || value.isEmpty) {
+      // 无 key:value 结构，整行作为 value
+      content = _richWithIpa(theme, raw, body);
+    } else {
+      final keyStyle = body?.copyWith(
+        color: cs.onSurface,
+        fontWeight: FontWeight.w600,
+      );
+      content = Text.rich(
+        TextSpan(
+          style: body,
+          children: [
+            TextSpan(text: key, style: keyStyle),
+            const TextSpan(text: '：'),
+            ..._ipaSpans(theme, value, body),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [bullet, Expanded(child: content)],
+    );
+  }
+
+  /// 将文本中的 /xxx/ IPA 音标拆分为普通 TextSpan + chip WidgetSpan
+  List<InlineSpan> _ipaSpans(ThemeData theme, String text, TextStyle? body) {
+    final cs = theme.colorScheme;
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final m in _ipaRegex.allMatches(text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: text.substring(last, m.start)));
+      }
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: cs.primaryContainer.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            m.group(0)!,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontFamilyFallback: const ['Menlo', 'Courier'],
+              fontSize: 11,
+              color: cs.onPrimaryContainer,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ));
+      last = m.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last)));
+    }
+    return spans;
+  }
+
+  /// 整段文本（含 IPA chip）渲染为 Text.rich
+  Widget _richWithIpa(ThemeData theme, String text, TextStyle? body) {
+    return Text.rich(
+      TextSpan(style: body, children: _ipaSpans(theme, text, body)),
+    );
+  }
+}
+
+/// 解析卡片三段类型
+/// 解析卡片段落定义
+class _Section {
+  /// 对应 [SentenceAnalysis.parseDisplayString] 返回数组的索引
+  /// (0=grammar, 1=vocabulary, 2=listening)
+  final int fieldIndex;
+
+  /// 段落标题（如"语法"）
+  final String label;
+
+  /// 段落 icon
+  final IconData icon;
+
+  const _Section(this.fieldIndex, this.label, this.icon);
 }

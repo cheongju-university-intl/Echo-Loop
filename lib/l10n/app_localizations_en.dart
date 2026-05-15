@@ -797,7 +797,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiGrammar => 'Grammar';
 
   @override
-  String get aiVocabulary => 'Vocabulary';
+  String get aiVocabulary => 'Key Vocabulary';
 
   @override
   String get aiListening => 'Listening';

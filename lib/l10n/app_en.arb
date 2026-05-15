@@ -386,7 +386,7 @@
   "aiAnalysisFailed": "Analysis failed, please retry",
   "aiRetry": "Retry",
   "aiGrammar": "Grammar",
-  "aiVocabulary": "Vocabulary",
+  "aiVocabulary": "Key Vocabulary",
   "aiListening": "Listening",
   "intensiveListenWordDictNotFound": "Word not found in dictionary",
   "intensiveListenContinue": "Continue",

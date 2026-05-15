@@ -1553,7 +1553,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiVocabulary.
   ///
   /// In en, this message translates to:
-  /// **'Vocabulary'**
+  /// **'Key Vocabulary'**
   String get aiVocabulary;
 
   /// No description provided for @aiListening.
