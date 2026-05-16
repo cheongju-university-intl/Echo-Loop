@@ -1391,7 +1391,7 @@
   "guidePlanPauseLearningTitle": "Pause learning",
   "guidePlanPauseLearningDescription": "If you no longer want to study this audio, tap here to pause anytime. Review reminders will stop, and you can resume with one tap later.",
   "guideRetellSkipTitle": "Skip this retell",
-  "guideRetellSkipDescription": "If it is not a good time to speak out loud, tap here to skip this retell. You can always practice it later in Free Practice.",
+  "guideRetellSkipDescription": "Retelling builds speaking fast; if you want to focus on listening for now, tap here to skip this retell.",
   "learningProgressLoadFailed": "Failed to load learning progress. Please try again later.",
   "guideMainShellVisitLibraryTitle": "Start from Library",
   "guideMainShellVisitLibraryDescription": "Tap here to learn how to use this app.",

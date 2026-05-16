@@ -2533,8 +2533,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get guideRetellSkipTitle => '跳过本次复述';
 
   @override
-  String get guideRetellSkipDescription =>
-      '如果暂时不方便开口说话，可以点这里跳过本次复述。之后可以随时在自由练习中补练。';
+  String get guideRetellSkipDescription => '复述能快速提升口语；如果当前更想专注练听力，可以点这里跳过本次复述。';
 
   @override
   String get learningProgressLoadFailed => '学习进度加载失败，请稍后重试';

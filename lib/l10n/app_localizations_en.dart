@@ -2613,7 +2613,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guideRetellSkipDescription =>
-      'If it is not a good time to speak out loud, tap here to skip this retell. You can always practice it later in Free Practice.';
+      'Retelling builds speaking fast; if you want to focus on listening for now, tap here to skip this retell.';
 
   @override
   String get learningProgressLoadFailed =>
