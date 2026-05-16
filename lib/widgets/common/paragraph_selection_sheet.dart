@@ -327,10 +327,13 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
   }
 
   /// 底部按钮区：
-  /// - onSkip == null：原"开始练习"满宽路径（盲听弹窗等共用组件不受影响）
-  /// - onSkip != null：左侧 OutlinedButton「跳过」(flex:1) + 右侧 FilledButton「开始练习」(flex:2)
+  /// - onSkip == null：「开始练习」满宽 FilledButton（盲听弹窗等共用组件）
+  /// - onSkip != null：左侧灰底 FilledButton.tonal「跳过」(flex:1) +
+  ///   右侧 FilledButton「开始练习」(flex:2)，与学习计划页「暂停 / 继续」
+  ///   按钮组同款配色（surfaceContainerHighest 灰底 + onSurfaceVariant 前景）。
   Widget _buildActionButtons(BuildContext context, AppLocalizations l10n) {
-    final startButton = FilledButton.icon(
+    final theme = Theme.of(context);
+    final startButton = FilledButton(
       onPressed: () {
         Navigator.of(context).pop();
         final duration = _targetSeconds < 0
@@ -338,8 +341,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
             : Duration(seconds: _targetSeconds);
         widget.onStartPractice(duration, _pauseMultiplier);
       },
-      icon: const Icon(Icons.play_arrow),
-      label: Text(l10n.startPractice),
+      child: Text(l10n.startPractice),
     );
 
     final skipLabel = widget.skipLabel;
@@ -352,12 +354,20 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
       children: [
         Expanded(
           flex: 1,
-          child: OutlinedButton(
+          child: FilledButton.tonal(
             onPressed: () {
               Navigator.of(context).pop();
               onSkip();
             },
-            child: Text(skipLabel),
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              foregroundColor: theme.colorScheme.onSurfaceVariant,
+            ),
+            child: Text(
+              skipLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
         const SizedBox(width: AppSpacing.m),

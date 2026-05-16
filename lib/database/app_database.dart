@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -5,6 +6,9 @@ import 'package:drift/native.dart';
 import '../utils/app_data_dir.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'enums.dart' show LearningStage;
+import '../services/app_logger.dart';
 
 import 'tables/audio_items.dart';
 import 'tables/collections.dart';
@@ -443,31 +447,174 @@ class AppDatabase extends _$AppDatabase {
             'INTEGER NOT NULL DEFAULT 0',
           );
         }
-        // v33→v34：learning_progresses 新增 review0_plan_version 列
-        // 1 = 旧版（难句补练 + 段落复述），2 = 新版（难句补练 + 全文盲听）。
-        // 默认 2；把 currentStage 已进入 review1+ 的行回填为 1，
-        // 保留这些用户的 review0 历史 UI 与旧 plan 一致。
+        // v33→v34：learning_progresses 新增 plan_versions_json 列。
+        // 统一存所有 LearningStage 的 plan 版本（dense JSON map）。
+        //
+        // 规则：每条 audio baseline 全 v1（保留老体验），对每个 review
+        // stage 检查 stage_completions 表是否有该 stage 的任何完成记录：
+        // **无记录 → 升级到 v2**（用户还没碰过这一轮，给新版体验）。
+        // firstLearn 永远 v1（暂无变体）。
         if (from < 34) {
           await _addColumnIfNotExists(
             'learning_progresses',
-            'review0_plan_version',
-            'INTEGER NOT NULL DEFAULT 2',
+            'plan_versions_json',
+            "TEXT NOT NULL DEFAULT '{}'",
           );
-          // 仅在表存在时回填（v28 fixture 直跳的路径下 _addColumnIfNotExists
-          // 会因为 learning_progresses 缺表跳过，UPDATE 也必须同样守卫）。
-          final exists = await customSelect(
+          final tableExists = await customSelect(
             "SELECT COUNT(*) AS cnt FROM sqlite_master "
             "WHERE type='table' AND name = 'learning_progresses'",
           ).getSingle();
-          if ((exists.data['cnt'] as int) > 0) {
-            await customStatement(
-              "UPDATE learning_progresses SET review0_plan_version = 1 "
-              "WHERE current_stage IN ('review1','review2','review4',"
-              "'review7','review14','review28','completed')",
-            );
+          if ((tableExists.data['cnt'] as int) > 0) {
+            await _migrateToPlanVersionsJson();
           }
         }
       },
+    );
+  }
+
+  /// v33→v34 迁移内核：把每条 audio 的 plan 版本翻译进 `plan_versions_json` 列，
+  /// 并修正 v1 → v2 切换时被设错位的 `current_sub_stage`。
+  ///
+  /// 规则：
+  /// 1. plan_versions：每个 audio baseline 全 v1；review stage 若**无 completion** → v2
+  /// 2. current_sub_stage snap：若 `current_stage` 是 review1-28 且正升 v2（无 completion）
+  ///    且 `current_sub_stage` 不是 `reviewDifficultPractice`（v2 plan first），
+  ///    snap 到 `reviewDifficultPractice`。
+  ///    原因：v1 时代 `current_sub_stage` 在跨阶段被设为 v1 plan first = `blindListen`；
+  ///    升 v2 后 `blindListen` 变成 v2 plan 第二项 → 用户像「跳过了第一步」。
+  ///    review0 不需要 snap（v1/v2 plan first 同为 `reviewDifficultPractice`）。
+  Future<void> _migrateToPlanVersionsJson() async {
+    // 1. 拉所有 audio 进度（id + currentStage + currentSubStage）
+    final progresses = await customSelect(
+      "SELECT audio_item_id, current_stage, current_sub_stage "
+      "FROM learning_progresses",
+    ).get();
+    if (progresses.isEmpty) {
+      AppLogger.log('DB.migrate', 'v33→v34 plan_versions_json: no rows, skip');
+      return;
+    }
+    AppLogger.log(
+      'DB.migrate',
+      'v33→v34 plan_versions_json: start, audio count = ${progresses.length}',
+    );
+
+    // 2. 预查每条 audio 在 review0-28 各阶段是否有任何 completion
+    //    stage_completions 表可能不存在（某些老 fixture 升级路径），守一下
+    final touchedStages = <String, Set<String>>{};
+    final scExists = await customSelect(
+      "SELECT COUNT(*) AS cnt FROM sqlite_master "
+      "WHERE type='table' AND name = 'stage_completions'",
+    ).getSingle();
+    if ((scExists.data['cnt'] as int) > 0) {
+      final rows = await customSelect(
+        "SELECT DISTINCT audio_item_id, stage FROM stage_completions "
+        "WHERE stage IN ('review0','review1','review2','review4',"
+        "'review7','review14','review28')",
+      ).get();
+      for (final row in rows) {
+        final audioId = row.data['audio_item_id'] as String;
+        final stage = row.data['stage'] as String;
+        touchedStages
+            .putIfAbsent(audioId, () => <String>{})
+            .add(stage);
+      }
+      AppLogger.log(
+        'DB.migrate',
+        'v33→v34: touchedStages 聚合完成，涉及 audio 数 = ${touchedStages.length}',
+      );
+    } else {
+      AppLogger.log('DB.migrate', 'v33→v34: stage_completions 表不存在，跳过启发式');
+    }
+
+    // 3. 对每条 audio 计算最终 map 并写回
+    const reviewStageKeys = [
+      'review0',
+      'review1',
+      'review2',
+      'review4',
+      'review7',
+      'review14',
+      'review28',
+    ];
+    var lockedV1Count = 0;
+    var allV2Count = 0;
+    var subStageSnappedCount = 0;
+    // review1-28 升 v2 后 plan first 固定是 reviewDifficultPractice。
+    // review0 v1/v2 plan first 都是 reviewDifficultPractice，无需 snap。
+    const v2SnapTargetForReview1Plus = 'reviewDifficultPractice';
+    const snapApplicableStages = {
+      'review1',
+      'review2',
+      'review4',
+      'review7',
+      'review14',
+      'review28',
+    };
+    for (final p in progresses) {
+      final audioId = p.data['audio_item_id'] as String;
+      final currentStage = p.data['current_stage'] as String;
+      final currentSubStage = p.data['current_sub_stage'] as String;
+      // baseline：现存 audio 全 v1（保留老体验）
+      final map = <String, int>{
+        for (final s in LearningStage.values)
+          if (s != LearningStage.completed) s.key: 1,
+      };
+      // 未碰过的 review stage 升级到 v2
+      final touched = touchedStages[audioId] ?? const <String>{};
+      for (final stageKey in reviewStageKeys) {
+        if (!touched.contains(stageKey)) {
+          map[stageKey] = 2;
+        }
+      }
+      if (touched.isEmpty) {
+        allV2Count++;
+      } else {
+        lockedV1Count++;
+      }
+      final lockedStages = map.entries
+          .where((e) => e.value == 1 && e.key != 'firstLearn')
+          .map((e) => e.key)
+          .toList();
+
+      // 修正 current_sub_stage：当前 stage 是 review1-28 且正升 v2 + 不在 v2 first
+      String? newSubStage;
+      if (snapApplicableStages.contains(currentStage) &&
+          !touched.contains(currentStage) &&
+          currentSubStage != v2SnapTargetForReview1Plus) {
+        newSubStage = v2SnapTargetForReview1Plus;
+        subStageSnappedCount++;
+        AppLogger.log(
+          'DB.migrate',
+          'v33→v34 audio=$audioId snap current_sub_stage '
+              '$currentStage:$currentSubStage → $currentStage:$newSubStage '
+              '(stage 升 v2，currentSubStage 是 v1 plan 残留)',
+        );
+      }
+
+      AppLogger.log(
+        'DB.migrate',
+        'v33→v34 audio=$audioId touched=${touched.toList()} '
+            'lockedV1=$lockedStages',
+      );
+      if (newSubStage != null) {
+        await customStatement(
+          "UPDATE learning_progresses "
+          "SET plan_versions_json = ?, current_sub_stage = ? "
+          "WHERE audio_item_id = ?",
+          [jsonEncode(map), newSubStage, audioId],
+        );
+      } else {
+        await customStatement(
+          "UPDATE learning_progresses SET plan_versions_json = ? "
+          "WHERE audio_item_id = ?",
+          [jsonEncode(map), audioId],
+        );
+      }
+    }
+    AppLogger.log(
+      'DB.migrate',
+      'v33→v34 done. 全 v2 (未碰过任何 review) = $allV2Count, '
+          '部分锁 v1 = $lockedV1Count, current_sub_stage snap = $subStageSnappedCount',
     );
   }
 

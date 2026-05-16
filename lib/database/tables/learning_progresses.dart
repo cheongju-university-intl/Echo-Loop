@@ -103,19 +103,27 @@ class LearningProgresses extends Table {
   /// 是否暂停学习（true 表示该音频不参与复习调度，可由用户随时恢复）
   BoolColumn get isPaused => boolean().withDefault(const Constant(false))();
 
-  /// 首轮复习（review0）计划版本
+  /// 每个 [LearningStage] 的 plan 版本快照（dense map，JSON 存储）。
   ///
-  /// 1 = 旧版（难句补练 + 段落复述）
-  /// 2 = 新版（难句补练 + 全文盲听）
+  /// 格式：JSON object，key = `LearningStage.key`，value = 整数版本号。例：
+  /// `{"firstLearn":1,"review0":2,"review1":2,...,"review28":2}`
   ///
-  /// 写入时机：新建 progress 时按当前代码默认 2；v33→v34 迁移把所有
-  /// `currentStage` 已进入 review1+ 的行回填为 1（这些用户已经按旧 plan
-  /// 完成 review0，保留历史 UI）。
+  /// **不包含 `completed`**：completed 是毕业终态标记、无 plan，不参与版本系统。
   ///
-  /// 真实子步骤列表由 `LearningPlan.standard(review0PlanVersion: ...)` 派生，
-  /// `LearningStage.review0.allSubStages` 仅作为 v1 ∪ v2 的展示并集。
-  IntColumn get review0PlanVersion =>
-      integer().withDefault(const Constant(2))();
+  /// **写入规则**：snapshot-per-entity 模式。仅在创建 progress / 迁移时
+  /// 由系统 stamp。日常用户操作（完成 / 跳过 substep、暂停等）**都不修改**
+  /// 此字段。区别于 `stage_completions`（持续累加）。
+  /// 如未来需要让存量 audio 升级到新版，需写显式迁移修改本字段。
+  ///
+  /// 写入时机：
+  /// - 新建 progress：stamp `kLatestPlanVersions`
+  /// - v33→v34 迁移：每条 audio baseline 全 v1 + 按 stage 是否有 completion 判定：
+  ///   该 stage 在 `stage_completions` 表里**无任何记录** → 升级到 v2
+  ///   （未碰过的轮次用新版；碰过的轮次锁旧版保留体验）
+  ///
+  /// 派生函数：`LearningPlan.standard(stagePlanVersions: ...)`。
+  TextColumn get planVersionsJson =>
+      text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column> get primaryKey => {audioItemId};

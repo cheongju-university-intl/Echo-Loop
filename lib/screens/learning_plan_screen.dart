@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 import '../database/enums.dart';
 import '../models/audio_item.dart';
+import '../models/learning_plan.dart';
 import '../models/learning_progress.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/audio_library_provider.dart';
@@ -732,6 +733,12 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
         );
       },
+      // 按计划学习路径才显示「跳过」按钮；自由练习路径无此回调
+      onSkip: () async {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .skipCurrentSubStage(widget.audioItemId);
+      },
     );
   }
 
@@ -1308,15 +1315,14 @@ class _FirstStudySection extends ConsumerWidget {
       ),
     };
 
-    // 学习计划页 iterate 全量子步骤；plan 静态后 inPlan 永远 true，但保留
-    // 三态判定语义：completed / userSkipped / planned 都显示，其它跳过。
-    final subStages = firstLearnStage.allSubStages.where((s) {
-      final inPlan = plan.includes(firstLearnStage, s);
-      final isDone = completedKeys.contains('${firstLearnStage.key}:${s.key}');
-      final isSkipped =
-          progress?.isSubStageSkipped(firstLearnStage, s) ?? false;
-      return inPlan || isDone || isSkipped;
-    }).toList(growable: false);
+    // 迭代顺序 = 当前 plan 顺序 + 历史外延项（已完成或已跳过但不在当前 plan 内）。
+    // firstLearn 没有 plan 变体，但 helper 统一处理便于复用。
+    final subStages = _orderedSubStagesForDisplay(
+      plan: plan,
+      stage: firstLearnStage,
+      completedKeys: completedKeys,
+      skippedKeys: progress?.skippedSubStageKeys ?? const {},
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2242,15 +2248,15 @@ class _ReviewRoundSection extends ConsumerWidget {
     final completedKeys = ref
         .watch(learningProgressNotifierProvider)
         .completionsFor(audioItemId);
-    // iterate 全量；plan 按 audio.review0PlanVersion 派生（v1 含段落复述、
-    // v2 含全文盲听）；三态判定：completed / userSkipped / planned 都显示，
-    // 其它跳过。
-    final subStages = review.stage.allSubStages.where((s) {
-      final inPlan = plan.includes(review.stage, s);
-      final isDone = completedKeys.contains('${review.stage.key}:${s.key}');
-      final isSkipped = progress?.isSubStageSkipped(review.stage, s) ?? false;
-      return inPlan || isDone || isSkipped;
-    }).toList(growable: false);
+    // 迭代顺序 = 当前 plan 顺序 + 历史外延项（已完成 / 已跳过但不在当前 plan 内）。
+    // 例如 review28 v1 用户完成了 reviewRetellSummary 后切到 v2 不会发生（v1 用户
+    // 该 stage 有 completion 仍走 v1 plan），但 helper 防御性兜底。
+    final subStages = _orderedSubStagesForDisplay(
+      plan: plan,
+      stage: review.stage,
+      completedKeys: completedKeys,
+      skippedKeys: progress?.skippedSubStageKeys ?? const {},
+    );
     final completedCount = _completedSubStageCount(completedKeys);
     final timingText =
         _reviewTimingText(context, completedKeys: completedKeys);
@@ -2680,6 +2686,32 @@ class _BottomButton extends ConsumerWidget {
         : startButton;
     return _wrap(context, SizedBox(width: double.infinity, child: guidedStart));
   }
+}
+
+/// 学习计划页子步骤显示顺序：当前 plan 顺序在前，历史外延项在后。
+///
+/// - [plan]：按 audio 版本派生的 plan（v1/v2）
+/// - [stage]：当前渲染的大阶段
+/// - [completedKeys]：该 audio 的 stage_completions 集合
+/// - [skippedKeys]：该 audio 的用户跳过集合
+///
+/// 历史外延项 = `stage.allSubStages` ∖ plan，且属于 completed 或 skipped。
+/// 用于保留 v1 已完成但 v2 已移除项（如 review28 v1→v2 中的 reviewRetellSummary）
+/// 的 ✅ 历史显示。当用户走 v1 plan（该 stage 有 completion）时，
+/// extras 通常为空（plan 已含历史项）。
+List<SubStageType> _orderedSubStagesForDisplay({
+  required LearningPlan plan,
+  required LearningStage stage,
+  required Set<String> completedKeys,
+  required Set<String> skippedKeys,
+}) {
+  final planned = plan.subStagesFor(stage);
+  final extras = stage.allSubStages.where((s) {
+    if (planned.contains(s)) return false;
+    final key = '${stage.key}:${s.key}';
+    return completedKeys.contains(key) || skippedKeys.contains(key);
+  }).toList(growable: false);
+  return [...planned, ...extras];
 }
 
 /// 难度等级本地化名称

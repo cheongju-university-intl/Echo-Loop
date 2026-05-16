@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -133,11 +134,8 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   ///   2. 把 `isLoading` 重置为 false，避免永久卡在加载态；
   ///   3. rethrow，让上层调用方（有 BuildContext）负责给用户反馈（snackbar 等）。
   ///
-  /// 加载后串行执行两个补扫：
-  /// 1. [_reconcileStaleSubStage]：修正 currentSubStage 不在当前 plan 内的
-  ///    历史进度（v2 plan 下 review0 中途 = reviewRetellParagraph 的 stale 状态）。
-  /// 2. `autoSkipRetell` 开启时跑 [_autoSkipScanAllProgress]，把停在复述位置
-  ///    的进度推进。两者互为正交：先 reconcile 把位置归一到 plan 内，再做跳过。
+  /// 加载后若 `autoSkipRetell` 已开启，跑 [_autoSkipScanAllProgress] 把停在
+  /// 复述位置的进度推进。
   Future<void> loadAll() async {
     state = state.copyWith(isLoading: true);
     try {
@@ -161,91 +159,10 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       rethrow;
     }
 
-    // 计划变体迁移补扫：review0 v1→v2 的中途音频可能 currentSubStage
-    // 仍指向旧 plan 的 reviewRetellParagraph，需修正为新 plan 内首个未完成项。
-    await _reconcileStaleSubStage();
-
     // 启动期自动跳过补扫：若 autoSkipRetell 已开启，把停在复述位置的进度推进。
     final settings = ref.read(learningSettingsProvider);
     if (settings.autoSkipRetell) {
       await _autoSkipScanAllProgress();
-    }
-  }
-
-  /// 测试入口：直接触发 [_reconcileStaleSubStage]，跳过 loadAll 的 DAO 读取。
-  @visibleForTesting
-  Future<void> debugReconcileStaleSubStage() => _reconcileStaleSubStage();
-
-  /// 修正 currentSubStage 不在当前 plan 内的进度。
-  ///
-  /// 触发场景：review0 计划版本变更后，原本卡在 reviewRetellParagraph
-  /// 的 v2 音频（migration 保留为 v2）需要切到新 plan 内的位置。
-  ///
-  /// 策略：plan 内首个未完成项 → 设为新 currentSubStage；plan 内全部已完成 →
-  /// 调 [completeCurrentSubStage] 复用阶段推进逻辑（写 completion 并跨阶段）。
-  ///
-  /// 写入路径走 [_persistProgress]，与日常推进一致，不产生新 stage_completions
-  /// 记录（除非走 completeCurrentSubStage 分支）。
-  Future<void> _reconcileStaleSubStage() async {
-    final ids = state.progressMap.keys.toList(growable: false);
-    for (final id in ids) {
-      try {
-        final p = state.progressMap[id];
-        if (p == null || p.isCompleted) continue;
-        final plan = _planFor(p);
-        final planned = plan.subStagesFor(p.currentStage);
-        if (planned.isEmpty) continue;
-        if (planned.contains(p.currentSubStage)) continue;
-
-        // currentSubStage 不在 plan 内 → 找 plan 内首个未完成项
-        final completed = state.completionsByAudio[id] ?? const <String>{};
-        SubStageType? firstUndone;
-        for (final sub in planned) {
-          if (!completed.contains('${p.currentStage.key}:${sub.key}')) {
-            firstUndone = sub;
-            break;
-          }
-        }
-
-        if (firstUndone != null) {
-          final now = DateTime.now();
-          final updated = p.copyWith(
-            currentSubStage: firstUndone,
-            currentStageStartedAt: now,
-            updatedAt: now,
-          );
-          await _persistProgress(updated);
-          final newMap = Map<String, LearningProgress>.from(state.progressMap);
-          newMap[id] = updated;
-          state = state.copyWith(progressMap: newMap);
-          AppLogger.log(
-            'LearningProgress',
-            'reconcile $id: ${p.currentStage.key}:${p.currentSubStage.key} '
-                '-> ${p.currentStage.key}:${firstUndone.key}',
-          );
-        } else {
-          // plan 内全部已完成 → 当前位置作为 anchor 调 completeCurrentSubStage
-          // 写入历史并跨阶段（避免阶段卡死）。先把 currentSubStage 设为 plan
-          // 末项，让 completeCurrentSubStage 走「跨阶段」分支。
-          final now = DateTime.now();
-          final anchored = p.copyWith(
-            currentSubStage: planned.last,
-            currentStageStartedAt: now,
-            updatedAt: now,
-          );
-          await _persistProgress(anchored);
-          final newMap = Map<String, LearningProgress>.from(state.progressMap);
-          newMap[id] = anchored;
-          state = state.copyWith(progressMap: newMap);
-          await completeCurrentSubStage(id);
-          AppLogger.log(
-            'LearningProgress',
-            'reconcile $id: plan all done at ${p.currentStage.key}, advanced stage',
-          );
-        }
-      } catch (e) {
-        AppLogger.log('LearningProgress', 'reconcile failed for $id: $e');
-      }
     }
   }
 
@@ -300,10 +217,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     // 持久化时间始终用真实时间
     final now = DateTime.now();
+    // 新建 progress 时 stamp kLatestPlanVersions（dense baseline）→
+    // 该 audio 的 plan 版本被永久锁定。未来 v3 上线时存量自动保留旧版本。
     final progress = LearningProgress(
       audioItemId: audioItemId,
       currentStageStartedAt: now,
       updatedAt: now,
+      planVersionsByStage: Map.unmodifiable(kLatestPlanVersions),
     );
 
     await dao.upsert(
@@ -317,7 +237,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         currentStageStartedAt: Value(now),
         totalStudyDurationMs: const Value(0),
         updatedAt: Value(now),
+        planVersionsJson: Value(_encodePlanVersions(progress.planVersionsByStage)),
       ),
+    );
+    AppLogger.log(
+      'LearningProgress',
+      'ensureProgress: new audio=$audioItemId stamped planVersions='
+          '${_encodePlanVersions(progress.planVersionsByStage)}',
     );
 
     final newMap = Map<String, LearningProgress>.from(state.progressMap);
@@ -329,7 +255,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
   /// 完成当前子步骤，自动推进到下一步
   ///
-  /// 通过 [learningPlanForAudioProvider] 按 audio 的 `review0PlanVersion`
+  /// 通过 [learningPlanForAudioProvider] 按 audio 的 `planVersionsByStage`
   /// 读取计划：以 `plan.subStagesFor(stage)` 为推进序列。同阶段内推进 →
   /// planned 列表下一项；推进到下一大阶段时跳过 planned 为空的阶段。
   ///
@@ -442,6 +368,14 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     }
 
     await _persistProgress(updated);
+
+    AppLogger.log(
+      'LearningProgress',
+      'completeCurrentSubStage audio=$audioItemId '
+          'from=${stage.key}:${progress.currentSubStage.key} → '
+          'to=${updated.currentStage.key}:${updated.currentSubStage.key} '
+          '(advancedToNextStage=$advancedToNextStage)',
+    );
 
     // 埋点：阶段推进（最后一个子步骤完成时触发）
     if (advancedToNextStage) {
@@ -984,7 +918,8 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         updatedAt: Value(progress.updatedAt),
         skippedSubStages: Value(_encodeSkippedKeys(progress.skippedSubStageKeys)),
         isPaused: Value(progress.isPaused),
-        review0PlanVersion: Value(progress.review0PlanVersion),
+        planVersionsJson:
+            Value(_encodePlanVersions(progress.planVersionsByStage)),
       ),
     );
   }
@@ -993,7 +928,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   /// 的循环依赖（family 内部 watch notifier state 会触发循环错误）。
   /// UI 侧仍走 [learningPlanForAudioProvider]。
   LearningPlan _planFor(LearningProgress progress) =>
-      LearningPlan.standard(review0PlanVersion: progress.review0PlanVersion);
+      LearningPlan.standard(stagePlanVersions: progress.planVersionsByStage);
 
   /// 序列化跳过集合：以 ',' 拼接；空集合 → 空字符串。
   static String _encodeSkippedKeys(Set<String> keys) =>
@@ -1003,6 +938,43 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   static Set<String> _decodeSkippedKeys(String raw) {
     if (raw.isEmpty) return const {};
     return raw.split(',').where((e) => e.isNotEmpty).toSet();
+  }
+
+  /// 序列化 plan 版本 map：JSON object，key=stage.key、value=版本号。
+  static String _encodePlanVersions(Map<LearningStage, int> map) =>
+      jsonEncode({for (final e in map.entries) e.key.key: e.value});
+
+  /// 反序列化 plan 版本 map；兼容空字符串 / `{}` / 损坏 JSON。
+  ///
+  /// 忽略：(a) 未知 stage key；(b) `completed` 这一项（completed 没有 plan，
+  /// 历史 baseline 可能误存 `"completed":1`，下次 persist 时自然清理）。
+  ///
+  /// 损坏 JSON 会记日志（避免静默重置 snapshot），返回空 map 让上层走兜底。
+  static Map<LearningStage, int> _decodePlanVersions(String raw) {
+    if (raw.isEmpty || raw == '{}') return const {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        AppLogger.log('LearningProgress',
+            'planVersionsJson decode: non-object value, ignoring: $raw');
+        return const {};
+      }
+      final stageByKey = {
+        for (final s in LearningStage.values) s.key: s,
+      };
+      final result = <LearningStage, int>{};
+      decoded.forEach((k, v) {
+        if (k is! String || v is! int) return;
+        final stage = stageByKey[k];
+        if (stage == null || stage == LearningStage.completed) return;
+        result[stage] = v;
+      });
+      return result;
+    } catch (e) {
+      AppLogger.log('LearningProgress',
+          'planVersionsJson decode failed: $e, raw=$raw');
+      return const {};
+    }
   }
 
   /// 从数据库行转换为模型
@@ -1044,21 +1016,22 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       updatedAt: row.updatedAt,
       skippedSubStageKeys: _decodeSkippedKeys(row.skippedSubStages),
       isPaused: row.isPaused,
-      review0PlanVersion: row.review0PlanVersion,
+      planVersionsByStage: _decodePlanVersions(row.planVersionsJson),
     );
   }
 
   /// 复习阶段兼容旧子步骤键，避免枚举扩展后旧数据无法推进。
   ///
-  /// 兼容规则：
-  /// - 首次学习阶段：保留原有子步骤；
-  /// - review0：blindListen（v2 计划合法项）与难句补练 / 段落复述（v1 合法项）
-  ///   原样保留；旧 listenAndRepeat / retell / reviewRetellSummary 归一到段落复述；
-  /// - 中间轮：旧 listenAndRepeat -> 难句补练，旧 retell -> 段落复述；
-  /// - 末轮 review28：旧 retell -> 全文复述。
+  /// 兼容规则：把数据库里的 raw key 归一为该 stage 在 v1 / v2 plan 中**合法**
+  /// 的 substage（v1 ∪ v2 并集，与 `LearningStage.allSubStages` 一致）。
+  /// 已合法的项原样保留；旧版废弃 key（如 `retell` / `listenAndRepeat`）映射
+  /// 到该阶段最相近的合法项。
   ///
-  /// 注意：review0 内 currentSubStage = `reviewRetellParagraph` 但 plan 为 v2
-  /// 的 stale 状态由 `_reconcileStaleSubStage` 修正，不在本函数处理。
+  /// - firstLearn / completed：保留原有子步骤
+  /// - review0：合法 = {difficult, blindListen, reviewRetellParagraph}
+  /// - review1-14：合法 = {blindListen, difficult, reviewRetellParagraph}
+  /// - review28：合法 = {blindListen, difficult, reviewRetellSummary,
+  ///   reviewRetellParagraph}（v1 用 summary，v2 用 paragraph）
   @visibleForTesting
   SubStageType normalizeSubStageForStageForTest({
     required LearningStage stage,
@@ -1077,11 +1050,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     if (stage == LearningStage.review0) {
       return switch (raw) {
+        // 合法项原样保留
         SubStageType.reviewDifficultPractice =>
           SubStageType.reviewDifficultPractice,
         SubStageType.blindListen => SubStageType.blindListen,
         SubStageType.reviewRetellParagraph =>
           SubStageType.reviewRetellParagraph,
+        // 废弃 key：映射到段落复述（v1 合法项）
         SubStageType.reviewRetellSummary => SubStageType.reviewRetellParagraph,
         SubStageType.retell => SubStageType.reviewRetellParagraph,
         _ => SubStageType.reviewDifficultPractice,
@@ -1090,20 +1065,28 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     if (stage == LearningStage.review28) {
       return switch (raw) {
+        // 合法项原样保留：summary（v1）+ paragraph（v2）+ blindListen + difficult
         SubStageType.reviewDifficultPractice =>
           SubStageType.reviewDifficultPractice,
+        SubStageType.blindListen => SubStageType.blindListen,
         SubStageType.reviewRetellSummary => SubStageType.reviewRetellSummary,
-        SubStageType.reviewRetellParagraph => SubStageType.reviewRetellSummary,
+        SubStageType.reviewRetellParagraph =>
+          SubStageType.reviewRetellParagraph,
+        // 废弃 key
         SubStageType.listenAndRepeat => SubStageType.reviewDifficultPractice,
-        SubStageType.retell => SubStageType.reviewRetellSummary,
+        SubStageType.retell => SubStageType.reviewRetellParagraph,
         _ => SubStageType.blindListen,
       };
     }
 
+    // review1 / review2 / review4 / review7 / review14
     return switch (raw) {
+      // 合法项原样保留：blindListen + difficult + paragraph
+      SubStageType.blindListen => SubStageType.blindListen,
       SubStageType.reviewDifficultPractice =>
         SubStageType.reviewDifficultPractice,
       SubStageType.reviewRetellParagraph => SubStageType.reviewRetellParagraph,
+      // 废弃 key
       SubStageType.reviewRetellSummary => SubStageType.reviewRetellParagraph,
       SubStageType.listenAndRepeat => SubStageType.reviewDifficultPractice,
       SubStageType.retell => SubStageType.reviewRetellParagraph,

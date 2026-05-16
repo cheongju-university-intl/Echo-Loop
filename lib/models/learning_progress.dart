@@ -96,13 +96,21 @@ class LearningProgress {
   /// 进度数据完整保留，恢复时按 [nextReviewAt] 原地继续。
   final bool isPaused;
 
-  /// 首轮复习（review0）计划版本：1 = 旧版（难句补练 + 段落复述），
-  /// 2 = 新版（难句补练 + 全文盲听）。
+  /// 每个 [LearningStage] 的 plan 版本快照（dense map，snapshot-per-entity）。
   ///
-  /// 新建 progress 默认 2；DB 迁移把 `currentStage` 已进入 review1+
-  /// 的行回填为 1，保留这些用户的 review0 历史 UI 与旧 plan 一致。
-  /// 真实子步骤列表由 `LearningPlan.standard(review0PlanVersion: ...)` 派生。
-  final int review0PlanVersion;
+  /// **写入规则**：仅在创建 progress / 迁移时由系统 stamp。日常用户操作
+  /// （完成 / 跳过 substep、暂停等）**都不修改**此字段。如未来需要让存量
+  /// audio 也升级到新版本，需写显式迁移。
+  ///
+  /// 新建 progress 时 stamp [kLatestPlanVersions]（dense baseline）；
+  /// 既有 audio 在 v33→v34 迁移时按规则回填：baseline 全 v1，未碰过的
+  /// review stage（无 stage_completion 记录）升级到 v2。
+  ///
+  /// 默认 `const {}` 仅用于老测试 / fixture 占位；正常路径下 ensureProgress
+  /// 会 stamp [kLatestPlanVersions]。读取用 [planVersionFor] 兜底确保安全。
+  ///
+  /// 真实子步骤列表由 `LearningPlan.standard(stagePlanVersions: ...)` 派生。
+  final Map<LearningStage, int> planVersionsByStage;
 
   const LearningProgress({
     required this.audioItemId,
@@ -133,8 +141,15 @@ class LearningProgress {
     required this.updatedAt,
     this.skippedSubStageKeys = const {},
     this.isPaused = false,
-    this.review0PlanVersion = 2,
+    this.planVersionsByStage = const {},
   });
+
+  /// 取指定 stage 的 plan 版本：先查 audio snapshot，未指定回退到代码当前最新版。
+  ///
+  /// 兜底场景：(1) 老 audio 没经历过新增 stage（如未来加 review60）；
+  /// (2) 数据损坏 / fixture 未初始化。
+  int planVersionFor(LearningStage stage) =>
+      planVersionsByStage[stage] ?? kLatestPlanVersions[stage] ?? 1;
 
   /// 所有阶段的总子步骤数（动态计算）
   static int get totalSubStages =>
@@ -350,7 +365,7 @@ class LearningProgress {
     bool clearRetellParagraphIndex = false,
     Set<String>? skippedSubStageKeys,
     bool? isPaused,
-    int? review0PlanVersion,
+    Map<LearningStage, int>? planVersionsByStage,
   }) {
     return LearningProgress(
       audioItemId: audioItemId ?? this.audioItemId,
@@ -416,7 +431,7 @@ class LearningProgress {
       updatedAt: updatedAt ?? this.updatedAt,
       skippedSubStageKeys: skippedSubStageKeys ?? this.skippedSubStageKeys,
       isPaused: isPaused ?? this.isPaused,
-      review0PlanVersion: review0PlanVersion ?? this.review0PlanVersion,
+      planVersionsByStage: planVersionsByStage ?? this.planVersionsByStage,
     );
   }
 }

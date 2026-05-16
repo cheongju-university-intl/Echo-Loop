@@ -13,17 +13,26 @@ import '../common/paragraph_selection_sheet.dart';
 
 /// 根据学习阶段计算段落复述的默认目标段落时长（秒）
 ///
-/// - 首次学习 + 首轮复习 + 第二轮复习 → 10s
-/// - 第三轮 + 第四轮复习 → 20s
-/// - 第五轮及以后 → 30s
+/// 默认按轮次递增（v2 plan）：
+/// - firstLearn / review0 / review1 → 10s（review0/1 在 v2 plan 下无复述，
+///   但 v1 兼容路径仍可能调用，保留 10s）
+/// - review2 → 15s
+/// - review4 → 20s
+/// - review7 → 25s
+/// - review14 → 30s
+/// - review28 → 60s
 int retellDefaultSeconds(LearningStage? stage) {
   return switch (stage) {
     null ||
     LearningStage.firstLearn ||
     LearningStage.review0 ||
     LearningStage.review1 => 10,
-    LearningStage.review2 || LearningStage.review4 => 20,
-    _ => 30,
+    LearningStage.review2 => 15,
+    LearningStage.review4 => 20,
+    LearningStage.review7 => 25,
+    LearningStage.review14 => 30,
+    LearningStage.review28 => 60,
+    LearningStage.completed => 10,
   };
 }
 

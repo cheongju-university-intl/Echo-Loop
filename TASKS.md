@@ -1,7 +1,169 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-05-16
-> 当前焦点：首轮复习改版（段落复述 → 全文盲听，向前兼容）
+> 当前焦点：plan 版本快照统一收尾（合并 schema、删 reconcile、简化迁移启发式）
+
+## 已完成：FIX2 — plan 版本架构二次收尾
+
+review 上一轮 plan_versions_json snapshot 重构时，发现以下问题：
+
+1. **review0_plan_version column 仍然保留但已无人读** —— 死代码
+2. **`_reconcileStaleSubStage` 函数继承自前一版 review0 v2 改版**：
+   - snapshot per entity 后 plan 版本永不变 → reconcile 失去意义
+   - 「plan 全完成」兜底分支调 `completeCurrentSubStage` 写假 stage_completion + 重置 `lastStageCompletedAt`，破坏复习链
+3. **迁移启发式过度复杂**：app 未发布，老数据全是 v1 plan 产生的，无须扫 first sub_stage 区分 v1/v2
+
+### 收尾改动
+
+**Schema 合并**：
+- [x] schema currentVersion 回退到 34
+- [x] 删 `review0_plan_version` 列（表定义 + drift 重生成）
+- [x] 删 v33→v34（review0_plan_version 加列回填）那段迁移
+- [x] v34→v35 改名 v33→v34，迁移逻辑简化为：每条 audio baseline 全 v1 + **未碰过的 review stage 升 v2**（按 stage 是否有任何 completion）
+- [x] 删 v34_to_v35 migration_test，新 v33_to_v34_migration_test 覆盖 4 类 fixture
+
+**删 reconcile**：
+- [x] 删 `_reconcileStaleSubStage` 函数（~100 行）
+- [x] 删 `loadAll()` 内调用
+- [x] 删 `debugReconcileStaleSubStage` testing helper
+- [x] 删 reconcileStaleSubStage 测试 group（9 用例）
+
+**Cleanup**：
+- [x] `demo_data_seeder.dart` 删冗余 `review0PlanVersion: Value(...)` 写
+- [x] `_decodePlanVersions` catch 分支 + 非 Map 分支加 `AppLogger.log`（避免静默重置 snapshot）
+- [x] enums.dart 注释更新（旧 API `review0PlanVersion/v1ReviewStages` 引用清理）
+- [x] 测试文档残留引用清理
+
+### 验证
+- flutter analyze 0 error
+- 2100 个 unit/widget 测试全过
+- 迁移测试 v33→v34 覆盖：fresh、only firstLearn、review0/1 已碰过、review0 完成 reviewRetellParagraph（critic 提的 v32 中途用户边界）
+
+  **完成时间**: 2026-05-16
+
+---
+
+## 已完成：FIX — plan 版本统一为 plan_versions_json（修架构 bug）
+
+### 背景
+上轮 review1-28 改版用「运行时从 stage_completions 派生 v1ReviewStages」的方案，
+**架构有根本缺陷**：用户在 v2 review1 完成难句补练 → 写入 `review1:reviewDifficultPractice`
+completion → derive 看到 review1 有 completion 就标记 v1 → plan 翻转成 v1。
+**完成新 plan 的第一步反而让 plan 切回旧版**。
+
+根因：plan 版本应当在「进入 stage」的瞬间锁定（snapshot-per-entity），不能从持续变化的
+stage_completions 反推。业界标准做法：Stripe Subscription / 保险单 / Stripe API
+都是版本字段随 entity 持久化，一旦写入永不变。
+
+### 设计：dense map snapshot
+
+- 加 `plan_versions_json` TEXT 列存 `Map<LearningStage, int>` JSON
+- **每个 LearningStage 都显式存版本**（含 firstLearn / completed），不留特例
+- 全局常量 `kLatestPlanVersions` 声明各 stage 当前版本，新建 progress 直接 stamp
+- 未来某 stage 加新版本：仅改 `kLatestPlanVersions` + `LearningPlan.standard` 派生分支，
+  迁移结构 / 持久化格式不变（snapshot 自动保留旧版）
+- 旧的 `review0_plan_version` column 保留不读（后续可移除）
+
+### 数据层
+- [x] `lib/database/tables/learning_progresses.dart` 加 `planVersionsJson TEXT default '{}'`
+- [x] `lib/database/app_database.dart` schema 34→35；迁移单步翻译既有数据：
+      baseline = `kLatestPlanVersions`，搬 `review0_plan_version` 进 map，
+      review1-28 按首条 stage_completion 启发式（sub_stage=blindListen → v1）
+
+### Model / API
+- [x] `lib/models/learning_plan.dart` 加 `kLatestPlanVersions`；
+      `LearningPlan.standard({stagePlanVersions})` 统一 API；删 `review0PlanVersion`
+      / `v1ReviewStages` 双参数
+- [x] `lib/models/learning_progress.dart` `int review0PlanVersion` → `Map<LearningStage, int> planVersionsByStage`；
+      加 `planVersionFor(stage)` 兜底 helper
+
+### Provider
+- [x] `lib/providers/learning_plan_provider.dart` family 直读 `progress.planVersionsByStage`；
+      **删** `deriveV1ReviewStages` 函数（运行时派生废弃）
+- [x] `lib/providers/learning_progress_provider.dart` `_planFor` 同源；
+      `ensureProgress` 创建新 progress 时 stamp `kLatestPlanVersions`；
+      DAO `_encodePlanVersions` / `_decodePlanVersions` JSON 序列化
+
+### 测试
+- [x] `test/database/v34_to_v35_migration_test.dart` 4 类 fixture：
+      fresh / review0 v1 / review1 首条 blindListen / review1 首条 difficult。
+      最后一类是 **bug 回归核心**：迁移不能把 v2 状态误标 v1
+- [x] `test/models/learning_plan_test.dart` 重写：`kLatestPlanVersions` 不变量、
+      `stagePlanVersions` 单 stage 覆盖 / 混合 / 与缺省一致 / 各 stage v1/v2 各分支
+- [x] `test/providers/learning_progress_provider_test.dart`：
+      `review0PlanVersion: 1` → `planVersionsByStage: {review0: 1}`；
+      触发 v1 plan 改用 `planVersionsByStage` 而非 `completionsByAudio`
+- [x] **回归用例**：v2 review1（fresh，baseline snapshot）完成 difficult →
+      plan 仍 v2、`planVersionsByStage` 完全不变（snapshot 不变量）；
+      再完成 blindListen → 跨阶段到 review2
+- [x] **删** `test/providers/learning_plan_provider_test.dart`（deriveV1ReviewStages 函数已删）
+- [x] `lib/services/demo_data_seeder.dart` 写 `planVersionsJson` baseline + 按 demo
+      currentStage 推算已练习的 review stage 锁 v1
+
+### 验证
+- flutter analyze 0 error
+- 2110 个 unit/widget 测试全过（含迁移测试 + 回归用例）
+
+  **完成时间**: 2026-05-16
+
+---
+
+## 已完成：复习计划 v2 扩展到 review1-review28
+
+把 v2 改版扩到剩余 7 轮复习。各轮 v2 plan：
+- 第2轮 review1：难句补练 + 全文盲听（去掉段落复述，同首轮）
+- 第3轮 review2：难句补练 + 全文盲听 + 段落复述（默认 15 秒，可跳过）
+- 第4轮 review4：同上，默认 20 秒
+- 第5轮 review7：同上，默认 25 秒
+- 第6轮 review14：同上，默认 30 秒
+- 第7轮 review28：同上，默认 60 秒（reviewRetellSummary → reviewRetellParagraph）
+
+约束：
+- 未练习的音频/轮次（该 stage 在 stage_completions 中无任何记录）→ v2
+- 已练习的轮次（任一 substep 已完成）→ 保留 v1 plan 与原 UI
+
+**零 DB 迁移**：plan 版本运行时由 `stage_completions` 派生。
+
+### Model 层
+- [x] `lib/database/enums.dart` `review28.allSubStages` 扩为 v1 ∪ v2 并集 4 项（含 reviewRetellParagraph）；注释更新
+- [x] `lib/models/learning_plan.dart` `standard({review0PlanVersion, v1ReviewStages})` 工厂支持每个 review 阶段独立切 v1/v2
+
+### Provider 层
+- [x] `lib/providers/learning_plan_provider.dart` family 派生 v1ReviewStages 集合（review1-28 任一有 completion 即视为已练习）；helper `deriveV1ReviewStages` 抽出可测
+- [x] `lib/providers/learning_progress_provider.dart` notifier `_planFor` 同步派生（避免与 family 循环）
+
+### Reconcile 兜底
+- [x] `_reconcileStaleSubStage` 加 option A 分支：currentSubStage 在 plan 内但 index > 0 + 该 stage 无任何 completion → snap 到 plan[0]。覆盖「老代码跨阶段时按 v1 first 设 currentSubStage、新 v2 first 顺序不同」的边界。
+
+### Normalize 修复
+- [x] `_normalizeSubStageForStage` review28 分支 `reviewRetellParagraph` 原样保留（v2 plan 合法项，旧实现误归一为 reviewRetellSummary）
+- [x] review1-14（_ 兜底分支）显式列 blindListen / reviewDifficultPractice / reviewRetellParagraph 三个合法项
+
+### Retell 默认时长
+- [x] `lib/widgets/retell/retell_briefing_sheet.dart` `retellDefaultSeconds` 按轮次递增：firstLearn/review0/review1=10, review2=15, review4=20, review7=25, review14=30, review28=60
+
+### UI 层
+- [x] `lib/screens/learning_plan_screen.dart` `_FirstStudySection` / `_ReviewRoundSection` 子步骤迭代改为「当前 plan 顺序 + 历史外延项」（helper `_orderedSubStagesForDisplay`）。v1 用户看 v1 顺序、v2 用户看 v2 顺序；v1 已完成但 v2 已移除项（如 review28 summary 历史）仍渲染。
+
+### 测试
+- [x] `test/database/enums_test.dart` review28 并集 4 项断言
+- [x] `test/models/learning_plan_test.dart` 重写：v1/v2 每阶段子步骤；v1ReviewStages 混合场景；review0 不受 v1ReviewStages 影响
+- [x] `test/models/learning_progress_test.dart` totalSubStages 26、review28.subStageCount 4、progressPercent 分母调整
+- [x] `test/providers/learning_plan_provider_test.dart` 新增：deriveV1ReviewStages 7 个用例（空 / firstLearn-only / review0-only / 单 stage / 多 stage / 完整学习 / 前缀严格）
+- [x] `test/providers/learning_progress_provider_test.dart`：
+  - 既有 review1/review28 推进用例适配新顺序（v2 first = difficult；v1 用 completion 显式触发）
+  - autoSkipRetell review0 v1 / review28 v1/v2 用例区分
+  - normalize：review28 paragraph + summary、review1/2/7/14 合法项 + 废弃 retell key 共 8 用例
+  - reconcile snap：4 用例（v2 snap / v1 不 snap / v2 已练习不 snap / v2 firstLearn completions 不影响）
+- [x] `test/models/retell_settings_test.dart` retellDefaultSeconds review2=15/review4=20/review7=25/review14=30/review28=60、completed=10
+
+### 验证
+- flutter analyze 0 error
+- 2113 个 unit/widget 测试全过
+
+  **完成时间**: 2026-05-16
+
+---
 
 ## 已完成：首轮复习改版 — 难句补练 + 全文盲听（向前兼容）
 

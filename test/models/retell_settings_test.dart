@@ -22,28 +22,28 @@ void main() {
       expect(retellDefaultSeconds(LearningStage.review1), 10);
     });
 
-    test('review2 返回 20', () {
-      expect(retellDefaultSeconds(LearningStage.review2), 20);
+    test('review2 返回 15', () {
+      expect(retellDefaultSeconds(LearningStage.review2), 15);
     });
 
     test('review4 返回 20', () {
       expect(retellDefaultSeconds(LearningStage.review4), 20);
     });
 
-    test('review7 返回 30', () {
-      expect(retellDefaultSeconds(LearningStage.review7), 30);
+    test('review7 返回 25', () {
+      expect(retellDefaultSeconds(LearningStage.review7), 25);
     });
 
     test('review14 返回 30', () {
       expect(retellDefaultSeconds(LearningStage.review14), 30);
     });
 
-    test('review28 返回 30', () {
-      expect(retellDefaultSeconds(LearningStage.review28), 30);
+    test('review28 返回 60', () {
+      expect(retellDefaultSeconds(LearningStage.review28), 60);
     });
 
-    test('completed 返回 30', () {
-      expect(retellDefaultSeconds(LearningStage.completed), 30);
+    test('completed 返回 10（兜底）', () {
+      expect(retellDefaultSeconds(LearningStage.completed), 10);
     });
   });
 

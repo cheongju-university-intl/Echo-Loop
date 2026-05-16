@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -7,6 +8,8 @@ import 'package:path/path.dart' as p;
 
 import '../data/demo_content.dart';
 import '../database/app_database.dart';
+import '../database/enums.dart';
+import '../models/learning_plan.dart' show kLatestPlanVersions;
 import '../models/study_stage.dart';
 
 /// 演示数据种子服务
@@ -81,19 +84,33 @@ class DemoDataSeeder {
             ? now.subtract(Duration(days: audio.lastStageCompletedDaysAgo!))
             : null;
 
-        // 已完成 review0 的 demo 音频走旧 plan（review0 = 难句补练 + 段落复述）
-        // 让 stage_completions 里的 review0:reviewRetellParagraph 历史与 plan 对齐。
-        const review0CompletedStages = {
-          'review1',
-          'review2',
-          'review4',
-          'review7',
-          'review14',
-          'review28',
-          'completed',
+        // 已练习过各 review 阶段的 demo 音频走 v1 plan：
+        // - review0 已完成 → demo 当前在 review1+
+        // - review1+ 已练习 → 对应 stage 在 v1
+        // baseline = kLatestPlanVersions，按 demo 的 currentStage 推算哪些 stage
+        // 应当锁定 v1（已完成）。stage_completions 里的历史与 v1 plan 对齐。
+        const reviewStages = [
+          LearningStage.review0,
+          LearningStage.review1,
+          LearningStage.review2,
+          LearningStage.review4,
+          LearningStage.review7,
+          LearningStage.review14,
+          LearningStage.review28,
+        ];
+        final currentStageEnum = LearningStage.fromKey(audio.currentStage);
+        final planVersions = <LearningStage, int>{
+          for (final e in kLatestPlanVersions.entries) e.key: e.value,
         };
-        final review0PlanVersion =
-            review0CompletedStages.contains(audio.currentStage) ? 1 : 2;
+        for (final s in reviewStages) {
+          // demo 当前 stage 严格大于 s → s 已完成 → 锁 v1
+          if (currentStageEnum.index > s.index) {
+            planVersions[s] = 1;
+          }
+        }
+        final planVersionsJson = jsonEncode(
+          {for (final e in planVersions.entries) e.key.key: e.value},
+        );
 
         await db.into(db.learningProgresses).insert(
           LearningProgressesCompanion.insert(
@@ -111,7 +128,7 @@ class DemoDataSeeder {
             ),
             shadowingSentenceIndex: Value(audio.shadowingSentenceIndex),
             updatedAt: now,
-            review0PlanVersion: Value(review0PlanVersion),
+            planVersionsJson: Value(planVersionsJson),
           ),
         );
       }

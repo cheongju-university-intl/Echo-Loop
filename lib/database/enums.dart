@@ -123,18 +123,22 @@ enum LearningStage {
   /// DB 存储用字符串键
   final String key;
 
-  /// 该阶段全量子步骤（有序列表，未过滤）。
+  /// 该阶段全量子步骤（有序列表，未过滤）—— v1 ∪ v2 的展示并集。
   ///
   /// 注意：实际学习流以 [LearningPlan] 为单一事实来源，UI/推进/reconcile
   /// 都应读 `plan.subStagesFor(stage)` 而非本 getter。仅 `LearningPlan`
-  /// 构造、自由练习入口等"需要全量信息"的场景读 [allSubStages]。
+  /// 构造、自由练习入口、学习计划页迭代等"需要全量信息"的场景读 [allSubStages]。
   ///
-  /// 对于 review0，[allSubStages] 返回 v1 ∪ v2 的展示并集
-  /// （`reviewDifficultPractice` + `blindListen` + `reviewRetellParagraph`），
-  /// 真实 plan 由 `LearningPlan.standard(review0PlanVersion: ...)` 派生。
-  /// 学习计划页迭代 [allSubStages] 时配合三态过滤 `inPlan || done || skipped`
-  /// 自然剔除非当前变体的项；旧 review0 已完成的 `reviewRetellParagraph`
-  /// 仍可作为历史项保留显示。
+  /// 各复习阶段的 v1 ∪ v2 集合：
+  /// - **review0**：v1 `[diff, retellPara]` ∪ v2 `[diff, blind]`
+  /// - **review1**：v1 `[blind, diff, retellPara]` ∪ v2 `[diff, blind]` = v1 全集
+  /// - **review2/4/7/14**：v1 与 v2 子步骤相同（仅顺序差），用同一集合
+  /// - **review28**：v1 `[blind, diff, summary]` ∪ v2 `[diff, blind, retellPara]`
+  ///
+  /// 真实当前 plan 由 `LearningPlan.standard(stagePlanVersions: ...)` 按
+  /// `progress.planVersionsByStage` 派生。学习计划页迭代时配合三态过滤
+  /// `inPlan || done || skipped` 自然剔除非当前变体项；v1 已完成但 v2 已移除
+  /// 的子步骤（如 review28 summary）仍可作为历史 ✅ 保留显示。
   List<SubStageType> get allSubStages => switch (this) {
     firstLearn => [
       SubStageType.blindListen,
@@ -151,6 +155,7 @@ enum LearningStage {
       SubStageType.blindListen,
       SubStageType.reviewDifficultPractice,
       SubStageType.reviewRetellSummary,
+      SubStageType.reviewRetellParagraph,
     ],
     completed => [],
     _ => [

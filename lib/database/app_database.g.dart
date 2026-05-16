@@ -3493,16 +3493,17 @@ class $LearningProgressesTable extends LearningProgresses
     ),
     defaultValue: const Constant(false),
   );
-  static const VerificationMeta _review0PlanVersionMeta =
-      const VerificationMeta('review0PlanVersion');
+  static const VerificationMeta _planVersionsJsonMeta = const VerificationMeta(
+    'planVersionsJson',
+  );
   @override
-  late final GeneratedColumn<int> review0PlanVersion = GeneratedColumn<int>(
-    'review0_plan_version',
+  late final GeneratedColumn<String> planVersionsJson = GeneratedColumn<String>(
+    'plan_versions_json',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(2),
+    defaultValue: const Constant('{}'),
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -3534,7 +3535,7 @@ class $LearningProgressesTable extends LearningProgresses
     updatedAt,
     skippedSubStages,
     isPaused,
-    review0PlanVersion,
+    planVersionsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3795,12 +3796,12 @@ class $LearningProgressesTable extends LearningProgresses
         isPaused.isAcceptableOrUnknown(data['is_paused']!, _isPausedMeta),
       );
     }
-    if (data.containsKey('review0_plan_version')) {
+    if (data.containsKey('plan_versions_json')) {
       context.handle(
-        _review0PlanVersionMeta,
-        review0PlanVersion.isAcceptableOrUnknown(
-          data['review0_plan_version']!,
-          _review0PlanVersionMeta,
+        _planVersionsJsonMeta,
+        planVersionsJson.isAcceptableOrUnknown(
+          data['plan_versions_json']!,
+          _planVersionsJsonMeta,
         ),
       );
     }
@@ -3925,9 +3926,9 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.bool,
         data['${effectivePrefix}is_paused'],
       )!,
-      review0PlanVersion: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}review0_plan_version'],
+      planVersionsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}plan_versions_json'],
       )!,
     );
   }
@@ -4029,18 +4030,26 @@ class LearningProgressesData extends DataClass
   /// 是否暂停学习（true 表示该音频不参与复习调度，可由用户随时恢复）
   final bool isPaused;
 
-  /// 首轮复习（review0）计划版本
+  /// 每个 [LearningStage] 的 plan 版本快照（dense map，JSON 存储）。
   ///
-  /// 1 = 旧版（难句补练 + 段落复述）
-  /// 2 = 新版（难句补练 + 全文盲听）
+  /// 格式：JSON object，key = `LearningStage.key`，value = 整数版本号。例：
+  /// `{"firstLearn":1,"review0":2,"review1":2,...,"review28":2}`
   ///
-  /// 写入时机：新建 progress 时按当前代码默认 2；v33→v34 迁移把所有
-  /// `currentStage` 已进入 review1+ 的行回填为 1（这些用户已经按旧 plan
-  /// 完成 review0，保留历史 UI）。
+  /// **不包含 `completed`**：completed 是毕业终态标记、无 plan，不参与版本系统。
   ///
-  /// 真实子步骤列表由 `LearningPlan.standard(review0PlanVersion: ...)` 派生，
-  /// `LearningStage.review0.allSubStages` 仅作为 v1 ∪ v2 的展示并集。
-  final int review0PlanVersion;
+  /// **写入规则**：snapshot-per-entity 模式。仅在创建 progress / 迁移时
+  /// 由系统 stamp。日常用户操作（完成 / 跳过 substep、暂停等）**都不修改**
+  /// 此字段。区别于 `stage_completions`（持续累加）。
+  /// 如未来需要让存量 audio 升级到新版，需写显式迁移修改本字段。
+  ///
+  /// 写入时机：
+  /// - 新建 progress：stamp `kLatestPlanVersions`
+  /// - v33→v34 迁移：每条 audio baseline 全 v1 + 按 stage 是否有 completion 判定：
+  ///   该 stage 在 `stage_completions` 表里**无任何记录** → 升级到 v2
+  ///   （未碰过的轮次用新版；碰过的轮次锁旧版保留体验）
+  ///
+  /// 派生函数：`LearningPlan.standard(stagePlanVersions: ...)`。
+  final String planVersionsJson;
   const LearningProgressesData({
     required this.audioItemId,
     required this.currentStage,
@@ -4070,7 +4079,7 @@ class LearningProgressesData extends DataClass
     required this.updatedAt,
     required this.skippedSubStages,
     required this.isPaused,
-    required this.review0PlanVersion,
+    required this.planVersionsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4169,7 +4178,7 @@ class LearningProgressesData extends DataClass
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['skipped_sub_stages'] = Variable<String>(skippedSubStages);
     map['is_paused'] = Variable<bool>(isPaused);
-    map['review0_plan_version'] = Variable<int>(review0PlanVersion);
+    map['plan_versions_json'] = Variable<String>(planVersionsJson);
     return map;
   }
 
@@ -4252,7 +4261,7 @@ class LearningProgressesData extends DataClass
       updatedAt: Value(updatedAt),
       skippedSubStages: Value(skippedSubStages),
       isPaused: Value(isPaused),
-      review0PlanVersion: Value(review0PlanVersion),
+      planVersionsJson: Value(planVersionsJson),
     );
   }
 
@@ -4328,7 +4337,7 @@ class LearningProgressesData extends DataClass
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       skippedSubStages: serializer.fromJson<String>(json['skippedSubStages']),
       isPaused: serializer.fromJson<bool>(json['isPaused']),
-      review0PlanVersion: serializer.fromJson<int>(json['review0PlanVersion']),
+      planVersionsJson: serializer.fromJson<String>(json['planVersionsJson']),
     );
   }
   @override
@@ -4393,7 +4402,7 @@ class LearningProgressesData extends DataClass
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'skippedSubStages': serializer.toJson<String>(skippedSubStages),
       'isPaused': serializer.toJson<bool>(isPaused),
-      'review0PlanVersion': serializer.toJson<int>(review0PlanVersion),
+      'planVersionsJson': serializer.toJson<String>(planVersionsJson),
     };
   }
 
@@ -4426,7 +4435,7 @@ class LearningProgressesData extends DataClass
     DateTime? updatedAt,
     String? skippedSubStages,
     bool? isPaused,
-    int? review0PlanVersion,
+    String? planVersionsJson,
   }) => LearningProgressesData(
     audioItemId: audioItemId ?? this.audioItemId,
     currentStage: currentStage ?? this.currentStage,
@@ -4496,7 +4505,7 @@ class LearningProgressesData extends DataClass
     updatedAt: updatedAt ?? this.updatedAt,
     skippedSubStages: skippedSubStages ?? this.skippedSubStages,
     isPaused: isPaused ?? this.isPaused,
-    review0PlanVersion: review0PlanVersion ?? this.review0PlanVersion,
+    planVersionsJson: planVersionsJson ?? this.planVersionsJson,
   );
   LearningProgressesData copyWithCompanion(LearningProgressesCompanion data) {
     return LearningProgressesData(
@@ -4585,9 +4594,9 @@ class LearningProgressesData extends DataClass
           ? data.skippedSubStages.value
           : this.skippedSubStages,
       isPaused: data.isPaused.present ? data.isPaused.value : this.isPaused,
-      review0PlanVersion: data.review0PlanVersion.present
-          ? data.review0PlanVersion.value
-          : this.review0PlanVersion,
+      planVersionsJson: data.planVersionsJson.present
+          ? data.planVersionsJson.value
+          : this.planVersionsJson,
     );
   }
 
@@ -4640,7 +4649,7 @@ class LearningProgressesData extends DataClass
           ..write('updatedAt: $updatedAt, ')
           ..write('skippedSubStages: $skippedSubStages, ')
           ..write('isPaused: $isPaused, ')
-          ..write('review0PlanVersion: $review0PlanVersion')
+          ..write('planVersionsJson: $planVersionsJson')
           ..write(')'))
         .toString();
   }
@@ -4675,7 +4684,7 @@ class LearningProgressesData extends DataClass
     updatedAt,
     skippedSubStages,
     isPaused,
-    review0PlanVersion,
+    planVersionsJson,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -4718,7 +4727,7 @@ class LearningProgressesData extends DataClass
           other.updatedAt == this.updatedAt &&
           other.skippedSubStages == this.skippedSubStages &&
           other.isPaused == this.isPaused &&
-          other.review0PlanVersion == this.review0PlanVersion);
+          other.planVersionsJson == this.planVersionsJson);
 }
 
 class LearningProgressesCompanion
@@ -4751,7 +4760,7 @@ class LearningProgressesCompanion
   final Value<DateTime> updatedAt;
   final Value<String> skippedSubStages;
   final Value<bool> isPaused;
-  final Value<int> review0PlanVersion;
+  final Value<String> planVersionsJson;
   final Value<int> rowid;
   const LearningProgressesCompanion({
     this.audioItemId = const Value.absent(),
@@ -4782,7 +4791,7 @@ class LearningProgressesCompanion
     this.updatedAt = const Value.absent(),
     this.skippedSubStages = const Value.absent(),
     this.isPaused = const Value.absent(),
-    this.review0PlanVersion = const Value.absent(),
+    this.planVersionsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LearningProgressesCompanion.insert({
@@ -4814,7 +4823,7 @@ class LearningProgressesCompanion
     required DateTime updatedAt,
     this.skippedSubStages = const Value.absent(),
     this.isPaused = const Value.absent(),
-    this.review0PlanVersion = const Value.absent(),
+    this.planVersionsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : audioItemId = Value(audioItemId),
        updatedAt = Value(updatedAt);
@@ -4847,7 +4856,7 @@ class LearningProgressesCompanion
     Expression<DateTime>? updatedAt,
     Expression<String>? skippedSubStages,
     Expression<bool>? isPaused,
-    Expression<int>? review0PlanVersion,
+    Expression<String>? planVersionsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4902,8 +4911,7 @@ class LearningProgressesCompanion
       if (updatedAt != null) 'updated_at': updatedAt,
       if (skippedSubStages != null) 'skipped_sub_stages': skippedSubStages,
       if (isPaused != null) 'is_paused': isPaused,
-      if (review0PlanVersion != null)
-        'review0_plan_version': review0PlanVersion,
+      if (planVersionsJson != null) 'plan_versions_json': planVersionsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4937,7 +4945,7 @@ class LearningProgressesCompanion
     Value<DateTime>? updatedAt,
     Value<String>? skippedSubStages,
     Value<bool>? isPaused,
-    Value<int>? review0PlanVersion,
+    Value<String>? planVersionsJson,
     Value<int>? rowid,
   }) {
     return LearningProgressesCompanion(
@@ -4987,7 +4995,7 @@ class LearningProgressesCompanion
       updatedAt: updatedAt ?? this.updatedAt,
       skippedSubStages: skippedSubStages ?? this.skippedSubStages,
       isPaused: isPaused ?? this.isPaused,
-      review0PlanVersion: review0PlanVersion ?? this.review0PlanVersion,
+      planVersionsJson: planVersionsJson ?? this.planVersionsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5115,8 +5123,8 @@ class LearningProgressesCompanion
     if (isPaused.present) {
       map['is_paused'] = Variable<bool>(isPaused.value);
     }
-    if (review0PlanVersion.present) {
-      map['review0_plan_version'] = Variable<int>(review0PlanVersion.value);
+    if (planVersionsJson.present) {
+      map['plan_versions_json'] = Variable<String>(planVersionsJson.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -5173,7 +5181,7 @@ class LearningProgressesCompanion
           ..write('updatedAt: $updatedAt, ')
           ..write('skippedSubStages: $skippedSubStages, ')
           ..write('isPaused: $isPaused, ')
-          ..write('review0PlanVersion: $review0PlanVersion, ')
+          ..write('planVersionsJson: $planVersionsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13033,7 +13041,7 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       required DateTime updatedAt,
       Value<String> skippedSubStages,
       Value<bool> isPaused,
-      Value<int> review0PlanVersion,
+      Value<String> planVersionsJson,
       Value<int> rowid,
     });
 typedef $$LearningProgressesTableUpdateCompanionBuilder =
@@ -13066,7 +13074,7 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<String> skippedSubStages,
       Value<bool> isPaused,
-      Value<int> review0PlanVersion,
+      Value<String> planVersionsJson,
       Value<int> rowid,
     });
 
@@ -13254,8 +13262,8 @@ class $$LearningProgressesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get review0PlanVersion => $composableBuilder(
-    column: $table.review0PlanVersion,
+  ColumnFilters<String> get planVersionsJson => $composableBuilder(
+    column: $table.planVersionsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13431,8 +13439,8 @@ class $$LearningProgressesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get review0PlanVersion => $composableBuilder(
-    column: $table.review0PlanVersion,
+  ColumnOrderings<String> get planVersionsJson => $composableBuilder(
+    column: $table.planVersionsJson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -13604,8 +13612,8 @@ class $$LearningProgressesTableAnnotationComposer
   GeneratedColumn<bool> get isPaused =>
       $composableBuilder(column: $table.isPaused, builder: (column) => column);
 
-  GeneratedColumn<int> get review0PlanVersion => $composableBuilder(
-    column: $table.review0PlanVersion,
+  GeneratedColumn<String> get planVersionsJson => $composableBuilder(
+    column: $table.planVersionsJson,
     builder: (column) => column,
   );
 
@@ -13702,7 +13710,7 @@ class $$LearningProgressesTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> skippedSubStages = const Value.absent(),
                 Value<bool> isPaused = const Value.absent(),
-                Value<int> review0PlanVersion = const Value.absent(),
+                Value<String> planVersionsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion(
                 audioItemId: audioItemId,
@@ -13736,7 +13744,7 @@ class $$LearningProgressesTableTableManager
                 updatedAt: updatedAt,
                 skippedSubStages: skippedSubStages,
                 isPaused: isPaused,
-                review0PlanVersion: review0PlanVersion,
+                planVersionsJson: planVersionsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13777,7 +13785,7 @@ class $$LearningProgressesTableTableManager
                 required DateTime updatedAt,
                 Value<String> skippedSubStages = const Value.absent(),
                 Value<bool> isPaused = const Value.absent(),
-                Value<int> review0PlanVersion = const Value.absent(),
+                Value<String> planVersionsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion.insert(
                 audioItemId: audioItemId,
@@ -13811,7 +13819,7 @@ class $$LearningProgressesTableTableManager
                 updatedAt: updatedAt,
                 skippedSubStages: skippedSubStages,
                 isPaused: isPaused,
-                review0PlanVersion: review0PlanVersion,
+                planVersionsJson: planVersionsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

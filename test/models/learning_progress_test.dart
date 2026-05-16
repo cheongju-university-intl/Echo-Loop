@@ -56,8 +56,8 @@ void main() {
 
       expect(progress.isStarted, true);
       expect(progress.isCompleted, false);
-      // plan ON 总 24 步；已完成 1
-      expect(progress.progressPercent(planOn, completed), closeTo(1 / 24, 0.001));
+      // plan v2 总 23 步（firstLearn:4 + review0:2 + review1:2 + review2/4/7/14:3*4 + review28:3）；已完成 1
+      expect(progress.progressPercent(planOn, completed), closeTo(1 / 23, 0.001));
       expect(progress.completedFirstStudySteps(planOn, completed), 1);
     });
 
@@ -73,7 +73,7 @@ void main() {
 
       expect(progress.isStarted, true);
       expect(progress.progressPercent(planOn, completed),
-          closeTo(4 / 24, 0.001));
+          closeTo(4 / 23, 0.001));
       expect(progress.completedFirstStudySteps(planOn, completed), 4);
     });
 
@@ -87,9 +87,9 @@ void main() {
       );
       final completed = doneUpTo(LearningStage.review2)
         ..add('${LearningStage.review2.key}:${SubStageType.blindListen.key}');
-      // 完成了：4(firstLearn) + 2(review0) + 3(review1) + 1(review2.blind) = 10
+      // 完成了：4(firstLearn) + 2(review0) + 2(review1) + 1(review2.blind) = 9
       expect(progress.progressPercent(planOn, completed),
-          closeTo(10 / 24, 0.001));
+          closeTo(9 / 23, 0.001));
       expect(progress.completedFirstStudySteps(planOn, completed), 4);
       expect(progress.completedReviewStages, 2);
     });
@@ -287,8 +287,9 @@ void main() {
     });
 
     test('totalSubStages 动态计算正确', () {
-      // firstLearn:4 + review0:3 (v1 ∪ v2 并集) + review1/2/4/7/14: 5*3 + review28:3 = 25
-      expect(LearningProgress.totalSubStages, 25);
+      // firstLearn:4 + review0:3 + review1/2/4/7/14: 5*3 + review28:4 (v1 ∪ v2 4 项) = 26
+      // 注：completed.allSubStages = []，对 totalSubStages 无贡献
+      expect(LearningProgress.totalSubStages, 26);
     });
 
     test('isPaused 默认 false', () {
@@ -598,10 +599,10 @@ void main() {
   group('LearningStage', () {
     test('subStageCount 正确', () {
       expect(LearningStage.firstLearn.subStageCount, 4);
-      // review0 返回 v1 ∪ v2 并集 3 项；真实 plan 由 LearningPlan 按版本派生为 2 项。
+      // review0 / review28 返回 v1 ∪ v2 并集；真实 plan 由 LearningPlan 派生为 2/3 项。
       expect(LearningStage.review0.subStageCount, 3);
       expect(LearningStage.review1.subStageCount, 3);
-      expect(LearningStage.review28.subStageCount, 3);
+      expect(LearningStage.review28.subStageCount, 4);
       expect(LearningStage.completed.subStageCount, 0);
     });
 
@@ -634,7 +635,7 @@ void main() {
         SubStageType.listenAndRepeat,
         SubStageType.retell,
       ]);
-      // v1 ∪ v2 并集（真实 plan 由 LearningPlan 按 review0PlanVersion 派生）
+      // v1 ∪ v2 并集（真实 plan 由 LearningPlan 按 planVersionsByStage 派生）
       expect(LearningStage.review0.allSubStages, [
         SubStageType.reviewDifficultPractice,
         SubStageType.blindListen,
@@ -649,6 +650,7 @@ void main() {
         SubStageType.blindListen,
         SubStageType.reviewDifficultPractice,
         SubStageType.reviewRetellSummary,
+        SubStageType.reviewRetellParagraph,
       ]);
       expect(LearningStage.completed.allSubStages, isEmpty);
     });

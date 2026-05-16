@@ -60,11 +60,12 @@ void main() {
       ]);
     });
 
-    test('review28 3 个子步骤', () {
+    test('review28 v1 ∪ v2 并集 4 项（v1 summary + v2 paragraph 都保留）', () {
       expect(LearningStage.review28.allSubStages, [
         SubStageType.blindListen,
         SubStageType.reviewDifficultPractice,
         SubStageType.reviewRetellSummary,
+        SubStageType.reviewRetellParagraph,
       ]);
     });
 

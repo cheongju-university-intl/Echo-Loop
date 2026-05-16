@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -5,59 +6,138 @@ import 'package:echo_loop/database/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-/// v33 → v34 迁移：learning_progresses 新增 review0_plan_version 列。
+/// v33 → v34 迁移：把 plan 版本统一存入 `plan_versions_json` dense map。
 ///
-/// - 列默认 2（= 新版 review0：难句补练 + 全文盲听）
-/// - 迁移规则：currentStage 已进入 review1+ 的行回填 1（保留旧版 UI）；
-///   firstLearn / review0 的行留 2（新版生效）
+/// 规则：每条 audio baseline 全 v1（保留老体验）；每个 review stage 若在
+/// `stage_completions` 表里**无任何记录** → 升级到 v2。
+///
+/// 验证 4 类 fixture：
+/// 1. 全新 audio（无任何 completion）→ 所有 review stage 都升 v2
+/// 2. 完成 firstLearn（无 review completion）→ 所有 review stage 升 v2
+/// 3. 完成 review0 全部、review1 中途 → review0/1 锁 v1，review2+ 升 v2
+/// 4. review0 完成 reviewRetellParagraph（v1 plan 末项）→ review0 锁 v1（critic 提的边界）
 void main() {
-  test('v33→v34 为 learning_progresses 加 review0_plan_version 列并按 stage 回填',
+  test('v33→v34 加 plan_versions_json 列并按 stage completion 是否存在判定 v1/v2',
       () async {
     final dir = Directory.systemTemp.createTempSync('fluency_v33_to_v34_');
     addTearDown(() {
-      if (dir.existsSync()) {
-        dir.deleteSync(recursive: true);
-      }
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
     });
     final file = File('${dir.path}/echo_loop.db');
-    _createV33LearningProgress(file);
+    _createV33Fixture(file);
 
     final db = AppDatabase(NativeDatabase(file));
     addTearDown(db.close);
 
+    // 列存在
     final columns = await db
         .customSelect('PRAGMA table_info(learning_progresses)')
         .get();
-    final columnNames = columns
-        .map((row) => row.data['name'] as String)
-        .toSet();
-    expect(columnNames, contains('review0_plan_version'));
+    final columnNames =
+        columns.map((row) => row.data['name'] as String).toSet();
+    expect(columnNames, contains('plan_versions_json'));
+    // 旧的 review0_plan_version 列不应存在（已删除）
+    expect(columnNames, isNot(contains('review0_plan_version')));
 
+    // 读取每条 audio 的 plan_versions_json 并解析
     final rows = await db
         .customSelect(
-          'SELECT audio_item_id, review0_plan_version FROM learning_progresses '
+          'SELECT audio_item_id, plan_versions_json FROM learning_progresses '
           'ORDER BY audio_item_id',
         )
         .get();
-    final byId = {
+    final byId = <String, Map<String, dynamic>>{
       for (final r in rows)
-        r.data['audio_item_id'] as String: r.data['review0_plan_version'] as int,
+        r.data['audio_item_id'] as String:
+            jsonDecode(r.data['plan_versions_json'] as String)
+                as Map<String, dynamic>,
     };
 
-    // (A) 全新音频 / 仍在 firstLearn → 新版
-    expect(byId['audio-firstlearn'], 2);
-    // (B) 已进入 review0 但未完成 → 新版
-    expect(byId['audio-review0'], 2);
-    // (C) 已完成 review0（review1+）→ 旧版
-    expect(byId['audio-review1'], 1);
-    expect(byId['audio-review28'], 1);
-    expect(byId['audio-completed'], 1);
+    // 每个 audio 应该有完整 dense baseline 的 8 个 stage key（除 completed）
+    const allStageKeys = [
+      'firstLearn',
+      'review0',
+      'review1',
+      'review2',
+      'review4',
+      'review7',
+      'review14',
+      'review28',
+    ];
+    for (final entry in byId.entries) {
+      expect(
+        entry.value.keys.toSet(),
+        containsAll(allStageKeys),
+        reason: '${entry.key} 应含所有带 plan 的 LearningStage',
+      );
+      expect(
+        entry.value.containsKey('completed'),
+        isFalse,
+        reason: '${entry.key} 不应含 completed',
+      );
+      // firstLearn 永远 v1（无变体）
+      expect(entry.value['firstLearn'], 1,
+          reason: '${entry.key} firstLearn 应为 v1');
+    }
+
+    // (1) 全新 audio：所有 review stage 升 v2
+    final fresh = byId['audio-fresh']!;
+    expect(fresh['review0'], 2);
+    expect(fresh['review1'], 2);
+    expect(fresh['review2'], 2);
+    expect(fresh['review28'], 2);
+
+    // (2) firstLearn 完成但无 review completion：review 全 v2
+    final onlyFirstLearn = byId['audio-only-firstlearn']!;
+    expect(onlyFirstLearn['review0'], 2);
+    expect(onlyFirstLearn['review1'], 2);
+
+    // (3) review0/1 已碰过 → 锁 v1；review2+ 没碰过 → v2
+    final midReview1 = byId['audio-mid-review1']!;
+    expect(midReview1['review0'], 1);
+    expect(midReview1['review1'], 1);
+    expect(midReview1['review2'], 2);
+    expect(midReview1['review28'], 2);
+
+    // (4) **critic 边界**：review0 完成 reviewRetellParagraph（v1 末项）
+    //     → review0 有 completion → 锁 v1 → UI 渲染 v1 plan 含历史 ✅
+    final review0V1End = byId['audio-review0-v1-end']!;
+    expect(review0V1End['review0'], 1,
+        reason: 'review0 有 completion 必须锁 v1，避免完成的复述消失');
+    expect(review0V1End['review1'], 2);
+
+    // (5) **current_sub_stage snap 验证**：
+    //     audio-mid-review1 currentStage=review1, currentSubStage=blindListen
+    //     （v1 时代 cross-stage 设的 v1 plan first），但 review1 无 completion
+    //     → 升 v2 → snap currentSubStage 到 reviewDifficultPractice（v2 plan first）
+    final snappedRow = await db
+        .customSelect(
+          "SELECT current_sub_stage FROM learning_progresses "
+          "WHERE audio_item_id = 'audio-snap-needed'",
+        )
+        .getSingle();
+    expect(
+      snappedRow.data['current_sub_stage'],
+      'reviewDifficultPractice',
+      reason: '升 v2 时 v1 plan 残留的 blindListen 必须 snap 到 v2 plan first',
+    );
+
+    // 反例：audio-mid-review1 在 review1 已有 completion → 不 snap，保留 v1 plan
+    final notSnappedRow = await db
+        .customSelect(
+          "SELECT current_sub_stage FROM learning_progresses "
+          "WHERE audio_item_id = 'audio-mid-review1'",
+        )
+        .getSingle();
+    expect(notSnappedRow.data['current_sub_stage'], 'blindListen',
+        reason: 'review1 已有 completion → 锁 v1，不 snap');
   });
 }
 
-void _createV33LearningProgress(File file) {
+void _createV33Fixture(File file) {
   final raw = sqlite.sqlite3.open(file.path);
   try {
+    // 模拟 v33 schema（含 is_paused，无 review0_plan_version 和 plan_versions_json）
     raw.execute('''
       CREATE TABLE learning_progresses (
         audio_item_id TEXT NOT NULL PRIMARY KEY,
@@ -90,25 +170,67 @@ void _createV33LearningProgress(File file) {
         is_paused INTEGER NOT NULL DEFAULT 0
       );
     ''');
+    raw.execute('''
+      CREATE TABLE stage_completions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        audio_item_id TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        sub_stage TEXT NOT NULL,
+        completed_at INTEGER NOT NULL,
+        duration_ms INTEGER
+      );
+    ''');
 
-    final now = DateTime(2026, 5, 1).millisecondsSinceEpoch;
-    final fixtures = <(String, String)>[
-      ('audio-firstlearn', 'firstLearn'),
-      ('audio-review0', 'review0'),
-      ('audio-review1', 'review1'),
-      ('audio-review28', 'review28'),
-      ('audio-completed', 'completed'),
+    final now = DateTime(2026, 5, 16).millisecondsSinceEpoch;
+    final progressFixtures = <(String, String, String)>[
+      ('audio-fresh', 'firstLearn', 'blindListen'),
+      ('audio-only-firstlearn', 'review0', 'blindListen'),
+      // mid-review1：review1 已有 completion → 不 snap
+      ('audio-mid-review1', 'review1', 'blindListen'),
+      ('audio-review0-v1-end', 'review0', 'reviewRetellParagraph'),
+      // snap-needed：review1 无 completion + currentSubStage 是 v1 残留 blindListen
+      ('audio-snap-needed', 'review1', 'blindListen'),
     ];
-    for (final (id, stage) in fixtures) {
+    for (final (id, stage, sub) in progressFixtures) {
       raw.execute(
         '''
         INSERT INTO learning_progresses (
           audio_item_id, current_stage, current_sub_stage, updated_at
         ) VALUES (?, ?, ?, ?)
         ''',
-        [id, stage, 'blindListen', now],
+        [id, stage, sub, now],
       );
     }
+
+    final completions = <(String, String, String, int)>[
+      // audio-only-firstlearn：只有 firstLearn 完成（无 review）
+      ('audio-only-firstlearn', 'firstLearn', 'blindListen', now - 7 * 86400000),
+      ('audio-only-firstlearn', 'firstLearn', 'retell', now - 6 * 86400000),
+      // audio-mid-review1：review0 完成、review1 中途
+      ('audio-mid-review1', 'firstLearn', 'blindListen', now - 14 * 86400000),
+      ('audio-mid-review1', 'review0', 'reviewDifficultPractice',
+          now - 7 * 86400000),
+      ('audio-mid-review1', 'review0', 'reviewRetellParagraph',
+          now - 7 * 86400000),
+      ('audio-mid-review1', 'review1', 'blindListen', now - 86400000),
+      // audio-review0-v1-end：review0 完成了 reviewRetellParagraph（v1 末项）
+      ('audio-review0-v1-end', 'firstLearn', 'retell', now - 7 * 86400000),
+      ('audio-review0-v1-end', 'review0', 'reviewDifficultPractice',
+          now - 86400000),
+      ('audio-review0-v1-end', 'review0', 'reviewRetellParagraph',
+          now - 86400000),
+    ];
+    for (final (audioId, stage, sub, completedAt) in completions) {
+      raw.execute(
+        '''
+        INSERT INTO stage_completions (
+          audio_item_id, stage, sub_stage, completed_at, duration_ms
+        ) VALUES (?, ?, ?, ?, ?)
+        ''',
+        [audioId, stage, sub, completedAt, 0],
+      );
+    }
+
     raw.execute('PRAGMA user_version = 33');
   } finally {
     raw.dispose();
