@@ -29,8 +29,6 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      // 引导弹窗预设已展示（避免遮挡 plan 页测试）
-      'retell_setup_choice_at_ms': 1700000000000,
       // 新手引导 flows 预设已看过（避免 GuideFlow 启动 500ms timer
       // 在 widget dispose 后还 pending，导致测试报 Timer 错误）
       'guide_v1_learning_plan_no_transcript_seen': true,

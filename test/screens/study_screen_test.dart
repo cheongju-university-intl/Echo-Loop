@@ -23,10 +23,7 @@ void main() {
   late SharedPreferences prefs;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({
-      // 默认预设已做过复述设置选择，避免每个测试都被 gate 弹窗拦截
-      'retell_setup_choice_at_ms': 1700000000000,
-    });
+    SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
   });
 

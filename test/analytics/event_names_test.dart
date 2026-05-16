@@ -136,10 +136,8 @@ void main() {
     });
 
     test('复述参数常量正确', () {
-      expect(EventParams.trigger, 'trigger');
       expect(EventParams.enabled, 'enabled');
       expect(EventParams.source, 'source');
-      expect(EventParams.choice, 'choice');
     });
   });
 

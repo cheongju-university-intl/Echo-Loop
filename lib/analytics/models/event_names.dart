@@ -244,18 +244,12 @@ abstract class EventParams {
   static const fromStage = 'from_stage';
   static const toStage = 'to_stage';
 
-  /// 阶段推进触发来源（如 'retell_disabled'，仅复述静默推进时附带）
-  static const trigger = 'trigger';
-
-  // ── 复述开关 ──
+  // ── 复述跳过 ──
   /// 复述开关当前值
   static const enabled = 'enabled';
 
-  /// 复述开关切换来源：'intro_dialog' 或 'settings_page'
+  /// 来源：'settings_page' / 'manual' / 'auto'
   static const source = 'source';
-
-  /// 引导弹窗用户选择：'enable' / 'dismiss'
-  static const choice = 'choice';
 
   // ── 录音评估 ──
   /// 录音来源界面：listen_repeat / retell / difficult_practice

@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/learning_progress_provider.dart';
 import '../providers/learning_settings_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -58,6 +59,13 @@ class LearningSettingsScreen extends ConsumerWidget {
                 await ref
                     .read(learningSettingsProvider.notifier)
                     .setAutoSkipRetell(value);
+                // 开启时显式触发一次扫描（与 progress 端 ref.listen 互为冗余，
+                // 防止边缘场景下监听窗口被错过）。关闭无需触发。
+                if (value) {
+                  await ref
+                      .read(learningProgressNotifierProvider.notifier)
+                      .triggerAutoSkipScan();
+                }
                 ref.read(analyticsServiceProvider).track(
                   Events.retellToggleChanged,
                   {

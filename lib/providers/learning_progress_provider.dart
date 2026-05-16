@@ -81,6 +81,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     return const LearningProgressState(isLoading: true);
   }
 
+  /// 显式触发对所有进度的自动跳过扫描。
+  ///
+  /// 设计：内部 `ref.listen<LearningSettings>` 已在 false→true 时自动触发，
+  /// 但部分边缘场景（启动期 race、外部直接 setState 等）可能错过监听窗口。
+  /// 设置页 UI 在 toggle ON 之后显式调一次本方法做兜底；幂等无副作用。
+  Future<void> triggerAutoSkipScan() => _autoSkipScanAllProgress();
+
   /// 自动跳过复述全局开关 false→true 时，对所有进度跑一次扫描，
   /// 把当前停在复述子阶段的位置批量推进（与用户在每条音频上手动跳过同效）。
   Future<void> _autoSkipScanAllProgress() async {
@@ -123,6 +130,10 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   ///   1. 记录日志；
   ///   2. 把 `isLoading` 重置为 false，避免永久卡在加载态；
   ///   3. rethrow，让上层调用方（有 BuildContext）负责给用户反馈（snackbar 等）。
+  ///
+  /// 加载完成后若 `autoSkipRetell` 已开启，对所有进度跑一次扫描——覆盖
+  /// 「上次会话开启后停在复述位置 → 本次启动需要继续推进」的场景，
+  /// 以及与 settings listener 路径互为冗余。
   Future<void> loadAll() async {
     state = state.copyWith(isLoading: true);
     try {
@@ -144,6 +155,12 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       AppLogger.log('LearningProgress', 'loadAll failed: $e\n$st');
       state = state.copyWith(isLoading: false);
       rethrow;
+    }
+
+    // 启动期自动跳过补扫：若 autoSkipRetell 已开启，把停在复述位置的进度推进。
+    final settings = ref.read(learningSettingsProvider);
+    if (settings.autoSkipRetell) {
+      await _autoSkipScanAllProgress();
     }
   }
 
