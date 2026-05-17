@@ -410,16 +410,37 @@ void main() {
   });
 
   group('SentenceAnnotationCard — 内联标记渲染', () {
-    /// 找到 fontFamily 为 monospace 的 Text widget（即反引号或 IPA chip 内的 Text）
-    Finder findChipText(String content) => find.byWidgetPredicate(
+    /// 查找符合反引号样式的 TextSpan：文本匹配 + 设置了 background Paint
+    bool hasBadgeSpan(String content) {
+      bool found = false;
+      for (final el in find.byType(Text).evaluate()) {
+        final w = el.widget as Text;
+        final root = w.textSpan;
+        if (root == null) continue;
+        root.visitChildren((span) {
+          if (span is TextSpan &&
+              span.text == content &&
+              span.style?.background != null) {
+            found = true;
+            return false;
+          }
+          return true;
+        });
+        if (found) break;
+      }
+      return found;
+    }
+
+    /// 找到 IPA chip 内的 monospace Text
+    Finder findIpaChip(String content) => find.byWidgetPredicate(
           (w) =>
               w is Text &&
               w.style?.fontFamily == 'monospace' &&
               w.data == content,
         );
 
-    /// 找到任意 monospace Text，用于断言"没有任何 chip"
-    final anyChipFinder = find.byWidgetPredicate(
+    /// 找到任意 monospace Text，用于断言"没有任何 IPA chip"
+    final anyIpaChipFinder = find.byWidgetPredicate(
       (w) => w is Text && w.style?.fontFamily == 'monospace',
     );
 
@@ -442,48 +463,48 @@ void main() {
 
     testWidgets('IPA 识别 — 含音节分界点', (tester) async {
       await pumpAnalysisCard(tester, '音标：/ˈɪŋ.ɡlɪʃ/ 是英语的发音');
-      expect(findChipText('/ˈɪŋ.ɡlɪʃ/'), findsOneWidget);
+      expect(findIpaChip('/ˈɪŋ.ɡlɪʃ/'), findsOneWidget);
     });
 
     testWidgets('IPA 识别 — 含连字符', (tester) async {
       await pumpAnalysisCard(tester, '音标：/pre-ˈfɪks/ 是前缀');
-      expect(findChipText('/pre-ˈfɪks/'), findsOneWidget);
+      expect(findIpaChip('/pre-ˈfɪks/'), findsOneWidget);
     });
 
     testWidgets('IPA 识别 — 单音节弱读', (tester) async {
       await pumpAnalysisCard(tester, '音标：/tə/ 是弱读形式');
-      expect(findChipText('/tə/'), findsOneWidget);
+      expect(findIpaChip('/tə/'), findsOneWidget);
     });
 
     testWidgets('IPA 否决 — 表示或者的斜杠两侧带空格', (tester) async {
       await pumpAnalysisCard(tester, '或者：and / or 表示选择');
-      expect(anyChipFinder, findsNothing);
+      expect(anyIpaChipFinder, findsNothing);
     });
 
     testWidgets('IPA 否决 — 含中文与斜杠', (tester) async {
       await pumpAnalysisCard(tester, '搭配：English / 英语 互译');
-      expect(anyChipFinder, findsNothing);
+      expect(anyIpaChipFinder, findsNothing);
     });
 
     testWidgets('IPA 否决 — 路径不被误判', (tester) async {
       await pumpAnalysisCard(tester, '路径：/path/to/file 是文件路径');
-      expect(anyChipFinder, findsNothing);
+      expect(anyIpaChipFinder, findsNothing);
     });
 
     testWidgets('IPA 否决 — 冠词 a/an', (tester) async {
       await pumpAnalysisCard(tester, '冠词：a/an 视下一词首音决定');
-      expect(anyChipFinder, findsNothing);
+      expect(anyIpaChipFinder, findsNothing);
     });
 
-    testWidgets('反引号 chip 渲染单个词', (tester) async {
+    testWidgets('反引号渲染为内联 badge（背景色 + 自然换行）', (tester) async {
       await pumpAnalysisCard(tester, '词义：`run` 表示经营');
-      expect(findChipText('run'), findsOneWidget);
+      expect(hasBadgeSpan('run'), isTrue);
     });
 
-    testWidgets('反引号与 IPA 同一行混排，各自正确分段', (tester) async {
+    testWidgets('反引号与 IPA 同一行混排：前者 badge，后者灰色 chip', (tester) async {
       await pumpAnalysisCard(tester, '弱读：`have` 常听起来像 /əv/ 这样');
-      expect(findChipText('have'), findsOneWidget);
-      expect(findChipText('/əv/'), findsOneWidget);
+      expect(hasBadgeSpan('have'), isTrue);
+      expect(findIpaChip('/əv/'), findsOneWidget);
     });
 
     /// 把所有渲染的 RichText 的可见文本拼起来，用于检验"反引号是否还在屏上"
@@ -509,14 +530,13 @@ void main() {
       // 清洗后的 key 文本应当出现在渲染结果中
       expect(rendered.contains('helped to 的弱读'), isTrue);
       // value 中的 IPA chip 不受影响
-      expect(findChipText('/tə/'), findsOneWidget);
+      expect(findIpaChip('/tə/'), findsOneWidget);
     });
 
-    testWidgets('客户端清洗 — value 中的反引号保留（仍渲染为 chip）',
-        (tester) async {
+    testWidgets('客户端清洗 — value 中的反引号保留（渲染为 badge）', (tester) async {
       await pumpAnalysisCard(tester, '词义：`run` 表示经营');
-      // value 中的 `run` 应渲染为 chip
-      expect(findChipText('run'), findsOneWidget);
+      // value 中的 `run` 应渲染为带背景色的内联 badge
+      expect(hasBadgeSpan('run'), isTrue);
     });
   });
 }

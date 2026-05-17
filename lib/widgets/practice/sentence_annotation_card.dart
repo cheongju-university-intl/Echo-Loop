@@ -855,9 +855,9 @@ class _AnalysisContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (var idx = 0; idx < visible.length; idx++) ...[
-          if (idx > 0) const SizedBox(height: 18),
+          if (idx > 0) const SizedBox(height: 12),
           _buildSectionHeader(theme, visible[idx]),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           _buildSectionBody(theme, fields[visible[idx].fieldIndex]),
         ],
       ],
@@ -873,15 +873,15 @@ class _AnalysisContent extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 24,
-            height: 24,
+            width: 20,
+            height: 20,
             decoration: BoxDecoration(
               color: cs.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(5),
             ),
-            child: Icon(s.icon, size: 14, color: cs.primary),
+            child: Icon(s.icon, size: 12, color: cs.primary),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
             s.label,
             style: theme.textTheme.labelLarge?.copyWith(
@@ -899,7 +899,7 @@ class _AnalysisContent extends StatelessWidget {
     final cs = theme.colorScheme;
     final body = theme.textTheme.bodySmall?.copyWith(
       color: cs.onSurfaceVariant,
-      height: 1.55,
+      height: 1.4,
     );
 
     final items = field.split('\n').where((s) => s.trim().isNotEmpty).toList();
@@ -911,7 +911,7 @@ class _AnalysisContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
+          if (i > 0) const SizedBox(height: 5),
           _buildBulletItem(theme, items[i], body),
         ],
       ],
@@ -938,7 +938,7 @@ class _AnalysisContent extends StatelessWidget {
     final value = m?.group(2)?.trim();
 
     final bullet = Padding(
-      padding: const EdgeInsets.only(top: 2, right: 8),
+      padding: const EdgeInsets.only(top: 1, right: 6),
       child: Text(
         '▸',
         style: TextStyle(
@@ -988,33 +988,23 @@ class _AnalysisContent extends StatelessWidget {
       }
       final codeContent = m.group(1);
       if (codeContent != null) {
+        // 反引号引用：用 primaryContainer 作为字形背后的扁平高亮色，沿文本流
+        // 自然换行；不使用 WidgetSpan 盒子，避免长短语撑出强制断行。
+        spans.add(TextSpan(
+          text: codeContent,
+          style: TextStyle(
+            background: Paint()..color = cs.primaryContainer,
+            color: cs.onPrimaryContainer,
+          ),
+        ));
+      } else {
+        // IPA 音标：保留 chip 盒子（monospace），但用中性灰色背景，不喧宾夺主
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              codeContent,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontFamilyFallback: const ['Menlo', 'Courier'],
-                fontSize: (body?.fontSize ?? 13) - 0.5,
-                color: cs.onSurface,
-                height: 1.2,
-              ),
-            ),
-          ),
-        ));
-      } else {
-        spans.add(WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer.withValues(alpha: 0.35),
+              color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -1022,8 +1012,8 @@ class _AnalysisContent extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontFamilyFallback: const ['Menlo', 'Courier'],
-                fontSize: 11,
-                color: cs.onPrimaryContainer,
+                fontSize: (body?.fontSize ?? 13) - 1,
+                color: cs.onSurface,
                 height: 1.2,
               ),
             ),
@@ -1038,7 +1028,7 @@ class _AnalysisContent extends StatelessWidget {
     return spans;
   }
 
-  /// 整段文本（含反引号 chip 和 IPA chip）渲染为 Text.rich
+  /// 整段文本（含反引号高亮 badge 和 IPA 斜体）渲染为 Text.rich
   Widget _richWithIpa(ThemeData theme, String text, TextStyle? body) {
     return Text.rich(
       TextSpan(style: body, children: _inlineSpans(theme, text, body)),
