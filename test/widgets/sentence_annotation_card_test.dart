@@ -408,4 +408,82 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
+
+  group('SentenceAnnotationCard — 内联标记渲染', () {
+    /// 找到 fontFamily 为 monospace 的 Text widget（即反引号或 IPA chip 内的 Text）
+    Finder findChipText(String content) => find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.style?.fontFamily == 'monospace' &&
+              w.data == content,
+        );
+
+    /// 找到任意 monospace Text，用于断言"没有任何 chip"
+    final anyChipFinder = find.byWidgetPredicate(
+      (w) => w is Text && w.style?.fontFamily == 'monospace',
+    );
+
+    /// 用给定的 grammar 段构造一个已缓存的解析卡，并展开解析面板
+    Future<void> pumpAnalysisCard(WidgetTester tester, String grammar) async {
+      final analysis = '$grammar${sep}vocab${sep}listen';
+      await tester.pumpWidget(
+        createTestApp(
+          SentenceAnnotationCard(
+            text: 'Test',
+            cachedAnalysis: analysis,
+            onRequestAnalysis: () async => analysis,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Analysis'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('IPA 识别 — 含音节分界点', (tester) async {
+      await pumpAnalysisCard(tester, '音标：/ˈɪŋ.ɡlɪʃ/ 是英语的发音');
+      expect(findChipText('/ˈɪŋ.ɡlɪʃ/'), findsOneWidget);
+    });
+
+    testWidgets('IPA 识别 — 含连字符', (tester) async {
+      await pumpAnalysisCard(tester, '音标：/pre-ˈfɪks/ 是前缀');
+      expect(findChipText('/pre-ˈfɪks/'), findsOneWidget);
+    });
+
+    testWidgets('IPA 识别 — 单音节弱读', (tester) async {
+      await pumpAnalysisCard(tester, '音标：/tə/ 是弱读形式');
+      expect(findChipText('/tə/'), findsOneWidget);
+    });
+
+    testWidgets('IPA 否决 — 表示或者的斜杠两侧带空格', (tester) async {
+      await pumpAnalysisCard(tester, '或者：and / or 表示选择');
+      expect(anyChipFinder, findsNothing);
+    });
+
+    testWidgets('IPA 否决 — 含中文与斜杠', (tester) async {
+      await pumpAnalysisCard(tester, '搭配：English / 英语 互译');
+      expect(anyChipFinder, findsNothing);
+    });
+
+    testWidgets('IPA 否决 — 路径不被误判', (tester) async {
+      await pumpAnalysisCard(tester, '路径：/path/to/file 是文件路径');
+      expect(anyChipFinder, findsNothing);
+    });
+
+    testWidgets('IPA 否决 — 冠词 a/an', (tester) async {
+      await pumpAnalysisCard(tester, '冠词：a/an 视下一词首音决定');
+      expect(anyChipFinder, findsNothing);
+    });
+
+    testWidgets('反引号 chip 渲染单个词', (tester) async {
+      await pumpAnalysisCard(tester, '词义：`run` 表示经营');
+      expect(findChipText('run'), findsOneWidget);
+    });
+
+    testWidgets('反引号与 IPA 同一行混排，各自正确分段', (tester) async {
+      await pumpAnalysisCard(tester, '弱读：`have` 常听起来像 /əv/ 这样');
+      expect(findChipText('have'), findsOneWidget);
+      expect(findChipText('/əv/'), findsOneWidget);
+    });
+  });
 }

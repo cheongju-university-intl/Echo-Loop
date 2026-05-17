@@ -807,20 +807,19 @@ class _AnalysisContent extends StatelessWidget {
 
   const _AnalysisContent({required this.content});
 
-  /// 匹配文本中的 IPA 音标片段（如 /tə/、/ˈɪŋɡlɪʃ ɪnə ˈmɪnɪt/）
+  /// 匹配文本中的内联标记：反引号引用 `xxx` 或 IPA 音标 /tə/。
   ///
-  /// 内容字符集合（CJK 已自然排除）：
-  /// - ASCII 字母（含 ŋ 之前的 g 等）
-  /// - Latin-1 / Latin Extended-A/B（U+00C0–U+024F）：覆盖 æ ð ŋ 等
-  /// - IPA 扩展 + 间隔修饰（U+0250–U+02FF）：覆盖 ɪ ə ʃ ɡ ˈ ˌ ː 等
-  /// - 组合附加符（U+0300–U+036F）
-  /// - 希腊字母（U+0370–U+03FF）：覆盖 θ
-  /// - 空白
-  ///
-  /// 同时要求至少出现一个 IPA 专属字符（U+0250–U+02FF），避免把诸如
-  /// `/中文/` `/hello/` `/path/` 这类普通文本误判为音标。
-  static final _ipaRegex = RegExp(
-    r'/(?=[^/]*[ɐ-˿])[a-zA-ZÀ-ɏɐ-˿̀-ͯͰ-Ͽ\s]{1,40}/',
+  /// - group(1)：反引号包裹的文本（不含反引号本身）。允许任意非反引号、非换行
+  ///   字符，长度 ≤ 80；用来标注被强调的词、短语或例子。
+  /// - group(2)：完整 IPA 音标片段（含两侧 `/`）。识别策略：
+  ///   - 起始 `/` 紧跟非空白字符，结束 `/` 紧贴非空白字符——
+  ///     用来与表示"或者"的斜杠（两侧通常有空格，如 `and / or`）区分。
+  ///   - 中间至少出现一个 IPA 专属字符（U+0250–U+02FF，如 ɪ ə ʃ ɡ ˈ ˌ ː），
+  ///     用来排除 `/path/to/file`、`1/2`、`a/an` 这类无 IPA 字符的斜杠。
+  ///   - 中间允许任意非斜杠非换行字符，长度 ≤ 60，覆盖音节分界 `.`、合成词
+  ///     连字符 `-`、组合附加符、希腊字母等常见 IPA 邻接字符。
+  static final _inlineMarkerRegex = RegExp(
+    r'`([^`\n]{1,80})`|(/(?=\S)(?=[^/\n]*[ɐ-˿])[^/\n]{1,60}(?<=\S)/)',
   );
 
   /// "key：value" 拆分
@@ -954,7 +953,7 @@ class _AnalysisContent extends StatelessWidget {
           children: [
             TextSpan(text: key, style: keyStyle),
             const TextSpan(text: '：'),
-            ..._ipaSpans(theme, value, body),
+            ..._inlineSpans(theme, value, body),
           ],
         ),
       );
@@ -966,35 +965,59 @@ class _AnalysisContent extends StatelessWidget {
     );
   }
 
-  /// 将文本中的 /xxx/ IPA 音标拆分为普通 TextSpan + chip WidgetSpan
-  List<InlineSpan> _ipaSpans(ThemeData theme, String text, TextStyle? body) {
+  /// 将文本中的 `xxx` 反引号引用和 /xxx/ IPA 音标拆分为普通 TextSpan + chip WidgetSpan
+  List<InlineSpan> _inlineSpans(ThemeData theme, String text, TextStyle? body) {
     final cs = theme.colorScheme;
     final spans = <InlineSpan>[];
     var last = 0;
-    for (final m in _ipaRegex.allMatches(text)) {
+    for (final m in _inlineMarkerRegex.allMatches(text)) {
       if (m.start > last) {
         spans.add(TextSpan(text: text.substring(last, m.start)));
       }
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            m.group(0)!,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontFamilyFallback: const ['Menlo', 'Courier'],
-              fontSize: 11,
-              color: cs.onPrimaryContainer,
-              height: 1.2,
+      final codeContent = m.group(1);
+      if (codeContent != null) {
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              codeContent,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontFamilyFallback: const ['Menlo', 'Courier'],
+                fontSize: (body?.fontSize ?? 13) - 0.5,
+                color: cs.onSurface,
+                height: 1.2,
+              ),
             ),
           ),
-        ),
-      ));
+        ));
+      } else {
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              m.group(2)!,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontFamilyFallback: const ['Menlo', 'Courier'],
+                fontSize: 11,
+                color: cs.onPrimaryContainer,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ));
+      }
       last = m.end;
     }
     if (last < text.length) {
@@ -1003,10 +1026,10 @@ class _AnalysisContent extends StatelessWidget {
     return spans;
   }
 
-  /// 整段文本（含 IPA chip）渲染为 Text.rich
+  /// 整段文本（含反引号 chip 和 IPA chip）渲染为 Text.rich
   Widget _richWithIpa(ThemeData theme, String text, TextStyle? body) {
     return Text.rich(
-      TextSpan(style: body, children: _ipaSpans(theme, text, body)),
+      TextSpan(style: body, children: _inlineSpans(theme, text, body)),
     );
   }
 }
