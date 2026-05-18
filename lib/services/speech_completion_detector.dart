@@ -71,9 +71,16 @@ SpeechMatchContext buildMatchContext({
 
 /// 检测 A：连续尾部匹配。
 ///
-/// 原文末尾有 ≥1 个连续词被匹配，且该尾部子序列在原文中唯一出现。
+/// 原文末尾有 ≥[minConsecutive] 个连续词被匹配，且该尾部子序列在原文中唯一出现。
 /// 触发条件说明：用户说出了原文结尾的独特片段，大概率已读完。
-DetectionResult detectTailMatch(SpeechMatchContext ctx) {
+///
+/// 默认参数与历史跟读行为一致（[minConsecutive] = 1，阈值 1s）。
+/// 复述场景调用方应传 `minConsecutive: 3, triggerDuration: Duration(seconds: 3)` 收紧。
+DetectionResult detectTailMatch(
+  SpeechMatchContext ctx, {
+  int minConsecutive = 1,
+  Duration triggerDuration = const Duration(seconds: 1),
+}) {
   if (!ctx.hasMatch) {
     return const DetectionResult(description: 'A:无匹配');
   }
@@ -88,8 +95,13 @@ DetectionResult detectTailMatch(SpeechMatchContext ctx) {
     }
   }
 
-  if (consecutiveTail < 1) {
-    return const DetectionResult(description: 'A:末尾未匹配');
+  if (consecutiveTail < minConsecutive) {
+    if (consecutiveTail < 1) {
+      return const DetectionResult(description: 'A:末尾未匹配');
+    }
+    return DetectionResult(
+      description: 'A:尾部连续${consecutiveTail}词<$minConsecutive,未触发',
+    );
   }
 
   final uniqueStart = tokens.length - consecutiveTail;
@@ -100,15 +112,25 @@ DetectionResult detectTailMatch(SpeechMatchContext ctx) {
   }
 
   return DetectionResult(
-    threshold: const Duration(seconds: 1),
-    description: 'A:尾部连续${consecutiveTail}词且唯一→1s',
+    threshold: triggerDuration,
+    description:
+        'A:尾部连续${consecutiveTail}词且唯一→${triggerDuration.inMilliseconds}ms',
   );
 }
 
 /// 检测 B：全句匹配率。
 ///
-/// 100% → 1s, ≥95% → 2s, ≥90% → 3s，低于 90% 不触发。
-DetectionResult detectOverallMatchRate(SpeechMatchContext ctx) {
+/// 默认（跟读模式）：100% → 1s, ≥95% → 2s, ≥90% → 3s，低于 90% 不触发。
+///
+/// 收紧模式：通过 [strictPerfectOnly] = true 启用，仅 100% 匹配才触发，阈值 [perfectDuration]。
+/// 复述场景用此模式，避免 90-99% 匹配触发短阈值早停。
+DetectionResult detectOverallMatchRate(
+  SpeechMatchContext ctx, {
+  bool strictPerfectOnly = false,
+  Duration perfectDuration = const Duration(seconds: 1),
+  Duration nearPerfectDuration = const Duration(seconds: 2),
+  Duration highMatchDuration = const Duration(seconds: 3),
+}) {
   if (!ctx.hasMatch) {
     return const DetectionResult(description: 'B:无匹配');
   }
@@ -116,20 +138,25 @@ DetectionResult detectOverallMatchRate(SpeechMatchContext ctx) {
   final pct = (ctx.matchRate * 100).toInt();
   if (ctx.matchRate >= 1.0) {
     return DetectionResult(
-      threshold: const Duration(seconds: 1),
-      description: 'B:匹配率${pct}%→1s',
+      threshold: perfectDuration,
+      description: 'B:匹配率${pct}%→${perfectDuration.inMilliseconds}ms',
+    );
+  }
+  if (strictPerfectOnly) {
+    return DetectionResult(
+      description: 'B:匹配率${pct}%<100%,严格模式不触发',
     );
   }
   if (ctx.matchRate >= 0.95) {
     return DetectionResult(
-      threshold: const Duration(seconds: 2),
-      description: 'B:匹配率${pct}%→2s',
+      threshold: nearPerfectDuration,
+      description: 'B:匹配率${pct}%→${nearPerfectDuration.inMilliseconds}ms',
     );
   }
   if (ctx.matchRate >= 0.90) {
     return DetectionResult(
-      threshold: const Duration(seconds: 3),
-      description: 'B:匹配率${pct}%→3s',
+      threshold: highMatchDuration,
+      description: 'B:匹配率${pct}%→${highMatchDuration.inMilliseconds}ms',
     );
   }
 
@@ -169,6 +196,66 @@ DetectionResult detectTailHitCount(SpeechMatchContext ctx, {int tailSize = 5}) {
   return DetectionResult(
     threshold: threshold,
     description: 'C:尾部${effectiveTailSize}词命中$tailMatchCount→${threshold.inSeconds}s',
+  );
+}
+
+/// 检测 E：近完成（全句匹配率高 + 末尾覆盖到位）。
+///
+/// 复述场景专用：当用户已讲完原文 9 成以上内容，且原文末尾 5 词命中 ≥4 时，
+/// 判定为"基本已完成复述"，高置信快速收尾。
+///
+/// 设计动机：覆盖 B 规则（要求 100% 全句匹配）漏掉的"差 1-2 个词没命中"场景，
+/// 又比 A 规则（要求末尾连续匹配）宽容，允许 ASR 漏识别 1 个末尾词。
+///
+/// 触发条件：
+/// - `matchRate >= minMatchRate`（默认 0.90）
+/// - 原文末尾 [tailSize] 词中至少 [minTailHits] 词被匹配（默认 5 词中 ≥4 词）
+///
+/// 默认参数对应复述模式收紧值。函数本身保持参数化，方便其他场景调用。
+DetectionResult detectNearCompletion(
+  SpeechMatchContext ctx, {
+  double minMatchRate = 0.90,
+  int tailSize = 5,
+  int minTailHits = 4,
+  Duration triggerDuration = const Duration(seconds: 1),
+}) {
+  if (!ctx.hasMatch) {
+    return const DetectionResult(description: 'E:无匹配');
+  }
+
+  final pct = (ctx.matchRate * 100).toInt();
+  if (ctx.matchRate < minMatchRate) {
+    final minPct = (minMatchRate * 100).toInt();
+    return DetectionResult(
+      description: 'E:匹配率${pct}%<$minPct%,未触发',
+    );
+  }
+
+  final tokens = ctx.referenceTokens;
+  final effectiveTailSize = tokens.length < tailSize ? tokens.length : tailSize;
+  final tailStart = tokens.length - effectiveTailSize;
+  var tailMatchCount = 0;
+  for (var i = tailStart; i < tokens.length; i++) {
+    if (ctx.matchedRefIndexes.contains(i)) {
+      tailMatchCount++;
+    }
+  }
+
+  // 短句兜底：末尾词数不足 [minTailHits] 时，要求全部命中。
+  final requiredHits =
+      effectiveTailSize < minTailHits ? effectiveTailSize : minTailHits;
+  if (tailMatchCount < requiredHits) {
+    return DetectionResult(
+      description:
+          'E:末尾${effectiveTailSize}词命中$tailMatchCount<$requiredHits,未触发',
+    );
+  }
+
+  return DetectionResult(
+    threshold: triggerDuration,
+    description:
+        'E:匹配率${pct}% + 末尾$tailMatchCount/${effectiveTailSize}'
+        '→${triggerDuration.inMilliseconds}ms',
   );
 }
 
@@ -343,16 +430,20 @@ Duration computeDynamicFallback({
 /// - ≤20s → 1.2
 /// - >20s → 1.3（长段落需要更多回忆时间）
 ///
-/// - [matchRate]：文本匹配率（0-1），低于 0.8 时不缩短兜底。
-///   传 null 表示无转录（ASR 关闭），此时仅凭有声比例计算。
+/// [matchRate]：文本匹配率（0-1），低于 0.8 时不缩短兜底。
+/// 传 null 表示无转录（ASR 关闭），此时仅凭有声比例计算。
+///
+/// 收紧版（2026-05-18）：上限 20s→30s，各档阈值翻倍，下限 1s→5s。
+/// 旧算法以注释保留在函数尾部，方便对比/回滚。
 Duration computeRetellDynamicFallback({
   required Duration voicedDuration,
   required Duration referenceDuration,
   double? matchRate,
 }) {
-  // 动态上限：min(20s, max(5s, referenceDuration))
-  final capMs = referenceDuration.inMilliseconds.clamp(5000, 20000);
-  final scale = capMs / 20000; // 缩放因子，各阈值等比缩放
+  // 动态上限：clamp(referenceDuration, 5s, 30s)
+  // [旧算法-2026-05-18] 旧上限：clamp(refDur, 5s, 20s)
+  final capMs = referenceDuration.inMilliseconds.clamp(5000, 30000);
+  final scale = capMs / 30000; // 缩放因子，各阈值按 cap/30s 等比缩放
 
   if (referenceDuration <= Duration.zero) return Duration(milliseconds: capMs);
   if (matchRate != null && matchRate < 0.8) return Duration(milliseconds: capMs);
@@ -365,24 +456,34 @@ Duration computeRetellDynamicFallback({
   final adjustedMs = referenceDuration.inMilliseconds * speedFactor;
   final ratio = voicedDuration.inMilliseconds / adjustedMs;
 
-  // 基准阈值（cap=20s 时）按比例缩放：3/6/10/15/20 × scale
+  // 基准阈值（scale=1.0 即 ref≥30s 时）：6/12/cap/cap/cap，下限 5s
   final int ms;
   if (ratio >= 0.95) {
-    ms = (3000 * scale).round();
-  } else if (ratio >= 0.90) {
     ms = (6000 * scale).round();
+  } else if (ratio >= 0.90) {
+    ms = (12000 * scale).round();
   } else if (ratio >= 0.85) {
-    ms = (10000 * scale).round();
+    ms = capMs;
   } else if (ratio >= 0.80) {
-    ms = (15000 * scale).round();
+    ms = capMs;
   } else if (ratio >= 0.75) {
     ms = capMs;
   } else {
     return Duration(milliseconds: capMs);
   }
 
-  // 最低 1s，避免过短误触
-  return Duration(milliseconds: ms < 1000 ? 1000 : ms);
+  // 收紧后下限：5s
+  // [旧算法-2026-05-18] 原下限：1s
+  return Duration(milliseconds: ms < 5000 ? 5000 : ms);
+
+  // [旧算法-2026-05-18] 原档位（cap=20s, scale=capMs/20000）：
+  // ratio >= 0.95 → 3000 * scale
+  // ratio >= 0.90 → 6000 * scale
+  // ratio >= 0.85 → 10000 * scale
+  // ratio >= 0.80 → 15000 * scale
+  // ratio >= 0.75 → cap
+  // 其他          → cap
+  // 下限 1000ms
 }
 
 // ========== 内部工具函数 ==========

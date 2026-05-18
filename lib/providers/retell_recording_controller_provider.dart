@@ -704,14 +704,27 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
         partialTranscript: liveTranscript,
       );
       if (ctx.hasMatch) {
-        final ruleD = detectRemainingByPosition(
+        // [旧算法-2026-05-18] D 规则（剩余词数估算）在复述场景过于激进，
+        // 用户说几个词碰巧匹配末尾就被快速停止。已在调用方禁用，函数本身保留。
+        // final ruleD = detectRemainingByPosition(
+        //   ctx,
+        //   secondsPerWord: 3,
+        //   baseSeconds: 2,
+        // );
+        // 复述场景：A 要求尾部连续 ≥3 词唯一匹配，B 仅 100% 匹配时触发，
+        // E 覆盖"接近完成但 ASR 漏识别 1-2 词"的场景。三者均高置信，阈值 1s。
+        final ruleA = detectTailMatch(
           ctx,
-          secondsPerWord: 3,
-          baseSeconds: 2,
+          minConsecutive: 3,
+          triggerDuration: const Duration(seconds: 1),
         );
-        final ruleA = detectTailMatch(ctx);
-        final ruleB = detectOverallMatchRate(ctx);
-        final rules = [ruleD, ruleA, ruleB];
+        final ruleB = detectOverallMatchRate(
+          ctx,
+          strictPerfectOnly: true,
+          perfectDuration: const Duration(seconds: 1),
+        );
+        final ruleE = detectNearCompletion(ctx);
+        final rules = [ruleA, ruleB, ruleE];
 
         // 找最短触发阈值用于日志
         Duration? shortest;
@@ -835,7 +848,13 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     );
   }
 
-  /// 转录停滞定时器：只在规则 A/B 触发时才设置。
+  /// 转录停滞定时器（收紧版）。
+  ///
+  /// 收紧后只用动态兜底阈值，不再被 A/B/D 内容匹配规则加速。
+  /// 语义：长时间没有新转录文字 → 等同于"声学静音兜底"。
+  /// A/B 规则的"已说完即停"职责由静音通道（`_checkAutoStopOnSilence`）独立承担。
+  ///
+  /// 旧逻辑保留在下方注释，方便回滚。
   void _resetTranscriptStaleTimer({
     required String promptId,
     required String referenceText,
@@ -843,63 +862,53 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
   }) {
     _transcriptStaleTimer?.cancel();
 
-    final ctx = buildMatchContext(
-      referenceText: referenceText,
-      partialTranscript: transcript,
-    );
-    if (!ctx.hasMatch) return;
+    final refDur = _referenceDuration;
+    final fallback = (refDur != null)
+        ? computeRetellDynamicFallback(
+            voicedDuration: _voicedDuration,
+            referenceDuration: refDur,
+          )
+        : _silenceTimeout;
+    final desc = '转录停滞动态兜底${fallback.inSeconds}s';
 
-    // 取规则 D/A/B 中最短的触发阈值
-    final ruleD = detectRemainingByPosition(
-      ctx,
-      secondsPerWord: 3,
-      baseSeconds: 2,
-    );
-    Duration? shortest;
-    String? desc;
-    for (final rule in [
-      ruleD,
-      detectTailMatch(ctx),
-      detectOverallMatchRate(ctx),
-    ]) {
-      if (rule.triggered) {
-        if (shortest == null || rule.threshold! < shortest) {
-          shortest = rule.threshold;
-          desc = rule.description;
-        }
-      }
-    }
-    // 无规则触发 → 用动态兜底阈值
-    if (shortest == null) {
-      final refDur = _referenceDuration;
-      final fallback = (refDur != null)
-          ? computeRetellDynamicFallback(
-              voicedDuration: _voicedDuration,
-              referenceDuration: refDur,
-            )
-          : _silenceTimeout;
-      shortest = fallback;
-      desc = '转录停滞兜底${fallback.inSeconds}s';
-      AppLogger.log(
-        'RetellRec',
-        '转录停滞: 无规则触发, 靠兜底 ${fallback.inSeconds}s',
-      );
-    }
-
-    AppLogger.log('RetellRec', '转录停滞阈值 ${shortest.inMilliseconds}ms | $desc');
-    _transcriptStaleTimer = Timer(shortest, () {
+    AppLogger.log('RetellRec', '转录停滞阈值 ${fallback.inMilliseconds}ms | $desc');
+    _transcriptStaleTimer = Timer(fallback, () {
       if (state.promptId != promptId || _isStopping) return;
       if (state.phase != RetellRecordingPhase.recording) return;
-      final pct = (ctx.matchRate * 100).toInt();
       AppLogger.log(
         'RetellRec',
-        '⏹ 转录停滞停止: '
-            '${shortest!.inMilliseconds}ms | '
-            '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
-            '($pct%), $desc',
+        '⏹ 转录停滞停止: ${fallback.inMilliseconds}ms | $desc',
       );
       _stopForEvaluation(promptId: promptId, reason: '转录停滞($desc)');
     });
+
+    // [旧算法-2026-05-18] 旧逻辑：取规则 D/A/B 最短触发阈值；都未触发再用兜底。
+    // 已下线：复述思考时 transcript 不更新，A/B/D 命中后阈值很短（1-5s）会误停。
+    // final ctx = buildMatchContext(
+    //   referenceText: referenceText,
+    //   partialTranscript: transcript,
+    // );
+    // if (!ctx.hasMatch) return;
+    // final ruleD = detectRemainingByPosition(
+    //   ctx,
+    //   secondsPerWord: 3,
+    //   baseSeconds: 2,
+    // );
+    // Duration? shortest;
+    // String? desc;
+    // for (final rule in [
+    //   ruleD,
+    //   detectTailMatch(ctx),
+    //   detectOverallMatchRate(ctx),
+    // ]) {
+    //   if (rule.triggered) {
+    //     if (shortest == null || rule.threshold! < shortest) {
+    //       shortest = rule.threshold;
+    //       desc = rule.description;
+    //     }
+    //   }
+    // }
+    // if (shortest == null) { ... 旧兜底分支 ... }
   }
 
   // ── 最大录音时长 ──
