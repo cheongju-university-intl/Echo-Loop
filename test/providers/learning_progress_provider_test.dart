@@ -94,6 +94,9 @@ void main() {
     when(
       () => mockStageCompletionDao.insertRecord(any()),
     ).thenAnswer((_) async {});
+    when(
+      () => mockStageCompletionDao.deleteByAudioId(any()),
+    ).thenAnswer((_) async {});
   });
 
   /// 创建带 mock DAO 的 ProviderContainer
@@ -1618,6 +1621,7 @@ void main() {
 
       expect(readProgress(container, 'a1'), isNull);
       verify(() => mockDao.deleteByAudioId('a1')).called(1);
+      verify(() => mockStageCompletionDao.deleteByAudioId('a1')).called(1);
     });
 
     test('删除不存在的 id 不报错', () async {
@@ -1625,6 +1629,9 @@ void main() {
 
       await notifier(container).deleteProgress('nonexistent');
       verify(() => mockDao.deleteByAudioId('nonexistent')).called(1);
+      verify(
+        () => mockStageCompletionDao.deleteByAudioId('nonexistent'),
+      ).called(1);
     });
   });
 

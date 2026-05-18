@@ -665,12 +665,15 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(progressMap: newMap);
   }
 
-  /// 删除指定音频的学习进度（音频删除时调用）
+  /// 删除指定音频的学习进度（音频删除 / 重置学习进度时调用）
+  ///
+  /// stage_completions 的外键关联的是 AudioItems（音频删除时才触发级联），
+  /// 所以"重置进度"场景下必须显式删除，否则子步骤完成态会残留在 UI 上。
   Future<void> deleteProgress(String audioItemId) async {
-    final dao = ref.read(learningProgressDaoProvider);
-    await dao.deleteByAudioId(audioItemId);
-
-    // stage_completions 会被外键级联删除
+    final progressDao = ref.read(learningProgressDaoProvider);
+    final completionDao = ref.read(stageCompletionDaoProvider);
+    await progressDao.deleteByAudioId(audioItemId);
+    await completionDao.deleteByAudioId(audioItemId);
 
     final newMap = Map<String, LearningProgress>.from(state.progressMap);
     newMap.remove(audioItemId);

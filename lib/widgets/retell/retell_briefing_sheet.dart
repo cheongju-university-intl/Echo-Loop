@@ -21,7 +21,7 @@ import '../common/paragraph_selection_sheet.dart';
 /// - review4 → 20s
 /// - review7 → 25s
 /// - review14 → 30s
-/// - review28 → 60s
+/// - review28 → 30s
 int retellDefaultSeconds(LearningStage? stage) {
   return switch (stage) {
     null ||
@@ -32,7 +32,7 @@ int retellDefaultSeconds(LearningStage? stage) {
     LearningStage.review4 => 20,
     LearningStage.review7 => 25,
     LearningStage.review14 => 30,
-    LearningStage.review28 => 60,
+    LearningStage.review28 => 30,
     LearningStage.completed => 10,
   };
 }

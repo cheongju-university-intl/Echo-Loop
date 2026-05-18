@@ -15,7 +15,7 @@ import '../review/review_briefing_sheet.dart' show formatEstimatedDuration;
 
 /// 目标段落时长选项（秒）
 /// 0 = 逐句，-1 = 不分段（全文一段）
-const paragraphDurationOptions = [0, 10, 20, 30, 45, 60, 90, -1];
+const paragraphDurationOptions = [0, 10, 15, 20, 25, 30, 45, 60, 90, -1];
 
 /// 显示段落选择弹窗
 ///
