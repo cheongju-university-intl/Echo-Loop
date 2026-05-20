@@ -61,10 +61,13 @@ void main() {
     });
   });
 
-  group('构建号场景', () {
-    test('本地 1.0.9+1 与远程 1.0.9+1 相等，无需更新', () {
+  group('构建号场景（不参与比较）', () {
+    // 设计：versionName 唯一标识一次发布，buildNumber 是平台内部机制
+    // （Android versionCode、iOS CFBundleVersion）。版本比较只看 versionName。
+
+    test('同 versionName 不同构建号视为相等，无需更新', () {
       const info = AppUpdateInfo(
-        latestVersion: '1.0.9+1',
+        latestVersion: '1.0.9+2',
         minimumVersion: '1.0.0',
       );
       expect(
@@ -73,7 +76,7 @@ void main() {
       );
     });
 
-    test('本地 1.0.9+1 与远程 1.0.9+0 相等，无需更新', () {
+    test('本地带构建号、远端不带，相等无需更新', () {
       const info = AppUpdateInfo(
         latestVersion: '1.0.9',
         minimumVersion: '1.0.0',
@@ -84,31 +87,9 @@ void main() {
       );
     });
 
-    test('本地 1.0.9+1 低于远程 1.0.9+2，需要更新', () {
+    test('本地不带构建号、远端带，相等无需更新', () {
       const info = AppUpdateInfo(
-        latestVersion: '1.0.9+2',
-        minimumVersion: '1.0.0',
-      );
-      expect(
-        AppUpdate.determineUpdateType('1.0.9+1', info),
-        AppUpdateType.softUpdate,
-      );
-    });
-
-    test('本地 1.0.9+2 高于远程 1.0.9+1，无需更新', () {
-      const info = AppUpdateInfo(
-        latestVersion: '1.0.9+1',
-        minimumVersion: '1.0.0',
-      );
-      expect(
-        AppUpdate.determineUpdateType('1.0.9+2', info),
-        AppUpdateType.none,
-      );
-    });
-
-    test('本地 1.0.9 高于远程 1.0.8+5，无需更新（patch 高于构建号）', () {
-      const info = AppUpdateInfo(
-        latestVersion: '1.0.8+5',
+        latestVersion: '1.0.9+5',
         minimumVersion: '1.0.0',
       );
       expect(
@@ -117,25 +98,24 @@ void main() {
       );
     });
 
-    test('本地 1.0.9+1 等于远程 1.0.9+1，无需更新', () {
+    test('patch 升级，构建号被忽略', () {
       const info = AppUpdateInfo(
-        latestVersion: '1.0.9+1',
+        latestVersion: '1.0.9+2',
         minimumVersion: '1.0.0',
       );
       expect(
-        AppUpdate.determineUpdateType('1.0.9+1', info),
-        AppUpdateType.none,
+        AppUpdate.determineUpdateType('1.0.8+99', info),
+        AppUpdateType.softUpdate,
       );
     });
 
-    test('buildNumber 为空时默认 +1', () {
+    test('本地 patch 更高，构建号被忽略', () {
       const info = AppUpdateInfo(
-        latestVersion: '1.0.9+1',
+        latestVersion: '1.0.8+5',
         minimumVersion: '1.0.0',
       );
-      // 空 buildNumber 时 localVersion 会是 "1.0.9+1"
       expect(
-        AppUpdate.determineUpdateType('1.0.9+1', info),
+        AppUpdate.determineUpdateType('1.0.9', info),
         AppUpdateType.none,
       );
     });
