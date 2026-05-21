@@ -840,14 +840,23 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
             title: l10n.retellTitle,
             onClose: _handleExit,
             onOpenSettings: _openSettings,
-            current: state.currentParagraphIndex + 1,
-            total: state.totalParagraphs,
-            progressText: l10n.retellParagraphProgress(
-              state.currentParagraphIndex + 1,
-              state.totalParagraphs,
+            current: _globalSentenceIdx(sentences, state.playingSentenceIndex),
+            total: player.totalSentenceCount,
+            progressText: _buildProgressText(
+              l10n,
+              sentenceCurrent: _globalSentenceIdx(
+                sentences,
+                state.playingSentenceIndex,
+              ),
+              sentenceTotal: player.totalSentenceCount,
+              paragraphCurrent: state.currentParagraphIndex + 1,
+              paragraphTotal: state.totalParagraphs,
             ),
-            durationText: l10n.retellParagraphDuration(
-              '${paragraphDuration.inSeconds}',
+            durationText: _formatDurationText(
+              l10n,
+              paragraphDuration: paragraphDuration,
+              totalDuration: player.totalDuration,
+              paragraphTotal: state.totalParagraphs,
             ),
             paragraphContent: ParagraphSentenceListCard(
               sentences: sentences,
@@ -941,6 +950,56 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       ),
     );
   }
+}
+
+/// 当前播放句子的全局序号（1-based）。
+///
+/// [localIdx] 为 -1（未播放/录音阶段）时取当前段落首句的全局序号。
+int _globalSentenceIdx(List<Sentence> paragraphSentences, int localIdx) {
+  if (paragraphSentences.isEmpty) return 0;
+  final pick = (localIdx >= 0 && localIdx < paragraphSentences.length)
+      ? paragraphSentences[localIdx]
+      : paragraphSentences.first;
+  return pick.index + 1;
+}
+
+/// 友好的时长展示：不到 1 分钟显示「X秒」，否则显示「X分Y秒」
+String _formatHumanDuration(AppLocalizations l10n, Duration duration) {
+  final totalSec = duration.inSeconds;
+  if (totalSec < 60) return l10n.retellParagraphDuration('$totalSec');
+  return l10n.durationMinutesSeconds(totalSec ~/ 60, totalSec % 60);
+}
+
+/// 时长文案：单段时只显示总长，多段时显示「段长 / 总长」
+String _formatDurationText(
+  AppLocalizations l10n, {
+  required Duration paragraphDuration,
+  required Duration totalDuration,
+  required int paragraphTotal,
+}) {
+  if (paragraphTotal <= 1) return _formatHumanDuration(l10n, totalDuration);
+  return '${_formatHumanDuration(l10n, paragraphDuration)} / '
+      '${_formatHumanDuration(l10n, totalDuration)}';
+}
+
+/// 进度文案：单段时只显示句子，多段时拼接段落信息
+String _buildProgressText(
+  AppLocalizations l10n, {
+  required int sentenceCurrent,
+  required int sentenceTotal,
+  required int paragraphCurrent,
+  required int paragraphTotal,
+}) {
+  final sentencePart = l10n.intensiveListenProgress(
+    sentenceCurrent,
+    sentenceTotal,
+  );
+  if (paragraphTotal <= 1) return sentencePart;
+  final paragraphPart = l10n.retellParagraphProgress(
+    paragraphCurrent,
+    paragraphTotal,
+  );
+  return '$paragraphPart · $sentencePart';
 }
 
 bool _isRetellMainPlaybackActive(RetellPlayerState state) {

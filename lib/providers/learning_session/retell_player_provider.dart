@@ -407,6 +407,20 @@ class RetellPlayer extends _$RetellPlayer {
       ? _paragraphs[state.currentParagraphIndex]
       : [];
 
+  /// 全部段落的句子总数（用于以句子粒度展示进度）
+  int get totalSentenceCount =>
+      _paragraphs.fold(0, (sum, p) => sum + p.length);
+
+  /// 所有段落的累计时长（各段首尾相加）
+  Duration get totalDuration {
+    var sum = Duration.zero;
+    for (final p in _paragraphs) {
+      if (p.isEmpty) continue;
+      sum += p.last.endTime - p.first.startTime;
+    }
+    return sum;
+  }
+
   /// 获取所有段落
   List<List<Sentence>> get paragraphs => List.unmodifiable(_paragraphs);
 

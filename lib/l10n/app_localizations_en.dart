@@ -1204,6 +1204,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String durationMinutesSeconds(int minutes, int seconds) {
+    return '${minutes}m ${seconds}s';
+  }
+
+  @override
   String get retellPreListenHint => 'Listen first, then retell';
 
   @override

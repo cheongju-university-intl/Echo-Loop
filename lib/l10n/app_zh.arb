@@ -497,6 +497,13 @@
       "duration": { "type": "String" }
     }
   },
+  "durationMinutesSeconds": "{minutes}分{seconds}秒",
+  "@durationMinutesSeconds": {
+    "placeholders": {
+      "minutes": { "type": "int" },
+      "seconds": { "type": "int" }
+    }
+  },
   "retellPreListenHint": "先听再复述",
   "retellListeningPhase": "认真听...",
   "retellPromptToRetell": "用自己的话复述",

@@ -2198,6 +2198,12 @@ abstract class AppLocalizations {
   /// **'{duration}s'**
   String retellParagraphDuration(String duration);
 
+  /// No description provided for @durationMinutesSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m {seconds}s'**
+  String durationMinutesSeconds(int minutes, int seconds);
+
   /// No description provided for @retellPreListenHint.
   ///
   /// In en, this message translates to:

@@ -1169,6 +1169,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String durationMinutesSeconds(int minutes, int seconds) {
+    return '$minutes分$seconds秒';
+  }
+
+  @override
   String get retellPreListenHint => '先听再复述';
 
   @override

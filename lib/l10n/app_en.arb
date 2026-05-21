@@ -654,6 +654,13 @@
       "duration": { "type": "String" }
     }
   },
+  "durationMinutesSeconds": "{minutes}m {seconds}s",
+  "@durationMinutesSeconds": {
+    "placeholders": {
+      "minutes": { "type": "int" },
+      "seconds": { "type": "int" }
+    }
+  },
   "retellPreListenHint": "Listen first, then retell",
   "retellListeningPhase": "Listening...",
   "retellPromptToRetell": "Retell it in your own words",
