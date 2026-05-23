@@ -28,6 +28,7 @@ import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../listening_practice/bookmark_manager.dart';
 import '../learned_vocabulary_tracker_provider.dart';
+import '../notification_permission_provider.dart';
 import '../retell_recording_controller_provider.dart';
 import '../settings_provider.dart';
 import 'countdown_controller.dart';
@@ -406,6 +407,15 @@ class RetellPlayer extends _$RetellPlayer {
       sentence.isBookmarked = true;
     }
     state = state.copyWith(bookmarkedSentenceIndices: newSet);
+
+    // 价值锚点：只在「添加收藏」时尝试触发通知权限 pre-prompt
+    if (!isCurrentlyBookmarked) {
+      unawaited(
+        ref
+            .read(notificationPermissionServiceProvider)
+            .maybeTriggerPrompt(),
+      );
+    }
   }
 
   /// 获取当前播放句子的全局句子索引（用于保存断点）。

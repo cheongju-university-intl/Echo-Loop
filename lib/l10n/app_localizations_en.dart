@@ -2287,6 +2287,33 @@ class AppLocalizationsEn extends AppLocalizations {
       'Get notified when it\'s time to review, helping you stay on track';
 
   @override
+  String get notificationPromptTitle => 'Lock in what you\'ve learned';
+
+  @override
+  String get notificationPromptBody =>
+      'Memory sticks when you review at the right moments. We\'ll nudge you only when it matters.';
+
+  @override
+  String get notificationPromptCtaGrant => 'Turn on reminders';
+
+  @override
+  String get notificationPromptCtaDismiss => 'Not now';
+
+  @override
+  String get notificationDisabledBanner =>
+      'Notifications are off. You won\'t receive review reminders.';
+
+  @override
+  String get notificationDisabledBannerCta => 'Open Settings';
+
+  @override
+  String get notificationNotGrantedBanner =>
+      'Allow notifications to receive daily review reminders.';
+
+  @override
+  String get notificationNotGrantedBannerCta => 'Turn on';
+
+  @override
   String recentCompletions(int count) {
     return 'Recently Completed ($count)';
   }

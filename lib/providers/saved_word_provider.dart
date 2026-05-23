@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../analytics/analytics_providers.dart';
@@ -7,6 +9,7 @@ import '../database/app_database.dart';
 import '../database/providers.dart';
 import '../models/dict_entry.dart';
 import '../services/dictionary_service.dart';
+import 'notification_permission_provider.dart';
 
 part 'saved_word_provider.g.dart';
 
@@ -48,6 +51,11 @@ class SavedWordList extends _$SavedWordList {
       EventParams.word: word,
       ...ref.audioEventParams(audioItemId),
     });
+
+    // 价值锚点：首次收藏单词 → 尝试触发通知权限 pre-prompt
+    unawaited(
+      ref.read(notificationPermissionServiceProvider).maybeTriggerPrompt(),
+    );
   }
 
   /// 取消收藏单词

@@ -4088,6 +4088,54 @@ abstract class AppLocalizations {
   /// **'Get notified when it\'s time to review, helping you stay on track'**
   String get audioReviewReminderDescription;
 
+  /// No description provided for @notificationPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock in what you\'ve learned'**
+  String get notificationPromptTitle;
+
+  /// No description provided for @notificationPromptBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory sticks when you review at the right moments. We\'ll nudge you only when it matters.'**
+  String get notificationPromptBody;
+
+  /// No description provided for @notificationPromptCtaGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on reminders'**
+  String get notificationPromptCtaGrant;
+
+  /// No description provided for @notificationPromptCtaDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get notificationPromptCtaDismiss;
+
+  /// No description provided for @notificationDisabledBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are off. You won\'t receive review reminders.'**
+  String get notificationDisabledBanner;
+
+  /// No description provided for @notificationDisabledBannerCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings'**
+  String get notificationDisabledBannerCta;
+
+  /// No description provided for @notificationNotGrantedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications to receive daily review reminders.'**
+  String get notificationNotGrantedBanner;
+
+  /// No description provided for @notificationNotGrantedBannerCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get notificationNotGrantedBannerCta;
+
   /// No description provided for @recentCompletions.
   ///
   /// In en, this message translates to:

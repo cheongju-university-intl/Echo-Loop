@@ -2219,6 +2219,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioReviewReminderDescription => '到复习时间时通知你，帮你保持复习节奏';
 
   @override
+  String get notificationPromptTitle => '开启提醒，让记忆更牢';
+
+  @override
+  String get notificationPromptBody => '记得牢的关键是适时回顾。我们只在关键节点轻轻提醒。';
+
+  @override
+  String get notificationPromptCtaGrant => '开启提醒';
+
+  @override
+  String get notificationPromptCtaDismiss => '暂不';
+
+  @override
+  String get notificationDisabledBanner => '通知已关闭，将无法接收复习提醒。';
+
+  @override
+  String get notificationDisabledBannerCta => '前往设置';
+
+  @override
+  String get notificationNotGrantedBanner => '允许通知，按时收到每日复习提醒。';
+
+  @override
+  String get notificationNotGrantedBannerCta => '开启';
+
+  @override
   String recentCompletions(int count) {
     return '最近完成 ($count)';
   }

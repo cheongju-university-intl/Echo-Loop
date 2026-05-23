@@ -4,6 +4,8 @@
 /// 实现 Tab 切换并保持各 Tab 状态。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +21,7 @@ import '../providers/app_update_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/notification_permission_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../providers/review_reminder_provider.dart';
 import '../providers/study_stats_provider.dart';
@@ -32,6 +35,8 @@ import '../providers/new_user_guide_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_update_dialog.dart';
 import '../widgets/guide_flow.dart';
+import '../widgets/notification_permission_dialog.dart';
+import 'app_router.dart' show rootNavigatorKey;
 
 /// 主导航壳组件 — 包含 NavigationRail / NavigationBar + 内容区域
 class MainShell extends ConsumerStatefulWidget {
@@ -50,6 +55,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       _progressMapSubscription;
   ProviderSubscription<AppUpdateState>? _appUpdateSubscription;
   ProviderSubscription<ReminderSettings>? _reminderSettingsSubscription;
+  ProviderSubscription<int>? _notificationPromptSubscription;
   late final AppLifecycleListener _lifecycleListener;
 
   /// 资源库 tab 图标的引导 target key；在整个 shell 生命周期内保持稳定。
@@ -161,6 +167,74 @@ class _MainShellState extends ConsumerState<MainShell> {
         },
       );
 
+      // 监听通知权限 pre-prompt 触发器：价值锚点（首次完成 sub_stage / 收藏）
+      // 调用 `maybeTriggerPrompt()` 通过判定后会把计数 +1，本监听弹出对话框。
+      // 用根 navigator context 弹，保证覆盖所有子路由。
+      //
+      // **延迟 500ms**：锚点常在子页面里触发（如 BlindListenPlayerScreen
+      // 完成对话框确认后 `completeCurrentSubStage` 紧接 `exitLearningMode` +
+      // `context.pop()`）。若立即 push dialog 到 root navigator，紧随其后的
+      // pop 会把 dialog 当作栈顶给关掉。给 in-flight 导航 500ms 落定再弹。
+      //
+      // **等 guide flow 结束**：sub_stage 完成回到学习计划页同时会触发新手引导
+      // showcase（如 `learning_plan_pause_learning`），两个 modal 同时出现会
+      // 互相挡住、抢占用户注意力。polling 等 `guideControllerProvider.isActive`
+      // 转为 false 后再弹 pre-prompt。
+      _notificationPromptSubscription = ref.listenManual<int>(
+        notificationPromptTriggerProvider,
+        (previous, next) async {
+          AppLogger.log(
+            'NotifPerm',
+            'MainShell listener: previous=$previous next=$next',
+          );
+          if (previous == null || previous == next) return;
+
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          if (!mounted) {
+            AppLogger.log(
+              'NotifPerm',
+              'MainShell listener: unmounted during delay, skip',
+            );
+            ref
+                .read(notificationPromptTriggerProvider.notifier)
+                .onDialogClosed();
+            return;
+          }
+
+          // 等待所有正在显示的 guide flow（showcase tooltip 等）结束。
+          // 事件驱动：通过 listen guideControllerProvider，active 转 inactive
+          // 的瞬间触发；如果 guide 永远不结束，dialog 也不弹——那是 guide 系统的 bug。
+          await _waitForGuideToFinish();
+          if (!mounted) {
+            ref
+                .read(notificationPromptTriggerProvider.notifier)
+                .onDialogClosed();
+            return;
+          }
+
+          final ctx = rootNavigatorKey.currentContext;
+          if (ctx == null) {
+            AppLogger.log(
+              'NotifPerm',
+              'MainShell listener: rootNavigatorKey.currentContext is null, skip',
+            );
+            ref
+                .read(notificationPromptTriggerProvider.notifier)
+                .onDialogClosed();
+            return;
+          }
+          AppLogger.log('NotifPerm', 'MainShell listener: showing dialog');
+          try {
+            await showNotificationPermissionDialog(ctx, ref);
+            AppLogger.log('NotifPerm', 'MainShell listener: dialog closed');
+          } finally {
+            ref
+                .read(notificationPromptTriggerProvider.notifier)
+                .onDialogClosed();
+          }
+        },
+      );
+
     });
   }
 
@@ -171,7 +245,38 @@ class _MainShellState extends ConsumerState<MainShell> {
     _progressMapSubscription?.close();
     _appUpdateSubscription?.close();
     _reminderSettingsSubscription?.close();
+    _notificationPromptSubscription?.close();
     super.dispose();
+  }
+
+  /// 等待 guide flow 结束（事件驱动）。如果当前没有 active guide 立刻 return；
+  /// 否则监听 [guideControllerProvider]，active 转 inactive 时 complete。
+  Future<void> _waitForGuideToFinish() {
+    if (!ref.read(guideControllerProvider).isActive) {
+      return Future.value();
+    }
+    final completer = Completer<void>();
+    late ProviderSubscription<GuideControllerState> sub;
+    sub = ref.listenManual<GuideControllerState>(
+      guideControllerProvider,
+      (previous, next) {
+        if (!next.isActive && !completer.isCompleted) {
+          sub.close();
+          AppLogger.log(
+            'NotifPerm',
+            'MainShell listener: guide finished, resuming pre-prompt',
+          );
+          completer.complete();
+        }
+      },
+    );
+    AppLogger.log(
+      'NotifPerm',
+      'MainShell listener: guide active '
+      '(${ref.read(guideControllerProvider).activeFlowId}), '
+      'waiting via listener…',
+    );
+    return completer.future;
   }
 
   /// 显示版本更新对话框

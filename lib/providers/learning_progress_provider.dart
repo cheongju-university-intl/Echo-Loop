@@ -16,6 +16,7 @@ import '../models/learning_progress.dart';
 import '../services/app_logger.dart';
 import 'learning_plan_provider.dart';
 import 'learning_settings_provider.dart';
+import 'notification_permission_provider.dart';
 import 'time_provider.dart';
 
 part 'learning_progress_provider.g.dart';
@@ -401,6 +402,14 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     // 完成后若新位置仍是复述类 + 自动跳过开启 → 连续推进
     await _autoSkipRetellIfEnabled(audioItemId);
+
+    // 价值锚点：用户产出一次学习成果 → 尝试触发通知权限 pre-prompt
+    // （内部按 系统状态 + SP 冷却 自行去重，非首次也安全调用）
+    unawaited(
+      ref
+          .read(notificationPermissionServiceProvider)
+          .maybeTriggerPrompt(),
+    );
   }
 
   /// 用户跳过当前子阶段（手动按钮 / 自动跳过策略）。

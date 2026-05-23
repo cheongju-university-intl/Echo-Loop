@@ -5,6 +5,8 @@
 /// 由复述页面的句子列表和收藏页面的句子列表共同使用。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,6 +19,7 @@ import '../models/audio_item.dart' as model;
 import '../models/sentence.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
+import '../providers/notification_permission_provider.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
@@ -129,11 +132,21 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
       }
 
       // 埋点：收藏/取消收藏句子
+      final isAdding = !_isBookmarked;
       ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
         ...ref.audioEventParams(args.audioItemId),
         EventParams.sentenceIndex: args.sentenceIndex,
         EventParams.action: _isBookmarked ? 'remove' : 'add',
       });
+
+      // 价值锚点：只在「添加收藏」时尝试触发通知权限 pre-prompt
+      if (isAdding) {
+        unawaited(
+          ref
+              .read(notificationPermissionServiceProvider)
+              .maybeTriggerPrompt(),
+        );
+      }
 
       if (mounted) {
         setState(() => _isBookmarked = !_isBookmarked);

@@ -927,6 +927,15 @@
   "audioReviewReminderToggle": "音频到期提醒",
   "audioReviewReminderDescription": "到复习时间时通知你，帮你保持复习节奏",
 
+  "notificationPromptTitle": "开启提醒，让记忆更牢",
+  "notificationPromptBody": "记得牢的关键是适时回顾。我们只在关键节点轻轻提醒。",
+  "notificationPromptCtaGrant": "开启提醒",
+  "notificationPromptCtaDismiss": "暂不",
+  "notificationDisabledBanner": "通知已关闭，将无法接收复习提醒。",
+  "notificationDisabledBannerCta": "前往设置",
+  "notificationNotGrantedBanner": "允许通知，按时收到每日复习提醒。",
+  "notificationNotGrantedBannerCta": "开启",
+
   "recentCompletions": "最近完成 ({count})",
   "recentCompletionsSummary": "过去24小时",
   "timeAgoJustNow": "刚刚",

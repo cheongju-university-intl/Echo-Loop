@@ -11,6 +11,7 @@ import '../../models/listening_practice_state.dart';
 import '../../services/app_logger.dart';
 import '../../services/storage_service.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../notification_permission_provider.dart';
 import 'bookmark_manager.dart';
 import 'playback_state_storage.dart';
 import 'sentence_tracker.dart';
@@ -728,6 +729,15 @@ class ListeningPractice extends _$ListeningPractice {
         EventParams.sentenceIndex: index,
         EventParams.action: isRemoving ? 'remove' : 'add',
       });
+    }
+
+    // 价值锚点：只在「添加收藏」时尝试触发通知权限 pre-prompt
+    if (!isRemoving) {
+      unawaited(
+        ref
+            .read(notificationPermissionServiceProvider)
+            .maybeTriggerPrompt(),
+      );
     }
 
     final inBookmarksMode = state.playlistMode == PlaylistMode.bookmarks;

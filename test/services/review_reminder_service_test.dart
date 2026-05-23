@@ -437,7 +437,7 @@ void main() {
       final intents = <NotificationIntent>[];
       bridge.intents.listen(intents.add);
 
-      await service.init();
+      await service.initPlugin();
 
       // init 可能因为 FlutterTimezone 失败而 catch——检查 pending intent 作为备选
       if (intents.isEmpty) {
@@ -455,7 +455,7 @@ void main() {
       final intents = <NotificationIntent>[];
       bridge.intents.listen(intents.add);
 
-      await service.init();
+      await service.initPlugin();
 
       if (intents.isEmpty) {
         final pending = bridge.takePendingIntent();
@@ -472,7 +472,7 @@ void main() {
       final intents = <NotificationIntent>[];
       bridge.intents.listen(intents.add);
 
-      await service.init();
+      await service.initPlugin();
 
       if (intents.isEmpty) {
         final pending = bridge.takePendingIntent();
@@ -497,10 +497,66 @@ void main() {
       final intents = <NotificationIntent>[];
       bridge.intents.listen(intents.add);
 
-      await service.init();
+      await service.initPlugin();
 
       expect(intents, isEmpty);
       expect(bridge.takePendingIntent(), isNull);
+    });
+  });
+
+  group('initPlugin 不触发权限请求', () {
+    test('initPlugin 不去 resolve 平台实现以请求权限', () async {
+      final service = createService();
+
+      await service.initPlugin();
+
+      // 行为契约：initPlugin 必须保持 silent，不应主动 resolve 出 plugin
+      // 来调任何 request*。mock 默认 stub 返回 null，可用作回归保护。
+      verifyNever(
+        () => mockPlugin
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >(),
+      );
+      verifyNever(
+        () => mockPlugin
+            .resolvePlatformSpecificImplementation<
+              MacOSFlutterLocalNotificationsPlugin
+            >(),
+      );
+      verifyNever(
+        () => mockPlugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >(),
+      );
+    });
+
+    test('initPlugin 使用 Darwin request* 全 false 的 settings', () async {
+      final service = createService();
+
+      await service.initPlugin();
+
+      // 捕获实际传给 initialize 的 settings
+      final captured = verify(
+        () => mockPlugin.initialize(
+          captureAny(),
+          onDidReceiveNotificationResponse:
+              any(named: 'onDidReceiveNotificationResponse'),
+          onDidReceiveBackgroundNotificationResponse:
+              any(named: 'onDidReceiveBackgroundNotificationResponse'),
+        ),
+      ).captured;
+      expect(captured, isNotEmpty);
+      final settings = captured.single as InitializationSettings;
+      final ios = settings.iOS;
+      final macos = settings.macOS;
+      expect(ios?.requestAlertPermission, isFalse);
+      expect(ios?.requestBadgePermission, isFalse);
+      expect(ios?.requestSoundPermission, isFalse);
+      expect(macos?.requestAlertPermission, isFalse);
+      expect(macos?.requestBadgePermission, isFalse);
+      expect(macos?.requestSoundPermission, isFalse);
     });
   });
 }

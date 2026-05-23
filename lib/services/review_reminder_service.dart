@@ -6,6 +6,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:universal_io/io.dart' as io;
 
+import 'app_logger.dart';
 import 'notification_tap_router_bridge.dart';
 import 'review_reminder_time_calculator.dart';
 
@@ -105,7 +106,16 @@ class ReviewReminderService {
     return io.Platform.isIOS || io.Platform.isAndroid || io.Platform.isMacOS;
   }
 
-  Future<void> init() async {
+  /// 仅初始化插件 + 时区，**不主动请求任何系统授权**。
+  ///
+  /// `DarwinInitializationSettings` 的 request* 三参数显式置 false，
+  /// 避免 iOS / macOS 在 `_plugin.initialize()` 时弹出系统授权框。
+  /// 调度通知本身在未授权时也不会抛错（iOS 静默不展示；后续授权后
+  /// 已有的 schedule 仍按时展示）。
+  ///
+  /// 真正的权限请求由 [requestNotificationPermission] 在 in-app
+  /// pre-prompt 取得用户同意后显式发起。
+  Future<void> initPlugin() async {
     if (_initialized) return;
     if (!_supportsSystemNotification) return;
 
@@ -114,8 +124,16 @@ class ReviewReminderService {
 
       const initSettings = InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
-        macOS: DarwinInitializationSettings(),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
+        macOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
       );
 
       await _plugin.initialize(
@@ -125,7 +143,6 @@ class ReviewReminderService {
             reviewReminderBackgroundNotificationTap,
       );
 
-      await _requestPermissions();
       _initialized = true;
 
       final launchDetails = await _plugin.getNotificationAppLaunchDetails();
@@ -134,8 +151,143 @@ class ReviewReminderService {
     } on MissingPluginException {
       debugPrint('ReviewReminderService: plugin unavailable on this runtime');
     } catch (e) {
-      debugPrint('ReviewReminderService.init error: $e');
+      debugPrint('ReviewReminderService.initPlugin error: $e');
     }
+  }
+
+  /// 检查系统层面是否已授权可发通知。
+  ///
+  /// 用 flutter_local_notifications 的 `checkPermissions` (iOS / macOS) 和
+  /// `areNotificationsEnabled` (Android) — fresh fetch、跨平台真值源。
+  /// 比 permission_handler 更可靠（后者在 iOS 上 status 跟 request 偶发不一致）。
+  Future<bool> checkNotificationGranted() async {
+    if (!_supportsSystemNotification) return false;
+    try {
+      if (io.Platform.isAndroid) {
+        final android = _plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        final enabled = (await android?.areNotificationsEnabled()) ?? false;
+        AppLogger.log(
+          'NotifPerm',
+          'checkNotificationGranted: android=$enabled',
+        );
+        return enabled;
+      }
+      if (io.Platform.isIOS) {
+        final ios = _plugin
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >();
+        final opts = await ios?.checkPermissions();
+        final enabled = opts?.isEnabled ?? false;
+        AppLogger.log(
+          'NotifPerm',
+          'checkNotificationGranted: ios isEnabled=$enabled '
+          'isAlertEnabled=${opts?.isAlertEnabled} '
+          'isBadgeEnabled=${opts?.isBadgeEnabled}',
+        );
+        return enabled;
+      }
+      if (io.Platform.isMacOS) {
+        final macos = _plugin
+            .resolvePlatformSpecificImplementation<
+              MacOSFlutterLocalNotificationsPlugin
+            >();
+        final opts = await macos?.checkPermissions();
+        final enabled = opts?.isEnabled ?? false;
+        AppLogger.log(
+          'NotifPerm',
+          'checkNotificationGranted: macos isEnabled=$enabled '
+          'isAlertEnabled=${opts?.isAlertEnabled} '
+          'isBadgeEnabled=${opts?.isBadgeEnabled}',
+        );
+        return enabled;
+      }
+      return false;
+    } catch (e) {
+      AppLogger.log('NotifPerm', 'checkNotificationGranted ERROR: $e');
+      return false;
+    }
+  }
+
+  /// 显式请求系统通知权限。调用前应已通过 in-app pre-prompt 取得用户同意。
+  ///
+  /// 三端任一为 true 即视为整体成功。注意 iOS / macOS：用户拒过一次后
+  /// 再调 requestPermissions 立刻返回 false（不再弹框），属系统行为。
+  Future<bool> requestNotificationPermission() async {
+    if (!_supportsSystemNotification) return false;
+
+    bool anyGranted = false;
+
+    try {
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      final r = await android?.requestNotificationsPermission();
+      AppLogger.log(
+        'NotifPerm',
+        'requestNotificationPermission: android returned $r',
+      );
+      if (r == true) anyGranted = true;
+    } catch (e) {
+      AppLogger.log(
+        'NotifPerm',
+        'requestNotificationPermission android ERROR: $e',
+      );
+    }
+
+    try {
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      final r = await ios?.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      AppLogger.log(
+        'NotifPerm',
+        'requestNotificationPermission: ios returned $r',
+      );
+      if (r == true) anyGranted = true;
+    } catch (e) {
+      AppLogger.log(
+        'NotifPerm',
+        'requestNotificationPermission ios ERROR: $e',
+      );
+    }
+
+    try {
+      final macos = _plugin
+          .resolvePlatformSpecificImplementation<
+            MacOSFlutterLocalNotificationsPlugin
+          >();
+      final r = await macos?.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      AppLogger.log(
+        'NotifPerm',
+        'requestNotificationPermission: macos returned $r',
+      );
+      if (r == true) anyGranted = true;
+    } catch (e) {
+      AppLogger.log(
+        'NotifPerm',
+        'requestNotificationPermission macos ERROR: $e',
+      );
+    }
+
+    AppLogger.log(
+      'NotifPerm',
+      'requestNotificationPermission: final anyGranted=$anyGranted',
+    );
+    return anyGranted;
   }
 
   /// 调度未来 15 天的收藏复习提醒（每天一个独立通知）
@@ -147,7 +299,7 @@ class ReviewReminderService {
   }) async {
     if (!_supportsSystemNotification) return;
 
-    await init();
+    await initPlugin();
     if (!_initialized) return;
 
     if (!hasSavedContent) {
@@ -211,7 +363,7 @@ class ReviewReminderService {
   ) async {
     if (!_supportsSystemNotification) return;
 
-    await init();
+    await initPlugin();
     if (!_initialized) return;
 
     // 构建快照
@@ -335,26 +487,6 @@ class ReviewReminderService {
       }
     }
     _scheduledPerAudioIds.clear();
-  }
-
-  Future<void> _requestPermissions() async {
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    await android?.requestNotificationsPermission();
-
-    final ios = _plugin
-        .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >();
-    await ios?.requestPermissions(alert: true, badge: true, sound: true);
-
-    final macos = _plugin
-        .resolvePlatformSpecificImplementation<
-          MacOSFlutterLocalNotificationsPlugin
-        >();
-    await macos?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
   Future<void> _ensureTimezoneReady() async {

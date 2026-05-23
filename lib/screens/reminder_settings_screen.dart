@@ -4,24 +4,166 @@
 /// 音频复习提醒（开关），通过 [ReminderSettingsNotifier] 持久化。
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
+import 'package:url_launcher/url_launcher.dart' as launcher;
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../l10n/app_localizations.dart';
 import '../models/reminder_settings.dart';
+import '../providers/notification_permission_provider.dart';
 import '../providers/reminder_settings_provider.dart';
+import '../services/app_logger.dart';
+import '../services/notification_permission_service.dart';
 import '../theme/app_theme.dart';
 
 /// 分钟可选值（15 分钟间隔）
 const _minuteOptions = [0, 15, 30, 45];
 
 /// 提醒设置页面
-class ReminderSettingsScreen extends ConsumerWidget {
+class ReminderSettingsScreen extends ConsumerStatefulWidget {
   const ReminderSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReminderSettingsScreen> createState() =>
+      _ReminderSettingsScreenState();
+}
+
+class _ReminderSettingsScreenState
+    extends ConsumerState<ReminderSettingsScreen>
+    with WidgetsBindingObserver {
+  /// 当前通知权限状态；null 表示未读取 / 不支持平台。
+  ///
+  /// 用 [NotificationPermissionState] 抽象（granted / canRequest / blocked），
+  /// 真值由 flutter_local_notifications 提供。
+  NotificationPermissionState? _notificationState;
+
+  @override
+  void initState() {
+    super.initState();
+    // 用 WidgetsBindingObserver 而不是 AppLifecycleListener：
+    // macOS 上窗口焦点切换（如系统设置和 app 并排时）AppLifecycleListener.onResume
+    // 不稳定触发，导致 toggle 完通知开关切回 app 后 banner 不刷新。
+    WidgetsBinding.instance.addObserver(this);
+    _refreshStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    AppLogger.log('NotifPerm', 'settings: lifecycle -> ${state.name}');
+    // resumed (app 拿回焦点) / inactive (macOS 窗口部分活跃) 都触发刷新。
+    // hidden / paused 不刷新（无意义）。
+    if (state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive) {
+      _refreshStatus();
+    }
+  }
+
+  /// 当前平台是否原生支持通知。Web / Linux 上不显示 banner（永远点不掉无意义）。
+  bool get _platformSupportsNotification {
+    if (kIsWeb) return false;
+    return Platform.isIOS ||
+        Platform.isAndroid ||
+        Platform.isMacOS;
+  }
+
+  /// 读取系统通知权限。用户从系统设置回来时（AppLifecycle.resumed）也调一次。
+  Future<void> _refreshStatus() async {
+    if (!_platformSupportsNotification) {
+      AppLogger.log(
+        'NotifPerm',
+        'settings: platform does not support notifications, skip banner',
+      );
+      return;
+    }
+    try {
+      final s = await ref
+          .read(notificationPermissionServiceProvider)
+          .getCurrentState();
+      AppLogger.log(
+        'NotifPerm',
+        'settings: _refreshStatus -> ${s.name}',
+      );
+      if (!mounted) return;
+      setState(() => _notificationState = s);
+    } catch (e) {
+      AppLogger.log('NotifPerm', 'settings: _refreshStatus ERROR: $e');
+      // 平台错误时不显示 banner（不误导）
+      if (mounted) setState(() => _notificationState = null);
+    }
+  }
+
+  /// 通知是否真正被系统阻止 → 红色警告横幅 + 跳系统设置
+  bool get _isNotificationBlocked =>
+      _notificationState == NotificationPermissionState.blocked;
+
+  /// 通知还没请求过 → 蓝色信息横幅 + 主动弹系统授权框
+  bool get _isNotificationCanRequest =>
+      _notificationState == NotificationPermissionState.canRequest;
+
+  /// 用户在 canRequest banner 上点「开启」：复用 pre-prompt 的 accept 路径，
+  /// 走系统授权 API（埋点 + 持久化都一致），权限结果通过 lifecycle resume 刷新。
+  Future<void> _onTurnOnNotification() async {
+    AppLogger.log('NotifPerm', 'settings: banner CTA tapped (turn on)');
+    final granted = await ref
+        .read(notificationPermissionServiceProvider)
+        .onUserAcceptedPrompt();
+    AppLogger.log(
+      'NotifPerm',
+      'settings: banner CTA result granted=$granted; refreshing status',
+    );
+    await _refreshStatus();
+  }
+
+  Future<void> _onOpenSystemSettings() async {
+    AppLogger.log('NotifPerm', 'settings: open-system-settings tapped');
+    ref.read(analyticsServiceProvider).track(
+      Events.notificationSettingsOpenTapped,
+      const {},
+    );
+    // macOS 上 permission_handler.openAppSettings() 不可靠（旧 URL 失效）。
+    // 用 url_launcher 直接 launch macOS 13+ 的新通知设置 URL。
+    // iOS / Android 仍走 permission_handler，它在这两个平台行为正确。
+    if (!kIsWeb && Platform.isMacOS) {
+      final uri = Uri.parse(
+        'x-apple.systempreferences:com.apple.Notifications-Settings.extension',
+      );
+      final ok = await launcher.launchUrl(uri);
+      AppLogger.log(
+        'NotifPerm',
+        'settings: macOS launchUrl notifications-settings ok=$ok',
+      );
+      if (!ok) {
+        // fallback：尝试旧 URL
+        final legacy = Uri.parse(
+          'x-apple.systempreferences:com.apple.preference.notifications',
+        );
+        final ok2 = await launcher.launchUrl(legacy);
+        AppLogger.log(
+          'NotifPerm',
+          'settings: macOS launchUrl legacy fallback ok=$ok2',
+        );
+      }
+      return;
+    }
+    final ok = await ph.openAppSettings();
+    AppLogger.log('NotifPerm', 'settings: ph.openAppSettings returned $ok');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(reminderSettingsNotifierProvider);
     final theme = Theme.of(context);
@@ -35,6 +177,27 @@ class ReminderSettingsScreen extends ConsumerWidget {
           vertical: AppSpacing.s,
         ),
         children: [
+          // ── 通知权限横幅（按状态分两态） ──
+          if (_isNotificationBlocked) ...[
+            _NotificationStatusBanner(
+              tone: _BannerTone.error,
+              icon: Icons.notifications_off_outlined,
+              message: l10n.notificationDisabledBanner,
+              ctaLabel: l10n.notificationDisabledBannerCta,
+              onCta: _onOpenSystemSettings,
+            ),
+            const SizedBox(height: AppSpacing.m),
+          ] else if (_isNotificationCanRequest) ...[
+            _NotificationStatusBanner(
+              tone: _BannerTone.warning,
+              icon: Icons.notifications_active_outlined,
+              message: l10n.notificationNotGrantedBanner,
+              ctaLabel: l10n.notificationNotGrantedBannerCta,
+              onCta: _onTurnOnNotification,
+            ),
+            const SizedBox(height: AppSpacing.m),
+          ],
+
           // ── 收藏复习提醒 ──
           _SectionHeader(title: l10n.savedReviewReminderSection),
           Card(
@@ -151,6 +314,79 @@ class ReminderSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────
 // 子组件
 // ─────────────────────────────────────────────────────────
+
+/// 通知权限提示横幅。
+///
+/// 两种 tone：
+/// - [_BannerTone.error]：系统通知已 denied / restricted → 红色，引导跳设置
+/// - [_BannerTone.warning]：尚未请求过通知权限（notDetermined）→ 黄色，引导主动允许
+enum _BannerTone { error, warning }
+
+/// 警告色（黄/琥珀），用于"还可以授权但未授权"的轻提醒。
+/// Material 3 没有标准 warning role，用 amber.shade700 作为统一警告色。
+const Color _kWarnAccent = Color(0xFFFFA000); // Material amber 700
+
+class _NotificationStatusBanner extends StatelessWidget {
+  final _BannerTone tone;
+  final IconData icon;
+  final String message;
+  final String ctaLabel;
+  final VoidCallback onCta;
+
+  const _NotificationStatusBanner({
+    required this.tone,
+    required this.icon,
+    required this.message,
+    required this.ctaLabel,
+    required this.onCta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final accent = tone == _BannerTone.error
+        ? colorScheme.error
+        : _kWarnAccent;
+    return Card(
+      color: accent.withValues(alpha: 0.08),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: accent.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.m,
+          AppSpacing.s,
+          AppSpacing.s,
+          AppSpacing.s,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: accent),
+            const SizedBox(width: AppSpacing.s),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onCta,
+              child: Text(
+                ctaLabel,
+                style: TextStyle(color: accent, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Section 标题
 class _SectionHeader extends StatelessWidget {

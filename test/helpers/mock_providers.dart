@@ -7,10 +7,13 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart' as ja;
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:echo_loop/analytics/analytics_channel.dart';
 import 'package:echo_loop/analytics/analytics_providers.dart';
 import 'package:echo_loop/analytics/analytics_service.dart';
+import 'package:echo_loop/providers/notification_permission_provider.dart';
+import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/analytics/consent_manager.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/models/collection.dart';
@@ -52,6 +55,10 @@ import 'package:echo_loop/models/sentence.dart';
 import 'package:echo_loop/providers/app_update_provider.dart';
 import 'package:echo_loop/providers/dictionary_provider.dart';
 import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
+import 'package:echo_loop/providers/flashcard/flashcard_provider.dart';
+import 'package:echo_loop/providers/flashcard/flashcard_flow_phase.dart';
+import 'package:echo_loop/models/flashcard_item.dart';
+import 'package:echo_loop/models/flashcard_settings.dart';
 import 'package:echo_loop/services/asr/offline_asr_engine.dart';
 
 // 数据工厂（createTestAudioItem / createTestSentences / createTestCollection /
@@ -120,6 +127,22 @@ Override analyticsOverride() {
   return analyticsServiceProvider.overrideWithValue(
     createTestAnalyticsServiceSync(),
   );
+}
+
+class _FakeNotificationPermissionService extends Mock
+    implements NotificationPermissionService {}
+
+/// 通知权限锚点 noop override（用于业务测试不必关心 prompt 触发的场景）
+///
+/// 用法：在 `ProviderContainer` overrides 列表里加入 `notificationPermissionOverride()`。
+/// fake 的 `maybeTriggerPrompt` / `onUserAcceptedPrompt` / `onUserDismissedPrompt`
+/// 都会返回成功并不产生副作用。
+Override notificationPermissionOverride() {
+  final fake = _FakeNotificationPermissionService();
+  when(() => fake.maybeTriggerPrompt()).thenAnswer((_) async {});
+  when(() => fake.onUserAcceptedPrompt()).thenAnswer((_) async => true);
+  when(() => fake.onUserDismissedPrompt()).thenAnswer((_) async {});
+  return notificationPermissionServiceProvider.overrideWithValue(fake);
 }
 
 /// 返回学习设置 Provider 系列的 override 列表（用于测试默认/自定义初值）。
@@ -1776,4 +1799,117 @@ Override offlineAsrOverride({
       ),
     ),
   );
+}
+
+/// 测试用 FlashcardNotifier — 不访问 SharedPreferences / TTS / 音频引擎
+///
+/// 与 integration_test/helpers/test_notifiers.dart 中同名类实现一致；
+/// 提供 [setState] 接口便于测试中直接驱动状态。
+class TestFlashcardNotifier extends FlashcardNotifier {
+  @override
+  FlashcardState build() => const FlashcardState();
+
+  @override
+  Future<void> initialize(List<FlashcardItem> items) async {
+    state = FlashcardState(words: items, currentIndex: 0);
+  }
+
+  @override
+  Future<void> userFlipCard() async {
+    if (state.isCompleted || state.words.isEmpty) return;
+    state = state.copyWith(isShowingBack: !state.isShowingBack);
+  }
+
+  @override
+  Future<void> userNextCard() async {
+    if (state.currentIndex >= state.words.length - 1) {
+      state = state.copyWith(isCompleted: true);
+      return;
+    }
+    state = state.copyWith(
+      currentIndex: state.currentIndex + 1,
+      isShowingBack: false,
+    );
+  }
+
+  @override
+  Future<void> userPreviousCard() async {
+    if (state.currentIndex <= 0) return;
+    state = state.copyWith(
+      currentIndex: state.currentIndex - 1,
+      isShowingBack: false,
+    );
+  }
+
+  @override
+  void onAppBackgrounded() {
+    state = state.copyWith(
+      phase: const FlashcardWaitingForUser(
+        FlashcardWaitingReason.appBackgrounded,
+      ),
+    );
+  }
+
+  @override
+  void onSettingsOpened() {
+    state = state.copyWith(
+      phase: const FlashcardWaitingForUser(
+        FlashcardWaitingReason.userOpenedSettings,
+      ),
+    );
+  }
+
+  @override
+  Future<void> userPlayWord() async {}
+
+  @override
+  Future<void> userPlaySentence() async {}
+
+  @override
+  Future<void> disposePlayer() async => state = const FlashcardState();
+
+  @override
+  Future<void> reset() async {
+    final words = state.words;
+    state = FlashcardState(words: words, currentIndex: 0);
+  }
+
+  @override
+  Future<void> toggleCurrentWordSave() async {
+    if (state.words.isEmpty) return;
+    final newWords = List<FlashcardItem>.from(state.words)
+      ..removeAt(state.currentIndex);
+    final newIndex =
+        state.currentIndex >= newWords.length && newWords.isNotEmpty
+        ? newWords.length - 1
+        : state.currentIndex;
+    if (newWords.isEmpty) {
+      state = state.copyWith(
+        words: newWords,
+        isCompleted: true,
+        removedCount: state.removedCount + 1,
+      );
+    } else {
+      state = state.copyWith(
+        words: newWords,
+        currentIndex: newIndex,
+        isShowingBack: false,
+        removedCount: state.removedCount + 1,
+      );
+    }
+  }
+
+  @override
+  Future<void> updateSettings(FlashcardSettings newSettings) async {
+    state = state.copyWith(settings: newSettings);
+  }
+
+  @override
+  Future<void> onWordPlayed() async {}
+
+  @override
+  Future<void> onSentencePlayed(String sentenceText) async {}
+
+  /// 直接设置状态（测试用）
+  void setState(FlashcardState newState) => state = newState;
 }

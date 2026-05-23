@@ -1230,6 +1230,15 @@
   "audioReviewReminderToggle": "Audio Due Reminder",
   "audioReviewReminderDescription": "Get notified when it's time to review, helping you stay on track",
 
+  "notificationPromptTitle": "Lock in what you've learned",
+  "notificationPromptBody": "Memory sticks when you review at the right moments. We'll nudge you only when it matters.",
+  "notificationPromptCtaGrant": "Turn on reminders",
+  "notificationPromptCtaDismiss": "Not now",
+  "notificationDisabledBanner": "Notifications are off. You won't receive review reminders.",
+  "notificationDisabledBannerCta": "Open Settings",
+  "notificationNotGrantedBanner": "Allow notifications to receive daily review reminders.",
+  "notificationNotGrantedBannerCta": "Turn on",
+
   "recentCompletions": "Recently Completed ({count})",
   "@recentCompletions": {
     "placeholders": {

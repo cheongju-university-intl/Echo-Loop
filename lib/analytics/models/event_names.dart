@@ -141,7 +141,8 @@ abstract class Events {
   static const officialCollectionEnroll = 'official_collection_enroll';
 
   /// 查看官方合集详情
-  static const officialCollectionDetailViewed = 'official_collection_detail_viewed';
+  static const officialCollectionDetailViewed =
+      'official_collection_detail_viewed';
 
   // ── 学习 Tab ──
   /// 查看活动日历
@@ -185,9 +186,19 @@ abstract class Events {
   /// 进入问卷页
   static const onboardingSurveyShown = 'onboarding_survey_shown';
 
+  /// 问卷题目展示（每进入一个题目步骤打一次，用于定位题间流失）
+  static const onboardingSurveyQuestionShown =
+      'onboarding_survey_question_shown';
+
   /// 单题选择（每题答完打一次）
   static const onboardingSurveyQuestionAnswered =
       'onboarding_survey_question_answered';
+
+  /// 问卷方法论页展示（用户已答完题，但尚未点击开始学习）
+  static const onboardingSurveySummaryShown = 'onboarding_survey_summary_shown';
+
+  /// 点击方法论页的开始学习按钮（提交前打点，用于区分 summary 流失）
+  static const onboardingSurveyStartTapped = 'onboarding_survey_start_tapped';
 
   /// 问卷全部完成
   static const onboardingSurveyCompleted = 'onboarding_survey_completed';
@@ -195,6 +206,26 @@ abstract class Events {
   // ── 系统授权 ──
   /// 冷启动时上报 4 类系统授权状态快照（mic / speech / notification / network）
   static const appPermissionSnapshot = 'app_permission_snapshot';
+
+  // ── 通知权限 pre-prompt 漏斗 ──
+  /// in-app pre-prompt 对话框展示
+  static const notificationPromptShown = 'notification_prompt_shown';
+
+  /// 用户对 pre-prompt 的选择
+  /// params: action ∈ 'grant' / 'dismiss'
+  static const notificationPromptResult = 'notification_prompt_result';
+
+  /// 锚点触发但未弹 pre-prompt 的原因
+  /// params: reason ∈ 'already_granted' / 'already_denied' / 'cooldown'
+  static const notificationPromptSkipped = 'notification_prompt_skipped';
+
+  /// 系统授权框的最终结果
+  /// params: status ∈ 'granted' / 'denied'
+  static const notificationSystemResult = 'notification_system_result';
+
+  /// 用户从提醒设置页跳转到系统设置
+  static const notificationSettingsOpenTapped =
+      'notification_settings_open_tapped';
 }
 
 /// User property 名称常量（写入分析通道用于分群留存）
@@ -306,7 +337,7 @@ abstract class EventParams {
   /// 是否首启触发（即每次进入问卷，都为 true；保留参数便于后期扩展）
   static const isFirstLaunch = 'is_first_launch';
 
-  /// 题目 ID（goal / daily_minutes）
+  /// 题目 ID（goal / exam_type / daily_minutes）
   static const questionId = 'question_id';
 
   /// 答案编码
@@ -336,4 +367,13 @@ abstract class EventParams {
 
   /// 网络授权（仅 iOS 有意义；其他平台填 not_applicable）
   static const networkStatus = 'network_status';
+
+  // ── 通知权限 pre-prompt ──
+  /// pre-prompt 被跳过的原因
+  /// 值：'already_granted' / 'already_denied' / 'cooldown'
+  static const reason = 'reason';
+
+  /// 系统授权框返回状态
+  /// 值：'granted' / 'denied'
+  static const status = 'status';
 }

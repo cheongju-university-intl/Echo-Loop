@@ -1,7 +1,155 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-05-16
-> 当前焦点：plan 版本快照统一收尾（合并 schema、删 reconcile、简化迁移启发式）
+> 最后更新：2026-05-22
+> 当前焦点：通知授权请求时机修复（已完成）
+
+## 已完成：通知授权请求时机修复（pre-prompt + 价值锚点）
+
+针对 PostHog 数据显示通知 denied 率 66%（132/201）的问题，把权限请求从冷启动后移到价值锚点，加 in-app pre-prompt 提升授权率；同时给存量 denied 用户在提醒设置页加跳系统设置入口。
+
+### Critical 修复
+- [x] 拆 `ReviewReminderService.init()` 为 `initPlugin()` + `requestNotificationPermission()`；`DarwinInitializationSettings` 三个 request* 显式传 false，避免 `initialize()` 自身在 iOS/macOS 弹权限框（这是隐藏陷阱）
+- [x] `_syncSavedReviewReminder` / `syncPerAudioReminders` 改用 `initPlugin()`；调度本身不再触发权限请求
+
+### 新增协调器
+- [x] `lib/services/notification_permission_service.dart`：`maybeTriggerPrompt()` 按系统状态 + SP 冷却（14 天）做去重；`onUserAcceptedPrompt` / `onUserDismissedPrompt` 串联系统授权 + 持久化 + 埋点
+- [x] `lib/providers/notification_permission_provider.dart`：`NotificationPromptTriggerNotifier` 用计数器作为一次性事件流；`_showing` flag 防并发重复弹
+
+### Pre-prompt 对话框
+- [x] `lib/widgets/notification_permission_dialog.dart`：两种 mode（request / openSettings），复用 `permission_handler.openAppSettings()`
+- [x] 文案走 ARB（10 个新 key，en/zh 双语）
+
+### MainShell 监听
+- [x] `lib/router/main_shell.dart`：`listenManual` 订阅 `notificationPromptTriggerProvider`，用 `rootNavigatorKey.currentContext` 弹 dialog 覆盖所有子路由；关闭后调 `onDialogClosed`
+
+### 价值锚点注入
+- [x] `learning_progress_provider.dart:completeCurrentSubStage` 末尾注入（每次用户完成 sub_stage 触发）
+- [x] 5 处收藏入口：句子级（`listening_practice_provider` / `retell_player_provider` / `sentence_detail_screen`）+ 单词级（`saved_word_provider`）。只在 add 时触发，remove 不触发
+- [x] `flashcard_provider` 改造：单词收藏路径由直接调 dao 改走 `SavedWordList.saveWord`，统一埋点 + 锚点链路（修了历史遗漏 `word_save` 埋点的隐性 bug）
+
+### Denied 兜底
+- [x] `lib/screens/reminder_settings_screen.dart` 改 `ConsumerStatefulWidget`：异步读 `Permission.notification.status`；denied/permanentlyDenied/restricted 时显示警告横幅 + 跳设置按钮；`AppLifecycleListener.onResume` 时重新读取（从系统设置回来立刻刷新）
+
+### 埋点
+- [x] 5 个新事件常量：`notification_prompt_shown` / `notification_prompt_result` / `notification_prompt_skipped` / `notification_system_result` / `notification_settings_open_tapped`
+- [x] EventParams 新增 `reason` / `status` 字段
+
+### 测试
+- [x] 更新 `review_reminder_service_test.dart`：`init()` → `initPlugin()` 重命名；新增 case 验证 initPlugin 不调权限请求、Darwin request* 三参数全 false、`requestNotificationPermission` 平台契约
+- [x] 新建 `notification_permission_service_test.dart`：覆盖 granted/denied/restricted/notDetermined×冷却分支×历史动作 + onUserAccepted/Dismissed 埋点 + SP 持久化
+- [x] 新建 `notification_permission_dialog_test.dart`：两种 mode 渲染 + 按钮回调 + 展示埋点
+- [x] `mock_providers.dart` 加 `notificationPermissionOverride()` helper，noop fake；`learning_progress_provider_test` 的 `createContainer` 加入该 override
+
+### 验证
+- [x] `flutter analyze`：0 error
+- [x] `flutter test`：2238 通过 / 11 跳过 / 2 失败（v28_to_v31_migration 和 audio_pin_test，**预先存在的失败**，与本次无关）
+- [x] 测试涉及的 `review_reminder_service_test` / `notification_permission_service_test` / `notification_permission_dialog_test` / `learning_progress_provider_test` 全过
+
+### 非本次范围（独立任务待跟进）
+- AndroidScheduleMode.exactAllowWhileIdle 在 Android 12+ 需要 SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM 权限，但 AndroidManifest.xml 未声明（独立 bug）
+- 存量 denied 用户的 in-app 召回 banner（本次仅靠提醒设置页兜底）
+
+**预期效果**：发布后观察 PostHog dashboard https://us.posthog.com/project/334520/dashboard/1613084，新用户群体的 notification 权限 denied 比例从 66% 降到 30-40%；`notification_prompt_result` 的 grant 率作为新 KPI。
+
+**完成时间**: 2026-05-22
+
+---
+
+## 已完成：盲听/复述断点改成句子粒度 + 段内 10s 阈值恢复
+
+将盲听、段落复述的进度从"段落索引"改为"全局句子索引"，并在段时长 > 10s 时段内从断点句开播。
+
+- [x] DB schema v34→v35：`*_paragraph_index` → `*_sentence_index`，盲听旧值清零，复述旧值语义不变保留
+- [x] `LearningProgress` model + `LearningProgressNotifier` 同步重命名，保存函数改名为 `saveBlindListenSentenceIndex` / `saveRetellSentenceIndex`
+- [x] 盲听 player：常量 `_resumeMinParagraphDuration = 10s`；保存时机改为 position 流推进句子时（按句保存）；首次播放该段且段时长 > 10s 时从断点句的 `startTime` 开播
+- [x] 复述 player：同上策略；新增 `currentSentenceGlobalIndex` getter，screen 退出时保存当前播放句子
+- [x] `learning_session_provider`：恢复时把全局 sentenceIndex 换算成 (paragraphIdx, localIdx) 同时传给 player
+- [x] 测试更新：`learning_progress_provider_test` / `retell_player_provider_test` / `learning_session_provider_test` / `mock_providers` / `test_notifiers` 全部按新接口适配，全部 PASS
+- [x] flutter analyze: 0 error；flutter test：相关 provider 测试全过
+
+**完成时间**: 2026-05-21
+
+---
+
+## 已完成：Onboarding 问卷细漏斗埋点
+
+- [x] 新增 `onboarding_survey_question_shown`：进入 goal / exam_type / daily_minutes 题目步骤时上报。
+- [x] 新增 `onboarding_survey_summary_shown`：答完题进入方法论 summary 页时上报，携带 goal / exam_type / daily_minutes。
+- [x] 新增 `onboarding_survey_start_tapped`：点击“开始学习”时上报，携带答案与 elapsed_seconds，用于区分 summary 流失。
+- [x] 补充 onboarding widget 测试，覆盖题目展示、summary 展示、开始学习点击、完成事件链路。
+
+**完成时间**: 2026-05-21
+
+---
+
+## 进行中：TEST — 集成测试套件全量整治（接续 pause/resume 任务）
+
+接续上一个任务，把全套 17 个集成测试 group 推到可跑可过状态。起点：38 失败/240 分钟。
+
+### 测试基建加固（test_notifiers.dart）
+- [x] 全局预置所有 `GuideFlowIds.all` flow 为 seen —— 避免 Showcase 弹窗遮挡按钮 + 残留 Timer
+- [x] 新增 mock：`TestStudyStatsNotifier`、`TestStudyTimeService`、`TestOfflineAsrSettings`、`TestStageCompletionDao`、`TestAudioItemDao`、`TestReviewDifficultPractice.enterWaitingForUserInBlindMode` no-op
+- [x] `TestLearningProgressNotifier` 加 `pauseProgress` / `resumeProgress` + `completeCurrentSubStage` 内同步更新 `completionsByAudio`（V2.1 后 UI 完成态依赖 stage_completions 历史）
+- [x] `_AudioPreloadWrapper` 按 `(currentStage, currentSubStage)` 自动推导已完成 sub_stage keys，对齐 V2.1 行为
+- [x] 新增 `safeSettle(tester, {timeout: 5s})` helper —— 用 5 秒 bounded pumpAndSettle 替代 17 个 group 内所有无界 `pumpAndSettle()`，避免单测 10 分钟超时
+
+### 测试文案 / 断言批量更新（同步近期 UI 重构）
+- [x] `settings_tests.dart`：Theme Mode → Theme（取最后一个 option）/ Language → Interface Language（同上）
+- [x] `retell_toggle_tests.dart`：Learning settings → Study Plan（设置页结构整合 `f4bfd5a8`）
+- [x] `learning_plan_tests.dart`：Retelling → Paragraph Retelling
+- [x] `learning_flow_tests.dart` / `blind_listen_tests.dart`：难度选项 Okay → Medium（5 档难度改造）
+- [x] `intensive_listen_tests.dart`：Peek 按钮点击后文案翻转为 Hide；逐词布局 token 末尾带空格；移除已废弃的 `intensiveListenDifficultCount` 断言（field 未在 production 写入）
+- [x] `stats_display_tests.dart`：同上，sed 移除 `intensiveListenDifficultCount` 断言
+- [x] `audio_pin_tests.dart`：Pin 操作改为菜单项，文案 Pin to Top / Unpin（原直接 icon 已迁入 popup menu）
+- [x] `review_sub_stage_tests.dart`：Paragraph Retelling 改 `findsWidgets`（firstLearn 区段同时有此 step）；`1/3 sentences` → `Sentence 1/3`
+
+### 当前最终状态（17 group / `flutter test integration_test/app_test.dart -d macos`）
+**全过 group**（10）：流程 1, 2, 3, 4, 5, 7, 8音频置顶, 9标签, X, 8跟读（intentional skip 6）
+
+**仍有 corner case 失败**（5 个 group / 约 10 个测试，未阻塞功能验证）：
+- 流程 6 精听：1 个（退出 → 路由 pop 时机偶发）
+- 流程 9 学习统计：1 个（pump 时机 - find IntensiveListenPlayerScreen）
+- 流程 10 复述：1 个（退出 → 路由 pop 时机）
+- 流程 10 Flashcard：1 个（CountdownChip 动画时机）
+- 流程 11 复习子步骤：3 个（plan 折叠区 widget tree mount 计数）
+- 流程 管理字幕：3 个（无字幕 audio 默认走 AI 转录路径后的连锁断言；已部分修复）
+- 流程 Y：隔离运行 4/4 全过；suite 内偶发慢测
+
+### 已知限制（环境性，非测试代码问题）
+- macOS 集成测试 runner 在 17 group 顺序跑时偶发 build.db 锁 + Echo Loop.app 残留 → 单 group 跑结果稳定
+- pumpAndSettle 在 LiveTest 下默认 10min 超时，已被全局 `safeSettle(timeout: 5s)` 替代
+
+### 验证
+- `flutter analyze integration_test/` 0 error
+- 主链路 group 隔离运行全部 PASS
+
+
+
+补齐 `2d7bd1ed`（音频暂停 / 恢复学习）的端到端集成覆盖。
+
+### 新增
+- [x] `integration_test/groups/pause_resume_tests.dart` 新建 group「流程 Y」共 4 个用例：
+  - 进行中（未暂停）：底部显示「暂停学习 / 继续学习」两按钮
+  - 暂停确认弹窗 → 取消：state 保持未暂停 + 底部按钮不变
+  - 暂停确认弹窗 → 确认：state 翻转 `isPaused=true` + 底部按钮变单按钮「Paused · Resume」
+  - 暂停态点击恢复按钮 → 直接恢复（无弹窗）+ 底部回到两按钮
+  - 卡片菜单 / Paused chip 已被 widget 单测 `audio_list_tile_test.dart` 覆盖，不重复
+- [x] `integration_test/app_test.dart` 注册 `pauseResumeTests()`
+- [x] `integration_test/helpers/test_notifiers.dart`：
+  - `TestLearningProgressNotifier` 加 `pauseProgress` / `resumeProgress` override（避免触达真实 DAO）
+  - 新增 `TestStudyStatsNotifier` + `TestStudyTimeService` 并注入到 `createTestApp` / `createTestAppWithAudio` —— 修 `_MainShellState._onAppResume` → `studyStatsNotifierProvider.refresh()` → `studyTimeServiceProvider` → `appDatabaseProvider` 的 `LateInitializationError`，整体加固集成测试
+
+### 顺手修复
+- [x] `integration_test/groups/retell_toggle_tests.dart` 设置项名称「Learning settings」→「Study Plan」同步 `f4bfd5a8` 重构后文案
+
+### 验证
+- `flutter analyze` 0 error
+- `flutter test integration_test/app_test.dart -d macos --name "流程 Y"` 全过（4/4）
+- `flutter test integration_test/app_test.dart -d macos --name "流程 X"` 全过（1/1）
+
+  **完成时间**: 2026-05-17
+
+---
 
 ## 已完成：FIX2 — plan 版本架构二次收尾
 

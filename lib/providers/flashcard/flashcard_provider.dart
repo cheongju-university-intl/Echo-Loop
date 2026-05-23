@@ -31,6 +31,7 @@ import '../../services/study_time_service.dart';
 import '../../services/tts_service.dart';
 import '../../widgets/flashcard/flashcard_card.dart';
 import '../daily_study_time_provider.dart';
+import '../saved_word_provider.dart';
 import 'flashcard_flow_engine.dart';
 import 'flashcard_flow_phase.dart';
 import 'flashcard_flow_state.dart';
@@ -495,8 +496,9 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     if (wasUnsaved) {
       switch (item) {
         case FlashcardWordItem(:final savedWord):
+          // 走 SavedWordList.saveWord 统一埋点 + 价值锚点
           await ref
-              .read(savedWordDaoProvider)
+              .read(savedWordListProvider.notifier)
               .saveWord(
                 word: savedWord.word,
                 audioItemId: savedWord.audioItemId,
@@ -525,7 +527,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     } else {
       switch (item) {
         case FlashcardWordItem():
-          await ref.read(savedWordDaoProvider).removeWord(key);
+          await ref.read(savedWordListProvider.notifier).removeWord(key);
         case FlashcardPhraseItem():
           await ref.read(savedSenseGroupDaoProvider).removeSenseGroup(key);
       }

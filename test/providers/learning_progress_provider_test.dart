@@ -114,6 +114,7 @@ void main() {
         stageCompletionDaoProvider.overrideWithValue(mockStageCompletionDao),
         if (nowGetter != null) nowProvider.overrideWithValue(nowGetter),
         analyticsOverride(),
+        notificationPermissionOverride(),
         ...learningSettingsOverrides(autoSkipRetell: autoSkipRetell),
         learningSettingsProvider.overrideWith(
           () => _TestLearningSettingsNotifier(
