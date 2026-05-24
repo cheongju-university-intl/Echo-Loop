@@ -5,12 +5,29 @@
 /// 提供 `createTestRouter` 辅助函数，用于需要路由的测试场景。
 library;
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
+
+import 'package:echo_loop/database/app_database.dart' hide AudioItem, Collection;
+import 'package:echo_loop/database/providers.dart';
+import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
+import 'package:echo_loop/main.dart';
+import 'package:echo_loop/models/audio_engine_state.dart';
+import 'package:echo_loop/models/audio_item.dart' show AudioItem;
+import 'package:echo_loop/models/collection.dart' show Collection;
+import 'package:echo_loop/models/learning_progress.dart';
+import 'package:echo_loop/models/sentence.dart';
+import 'package:echo_loop/database/enums.dart' show LearningStage;
+import 'package:echo_loop/providers/new_user_guide_provider.dart';
+import 'package:echo_loop/providers/package_info_provider.dart';
 import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
@@ -20,6 +37,12 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/providers/learning_session/blind_listen_player_provider.dart';
+import 'package:echo_loop/providers/learning_session/intensive_listen_player_provider.dart';
+import 'package:echo_loop/providers/learning_session/retell_player_provider.dart';
+import 'package:echo_loop/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
+import 'package:echo_loop/providers/flashcard/flashcard_provider.dart';
+import 'package:echo_loop/providers/transcription_task_provider.dart';
 import 'package:echo_loop/theme/app_theme.dart';
 
 import 'mock_providers.dart';
@@ -137,6 +160,170 @@ Widget createTestScreen(
         );
       },
     ),
+  );
+}
+
+/// 在 flutter_test 中渲染完整 [EchoLoopApp]，注入与集成测试一致的 Provider 替身。
+///
+/// 用于把原本写在 `integration_test/` 里的「app shell」级用例（Tab 切换、主题切换、
+/// 语言切换等）下沉到 `flutter_test`，绕开 LiveTest binding 的 8 分钟冷启动成本。
+///
+/// 调用者职责：
+/// - 在 `testWidgets` 内部调用 `await pumpFullApp(tester)` 后，用 `tester.pump(...)`
+///   推进 Riverpod async / Showcase 等异步初始化（建议先 pump 一次再 pump 1-200ms）。
+/// - 测试末尾用 `await tester.pump(const Duration(seconds: 6));` 消耗冷启动保护
+///   定时器，避免 pending timer 断言。
+///
+/// [overrides] 用于覆盖默认替身（例如预置 LearningProgress）。
+Future<void> pumpFullApp(
+  WidgetTester tester, {
+  List<Override> overrides = const [],
+}) async {
+  final packageInfo = PackageInfo(
+    appName: 'Echo Loop',
+    packageName: 'top.echo-loop',
+    version: '1.0.0',
+    buildNumber: '1',
+  );
+
+  // 把所有 guide flow 预置为「已看」，避免 Showcase 在测试中弹出 + 留下持续
+  // 调度帧的 Timer 导致 pumpAndSettle 超时。
+  final guideSeen = <String, Object>{
+    for (final flowId in GuideFlowIds.all) 'guide_v1_${flowId}_seen': true,
+  };
+  SharedPreferences.setMockInitialValues(guideSeen);
+  final prefs = await SharedPreferences.getInstance();
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        isFirstLaunchProvider.overrideWithValue(false),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        initialOnboardingCompletedProvider.overrideWithValue(true),
+        // 隐藏 AI section，避免 ASR 相关 Provider 未实现导致 UnimplementedError
+        showOfflineAsrSectionProvider.overrideWithValue(false),
+        offlineAsrOverride(),
+        appSettingsProvider.overrideWith(() => TestAppSettings()),
+        audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
+        collectionListProvider.overrideWith(() => TestCollectionList()),
+        tagListProvider.overrideWith(() => TestTagList()),
+        listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
+        audioEngineProvider.overrideWith(() => TestAudioEngine()),
+        learningProgressNotifierProvider.overrideWith(
+          () => TestLearningProgressNotifier(),
+        ),
+        learningSessionProvider.overrideWith(() => TestLearningSession()),
+        blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
+        intensiveListenPlayerProvider.overrideWith(
+          () => TestIntensiveListenPlayer(),
+        ),
+        retellPlayerProvider.overrideWith(() => TestRetellPlayer()),
+        reviewDifficultPracticeProvider.overrideWith(
+          () => TestReviewDifficultPractice(),
+        ),
+        flashcardNotifierProvider.overrideWith(() => TestFlashcardNotifier()),
+        transcriptionTaskManagerProvider.overrideWith(
+          () => TestTranscriptionTaskManager(),
+        ),
+        packageInfoProvider.overrideWithValue(packageInfo),
+        analyticsOverride(),
+        ...studyTimeOverrides(),
+        ...learningSettingsOverrides(),
+        appDatabaseProvider.overrideWithValue(
+          AppDatabase(
+            NativeDatabase.memory(
+              setup: (db) => db.execute('PRAGMA foreign_keys = ON'),
+            ),
+          ),
+        ),
+        ...overrides,
+      ],
+      child: const EchoLoopApp(),
+    ),
+  );
+}
+
+/// 在 flutter_test 中渲染完整 [EchoLoopApp] 并预置一份音频学习数据。
+///
+/// 对应 integration_test 中的 `createTestAppWithAudio`：注入 1 个 AudioItem +
+/// 1 个 Collection（含音频关联）+ N 句 Sentence + LearningProgress（默认 firstLearn/
+/// blindListen 阶段）+ AudioEngine totalDuration=25s。
+///
+/// 区别在于：通过构造器把数据塞进 Test* Notifier 的 `_initialState`，避免依赖
+/// 「addPostFrameCallback + Notifier mutator」模式（test/helpers 的 mock 不暴露这些
+/// mutator）。学习计划页等 UI 通常用 `findsAtLeast(1)` 之类的弱断言验证渲染即可。
+Future<void> pumpFullAppWithAudio(
+  WidgetTester tester, {
+  AudioItem? audioItem,
+  Collection? collection,
+  List<Sentence>? sentences,
+  LearningProgress? progress,
+  List<Override> overrides = const [],
+}) async {
+  final seedAudioItem = audioItem ?? createTestAudioItem();
+  final seedCollection = collection ?? createTestCollection();
+  final seedSentences = sentences ?? createTestSentences();
+  final seedProgress = progress ??
+      createTestLearningProgress(currentStageStartedAt: DateTime.now());
+
+  // 按 (currentStage, currentSubStage) 推导已完成的 sub_stage key 集合：
+  // 当前 stage 内 currentSubStage 之前的子步骤 + 所有先前 stage 全部 sub_stages。
+  final completed = <String>{};
+  for (final stage in LearningStage.values) {
+    if (stage.index < seedProgress.currentStage.index) {
+      for (final sub in stage.allSubStages) {
+        completed.add('${stage.key}:${sub.key}');
+      }
+    } else if (stage.index == seedProgress.currentStage.index) {
+      final subs = stage.allSubStages;
+      final idx = subs.indexOf(seedProgress.currentSubStage);
+      if (idx > 0) {
+        for (var i = 0; i < idx; i++) {
+          completed.add('${stage.key}:${subs[i].key}');
+        }
+      }
+    }
+  }
+
+  await pumpFullApp(
+    tester,
+    overrides: [
+      audioLibraryProvider.overrideWith(
+        () => TestAudioLibrary(
+          AudioLibraryState(audioItems: [seedAudioItem]),
+        ),
+      ),
+      collectionListProvider.overrideWith(
+        () => TestCollectionList(
+          CollectionState(
+            rawCollections: [seedCollection],
+            audioIdsMap: {
+              seedCollection.id: [seedAudioItem.id],
+            },
+          ),
+        ),
+      ),
+      learningProgressNotifierProvider.overrideWith(
+        () => TestLearningProgressNotifier(
+          LearningProgressState(
+            progressMap: {seedProgress.audioItemId: seedProgress},
+            completionsByAudio: {seedProgress.audioItemId: completed},
+          ),
+        ),
+      ),
+      listeningPracticeProvider.overrideWith(
+        () => TestListeningPractice(
+          ListeningPracticeState(sentences: seedSentences),
+        ),
+      ),
+      audioEngineProvider.overrideWith(
+        () => TestAudioEngine(
+          initialState:
+              const AudioEngineState(totalDuration: Duration(seconds: 25)),
+        ),
+      ),
+      ...overrides,
+    ],
   );
 }
 
