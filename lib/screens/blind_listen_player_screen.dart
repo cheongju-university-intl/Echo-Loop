@@ -181,6 +181,13 @@ class _BlindListenPlayerScreenState
         await ref.read(learningSessionProvider.notifier).replayBlindListen();
       },
       onExit: () async {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .saveBlindListenSentenceIndex(
+              widget.audioItemId,
+              null,
+              isFreePlay: true,
+            );
         if (mounted) context.pop();
         await ref.read(learningSessionProvider.notifier).exitLearningMode();
       },
@@ -226,6 +233,13 @@ class _BlindListenPlayerScreenState
               result.difficulty ?? DifficultyLevel.medium,
             );
       }
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveBlindListenSentenceIndex(
+            widget.audioItemId,
+            null,
+            isFreePlay: false,
+          );
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .completeCurrentSubStage(widget.audioItemId);

@@ -474,6 +474,11 @@ class AppDatabase extends _$AppDatabase {
         // - 盲听旧值（段索引语义）直接清零，避免被当成句子 index 错误恢复
         // - 复述旧值（实际就是句首句的全局 index）语义不变，保留
         if (from < 35) {
+          final lpExists = await customSelect(
+            "SELECT COUNT(*) AS cnt FROM sqlite_master "
+            "WHERE type='table' AND name = 'learning_progresses'",
+          ).getSingle();
+          if ((lpExists.data['cnt'] as int) == 0) return;
           await customStatement(
             'ALTER TABLE learning_progresses '
             'RENAME COLUMN blind_listen_paragraph_index '

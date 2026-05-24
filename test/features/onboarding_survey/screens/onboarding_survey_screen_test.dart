@@ -4,6 +4,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:echo_loop/analytics/analytics_channel.dart';
+import 'package:echo_loop/analytics/analytics_providers.dart';
+import 'package:echo_loop/analytics/analytics_service.dart';
+import 'package:echo_loop/analytics/consent_manager.dart';
+import 'package:echo_loop/analytics/models/event_names.dart';
 import 'package:echo_loop/features/onboarding_survey/data/onboarding_survey_storage.dart';
 import 'package:echo_loop/features/onboarding_survey/models/onboarding_question.dart';
 import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
@@ -14,10 +19,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/mock_providers.dart';
 
+class _RecordingAnalyticsChannel implements AnalyticsChannel {
+  final List<({String name, Map<String, Object>? params})> events = [];
+
+  @override
+  String get name => 'Recording';
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<void> logEvent(String name, Map<String, Object>? parameters) async {
+    events.add((name: name, params: parameters));
+  }
+
+  @override
+  Future<void> registerSuperProperties(Map<String, Object> properties) async {}
+
+  @override
+  Future<void> setUserId(String? id) async {}
+
+  @override
+  Future<void> setUserProperty(String name, String? value) async {}
+}
+
 /// 创建一个最小化的可路由测试 App，承载 onboarding 页 + study 占位页。
 Widget _wrap({
   required SharedPreferences prefs,
   bool initialOnboardingCompleted = false,
+  _RecordingAnalyticsChannel? analyticsChannel,
 }) {
   final router = GoRouter(
     initialLocation: AppRoutes.onboardingSurvey,
@@ -39,7 +69,15 @@ Widget _wrap({
       initialOnboardingCompletedProvider.overrideWithValue(
         initialOnboardingCompleted,
       ),
-      analyticsOverride(),
+      if (analyticsChannel == null)
+        analyticsOverride()
+      else
+        analyticsServiceProvider.overrideWithValue(
+          AnalyticsService(
+            channel: analyticsChannel,
+            consent: ConsentManager(prefs),
+          ),
+        ),
     ],
     child: MaterialApp.router(
       routerConfig: router,
@@ -246,5 +284,41 @@ void main() {
     expect(find.text('以后再说'), findsNothing);
     expect(find.text('Skip'), findsNothing);
     expect(find.text('Skip for now'), findsNothing);
+  });
+
+  testWidgets('埋点覆盖问卷展示、答案上报和完成漏斗', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    final analytics = _RecordingAnalyticsChannel();
+    await tester.pumpWidget(_wrap(prefs: prefs, analyticsChannel: analytics));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('应对考试'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    await tester.tap(find.text('雅思 IELTS'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    await tester.tap(find.text('约 20 分钟'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+    await tester.tap(find.text('开始学习'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    final names = analytics.events.map((event) => event.name).toList();
+    expect(names, contains(Events.onboardingSurveyShown));
+    expect(names, contains(Events.onboardingSurveyQuestionAnswered));
+    expect(names, contains(Events.onboardingSurveyCompleted));
+
+    // 验证每道题的答案上报
+    final answers = analytics.events
+        .where((event) => event.name == Events.onboardingSurveyQuestionAnswered)
+        .toList();
+    expect(answers.length, 3);
+
+    expect(answers[0].params?[EventParams.questionId], OnboardingQuestionId.goal);
+    expect(answers[0].params?[EventParams.answerCode], OnboardingGoal.exam);
+
+    expect(answers[1].params?[EventParams.questionId], OnboardingQuestionId.examType);
+    expect(answers[1].params?[EventParams.answerCode], OnboardingExamType.ielts);
+
+    expect(answers[2].params?[EventParams.questionId], OnboardingQuestionId.dailyMinutes);
+    expect(answers[2].params?[EventParams.answerCode], OnboardingDailyMinutes.m20);
   });
 }
