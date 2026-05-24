@@ -186,19 +186,9 @@ abstract class Events {
   /// 进入问卷页
   static const onboardingSurveyShown = 'onboarding_survey_shown';
 
-  /// 问卷题目展示（每进入一个题目步骤打一次，用于定位题间流失）
-  static const onboardingSurveyQuestionShown =
-      'onboarding_survey_question_shown';
-
   /// 单题选择（每题答完打一次）
   static const onboardingSurveyQuestionAnswered =
       'onboarding_survey_question_answered';
-
-  /// 问卷方法论页展示（用户已答完题，但尚未点击开始学习）
-  static const onboardingSurveySummaryShown = 'onboarding_survey_summary_shown';
-
-  /// 点击方法论页的开始学习按钮（提交前打点，用于区分 summary 流失）
-  static const onboardingSurveyStartTapped = 'onboarding_survey_start_tapped';
 
   /// 问卷全部完成
   static const onboardingSurveyCompleted = 'onboarding_survey_completed';
