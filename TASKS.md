@@ -1,7 +1,30 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-05-22
-> 当前焦点：通知授权请求时机修复（已完成）
+> 最后更新：2026-05-25
+> 当前焦点：全文盲听播放速度设置（已完成）
+
+## 已完成：全文盲听播放速度设置
+
+- [x] `BlindListenSettings` 增加会话内 `playbackSpeed`，默认 `1x`，入口面板离散选项固定为 `0.5x`、`0.7x`、`0.8x`、`0.9x`、`1x`、`1.1x`、`1.3x`、`1.5x`、`2.0x`
+- [x] 全文盲听入口段落选择面板新增播放速度下拉菜单，选择值随开始练习传入盲听设置
+- [x] 盲听设置面板新增播放速度滑块，范围 `0.5x-2.0x`，步进 `0.05x`，和盲听 player state 保持同步
+- [x] 盲听播放前及设置变更时同步 `AudioEngine.setSpeed`，退出学习模式时恢复进入前的播放速度，避免影响其它播放场景
+- [x] 补充模型、入口面板、设置面板测试，覆盖默认值、离散选项、滑块范围/步进、状态同步和音频引擎速度同步
+- [x] 设置面板中播放速度下移到重复次数与段间停顿之后，保持控制相关设置优先
+- [x] 入口面板播放速度下拉菜单去掉菜单阴影
+- [x] 全文盲听播放页底部状态标签追加当前播放速度
+
+### 验证
+- [x] `flutter analyze lib/models/blind_listen_settings.dart lib/widgets/blind_listen_paragraph_sheet.dart lib/widgets/common/paragraph_selection_sheet.dart lib/widgets/blind_listen_settings_sheet.dart lib/providers/learning_session/blind_listen_player_provider.dart lib/providers/learning_session/learning_session_provider.dart lib/screens/learning_plan_screen.dart test/models/blind_listen_settings_test.dart test/widgets/blind_listen_settings_sheet_test.dart test/widgets/blind_listen_paragraph_sheet_test.dart`：No issues found
+- [x] `flutter test test/models/blind_listen_settings_test.dart test/widgets/blind_listen_paragraph_sheet_test.dart test/widgets/blind_listen_settings_sheet_test.dart test/providers/learning_session/blind_listen_player_test.dart`：All tests passed
+- [x] `flutter test test/screens/learning_plan_screen_test.dart`：37 tests passed
+- [x] `flutter analyze lib/widgets/blind_listen_settings_sheet.dart lib/widgets/common/paragraph_selection_sheet.dart lib/widgets/practice/practice_play_count_label.dart lib/widgets/common/practice_playback_footer.dart lib/widgets/common/paragraph_practice_scaffold.dart lib/screens/blind_listen_player_screen.dart test/widgets/blind_listen_paragraph_sheet_test.dart test/widgets/blind_listen_settings_sheet_test.dart test/screens/blind_listen_player_screen_test.dart`：No issues found
+- [x] `flutter test test/widgets/blind_listen_paragraph_sheet_test.dart test/widgets/blind_listen_settings_sheet_test.dart test/screens/blind_listen_player_screen_test.dart`：All tests passed
+- [ ] `scripts/check.sh`：全量脚本退出码 1；本次相关新增/更新测试通过，失败集中在既有未触碰测试/分析问题，包括 `_MockCacheDao.getByHash` 未 stub 导致 `Future<String?>` 类型错误、`initialLearningSettingsProvider` 未 override、`app_shell_test` 中 `SwitchListTile` 多匹配，以及 `sentence_annotation_card_test` 内联标记期望失败
+
+**完成时间**: 2026-05-25
+
+---
 
 ## 已完成：通知授权请求时机修复（pre-prompt + 价值锚点）
 

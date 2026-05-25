@@ -269,8 +269,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
       : [];
 
   /// 全部段落的句子总数（用于以句子粒度展示进度）
-  int get totalSentenceCount =>
-      _paragraphs.fold(0, (sum, p) => sum + p.length);
+  int get totalSentenceCount => _paragraphs.fold(0, (sum, p) => sum + p.length);
 
   /// 所有段落的累计时长（各段首尾相加）
   Duration get totalDuration {
@@ -411,10 +410,20 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   /// 切换到手动模式时，停在当前段落，取消一切异步操作。
   void updateSettings(BlindListenSettings newSettings) {
     final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
+    final speedChanged =
+        newSettings.playbackSpeed != state.settings.playbackSpeed;
     final shouldKeepWaiting =
         state.isWaitingForUser || _waitAfterCurrentParagraph;
 
     state = state.copyWith(settings: newSettings);
+
+    if (speedChanged) {
+      unawaited(
+        ref
+            .read(audioEngineProvider.notifier)
+            .setSpeed(newSettings.playbackSpeed),
+      );
+    }
 
     if (shouldKeepWaiting) {
       return;
@@ -548,6 +557,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     final start = sentences[startLocalIdx].startTime;
     final end = sentences.last.endTime;
 
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playRangeOnce(start, end, sid);
 
     if (!engine.isActiveSession(sid)) return;
@@ -618,11 +628,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   ///
   /// 段落 clip 范围 = [first.start, last.end]，因此 detector 的末尾分支
   /// 在盲听场景永远不会命中——这里只会在中间 gap 触发。
-  void _maybeSkipSilence(
-    List<Sentence> sentences,
-    Duration position,
-    int idx,
-  ) {
+  void _maybeSkipSilence(List<Sentence> sentences, Duration position, int idx) {
     final settings = ref.read(appSettingsProvider);
     if (!settings.skipSilenceEnabled) return;
 

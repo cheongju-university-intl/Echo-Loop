@@ -26,6 +26,7 @@ const paragraphDurationOptions = [0, 10, 15, 20, 25, 30, 45, 60, 90, -1];
 /// [sentences] 字幕句子列表
 /// [defaultSeconds] 默认段落时长（秒）
 /// [showPauseMultiplier] 是否显示段间停顿行
+/// [showPlaybackSpeed] 是否显示播放速度行（盲听专用，会话内生效）
 /// [stageLabel] 标题下方显示的阶段名（如"第三轮复习"），可选
 /// [estimatedDurationText] 说明下方显示的预估时长文本，可选（静态文案，不随选项变化）
 /// [estimateDurationBuilder] 动态预估时长 builder，根据当前选中的段落时长 + 停顿倍数实时计算；
@@ -40,17 +41,26 @@ Future<void> showParagraphSelectionSheet({
   required List<Sentence> sentences,
   int defaultSeconds = 30,
   bool showPauseMultiplier = false,
+  bool showPlaybackSpeed = false,
   List<double>? pauseMultiplierOptions,
   String? stageLabel,
   String? estimatedDurationText,
   Duration Function(int targetSeconds, double pauseMultiplier)?
-      estimateDurationBuilder,
+  estimateDurationBuilder,
   KeywordRatio? defaultKeywordRatio,
   required void Function(
     Duration targetDuration,
     double pauseMultiplier,
     KeywordRatio? keywordRatio,
-  ) onStartPractice,
+  )
+  onStartPractice,
+  void Function(
+    Duration targetDuration,
+    double pauseMultiplier,
+    KeywordRatio? keywordRatio,
+    double playbackSpeed,
+  )?
+  onStartPracticeWithPlaybackSpeed,
   String? skipLabel,
   VoidCallback? onSkip,
   String? skipGuideFlowId,
@@ -70,12 +80,14 @@ Future<void> showParagraphSelectionSheet({
       sentences: sentences,
       defaultSeconds: defaultSeconds,
       showPauseMultiplier: showPauseMultiplier,
+      showPlaybackSpeed: showPlaybackSpeed,
       pauseMultiplierOptions: pauseMultiplierOptions,
       stageLabel: stageLabel,
       estimatedDurationText: estimatedDurationText,
       estimateDurationBuilder: estimateDurationBuilder,
       defaultKeywordRatio: defaultKeywordRatio,
       onStartPractice: onStartPractice,
+      onStartPracticeWithPlaybackSpeed: onStartPracticeWithPlaybackSpeed,
       skipLabel: skipLabel,
       onSkip: onSkip,
       skipGuideFlowId: skipGuideFlowId,
@@ -92,17 +104,26 @@ class _ParagraphSelectionSheet extends StatefulWidget {
   final List<Sentence> sentences;
   final int defaultSeconds;
   final bool showPauseMultiplier;
+  final bool showPlaybackSpeed;
   final List<double>? pauseMultiplierOptions;
   final String? stageLabel;
   final String? estimatedDurationText;
   final Duration Function(int targetSeconds, double pauseMultiplier)?
-      estimateDurationBuilder;
+  estimateDurationBuilder;
   final KeywordRatio? defaultKeywordRatio;
   final void Function(
     Duration targetDuration,
     double pauseMultiplier,
     KeywordRatio? keywordRatio,
-  ) onStartPractice;
+  )
+  onStartPractice;
+  final void Function(
+    Duration targetDuration,
+    double pauseMultiplier,
+    KeywordRatio? keywordRatio,
+    double playbackSpeed,
+  )?
+  onStartPracticeWithPlaybackSpeed;
   final String? skipLabel;
   final VoidCallback? onSkip;
   final String? skipGuideFlowId;
@@ -116,12 +137,14 @@ class _ParagraphSelectionSheet extends StatefulWidget {
     required this.sentences,
     required this.defaultSeconds,
     required this.showPauseMultiplier,
+    required this.showPlaybackSpeed,
     this.pauseMultiplierOptions,
     this.stageLabel,
     this.estimatedDurationText,
     this.estimateDurationBuilder,
     this.defaultKeywordRatio,
     required this.onStartPractice,
+    this.onStartPracticeWithPlaybackSpeed,
     this.skipLabel,
     this.onSkip,
     this.skipGuideFlowId,
@@ -136,8 +159,10 @@ class _ParagraphSelectionSheet extends StatefulWidget {
 
 class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
   late int _targetSeconds = widget.defaultSeconds;
+
   /// -1.0 = 自动（智能模式）
   double _pauseMultiplier = -1.0;
+  double _playbackSpeed = 1.0;
   late KeywordRatio? _keywordRatio = widget.defaultKeywordRatio;
 
   /// 用于「跳过」按钮新手引导的 showcase key；仅在调用方传入 flow id 时使用。
@@ -160,7 +185,10 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
     final body = SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.l, AppSpacing.s, AppSpacing.l, AppSpacing.l,
+          AppSpacing.l,
+          AppSpacing.s,
+          AppSpacing.l,
+          AppSpacing.l,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -172,8 +200,9 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: AppSpacing.m),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant
-                      .withValues(alpha: 0.4),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.4,
+                  ),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -241,10 +270,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                         -1 => l10n.blindListenNoParagraph,
                         _ => '${s}s',
                       };
-                      return DropdownMenuItem(
-                        value: s,
-                        child: Text(label),
-                      );
+                      return DropdownMenuItem(value: s, child: Text(label));
                     }).toList(),
                     onChanged: (v) {
                       if (v != null) setState(() => _targetSeconds = v);
@@ -269,31 +295,69 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                   SizedBox(
                     width: 80,
                     child: DropdownButton<double>(
-                    value: _pauseMultiplier,
-                    isExpanded: true,
-                    isDense: true,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(
-                        value: -1.0,
-                        child: Text(l10n.pauseModeSmart),
-                      ),
-                      ...(widget.pauseMultiplierOptions ??
-                              BlindListenSettings.multiplierOptions)
-                          .map((m) {
-                        final label = m == m.roundToDouble()
-                            ? '${m.toInt()}x'
-                            : '${m}x';
-                        return DropdownMenuItem(
-                          value: m,
-                          child: Text(label),
-                        );
-                      }),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setState(() => _pauseMultiplier = v);
-                    },
+                      value: _pauseMultiplier,
+                      isExpanded: true,
+                      isDense: true,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        DropdownMenuItem(
+                          value: -1.0,
+                          child: Text(l10n.pauseModeSmart),
+                        ),
+                        ...(widget.pauseMultiplierOptions ??
+                                BlindListenSettings.multiplierOptions)
+                            .map((m) {
+                              final label = m == m.roundToDouble()
+                                  ? '${m.toInt()}x'
+                                  : '${m}x';
+                              return DropdownMenuItem(
+                                value: m,
+                                child: Text(label),
+                              );
+                            }),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => _pauseMultiplier = v);
+                      },
+                    ),
                   ),
+                ],
+              ),
+            ],
+
+            if (widget.showPlaybackSpeed) ...[
+              const SizedBox(height: AppSpacing.s),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    l10n.playbackSpeed,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 80,
+                    child: DropdownButton<double>(
+                      value: _playbackSpeed,
+                      isExpanded: true,
+                      isDense: true,
+                      elevation: 0,
+                      underline: const SizedBox.shrink(),
+                      items: BlindListenSettings.briefingPlaybackSpeedOptions
+                          .map(
+                            (speed) => DropdownMenuItem(
+                              value: speed,
+                              child: Text(_formatSpeed(speed)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() => _playbackSpeed = v);
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -337,72 +401,75 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
 
             // 段落数 + 预计时长（同一行节省空间）
             // 不分段时段落数无意义，仅显示预计时长（若有）
-            Builder(builder: (_) {
-              final showParagraphCount = _targetSeconds != -1;
-              final dynamicText = widget.estimateDurationBuilder != null
-                  ? formatEstimatedDuration(
-                      l10n,
-                      widget.estimateDurationBuilder!(
-                        _targetSeconds,
-                        _pauseMultiplier,
-                      ),
-                    )
-                  : null;
-              final estimatedText = dynamicText ?? widget.estimatedDurationText;
-              if (!showParagraphCount && estimatedText == null) {
-                return const SizedBox.shrink();
-              }
-              final pieces = <Widget>[];
-              if (showParagraphCount) {
-                pieces.add(
-                  Text(
-                    l10n.blindListenParagraphCount(_paragraphCount),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                );
-              }
-              if (estimatedText != null) {
-                if (pieces.isNotEmpty) {
-                  pieces.add(
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s,
-                      ),
-                      child: Text(
-                        '·',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+            Builder(
+              builder: (_) {
+                final showParagraphCount = _targetSeconds != -1;
+                final dynamicText = widget.estimateDurationBuilder != null
+                    ? formatEstimatedDuration(
+                        l10n,
+                        widget.estimateDurationBuilder!(
+                          _targetSeconds,
+                          _pauseMultiplier,
                         ),
+                      )
+                    : null;
+                final estimatedText =
+                    dynamicText ?? widget.estimatedDurationText;
+                if (!showParagraphCount && estimatedText == null) {
+                  return const SizedBox.shrink();
+                }
+                final pieces = <Widget>[];
+                if (showParagraphCount) {
+                  pieces.add(
+                    Text(
+                      l10n.blindListenParagraphCount(_paragraphCount),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   );
                 }
-                pieces.addAll([
-                  Icon(
-                    Icons.timer_outlined,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    estimatedText,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                if (estimatedText != null) {
+                  if (pieces.isNotEmpty) {
+                    pieces.add(
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s,
+                        ),
+                        child: Text(
+                          '·',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  pieces.addAll([
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 16,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
+                    const SizedBox(width: 4),
+                    Text(
+                      estimatedText,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ]);
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: pieces,
                   ),
-                ]);
-              }
-              return Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: pieces,
-                ),
-              );
-            }),
+                );
+              },
+            ),
 
             const SizedBox(height: AppSpacing.m),
 
@@ -454,7 +521,17 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
         final duration = _targetSeconds < 0
             ? const Duration(hours: 24)
             : Duration(seconds: _targetSeconds);
-        widget.onStartPractice(duration, _pauseMultiplier, _keywordRatio);
+        final speedCallback = widget.onStartPracticeWithPlaybackSpeed;
+        if (speedCallback != null) {
+          speedCallback(
+            duration,
+            _pauseMultiplier,
+            _keywordRatio,
+            _playbackSpeed,
+          );
+        } else {
+          widget.onStartPractice(duration, _pauseMultiplier, _keywordRatio);
+        }
       },
       child: Text(l10n.startPractice),
     );
@@ -474,25 +551,20 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
         backgroundColor: theme.colorScheme.surfaceContainerHighest,
         foregroundColor: theme.colorScheme.onSurfaceVariant,
       ),
-      child: Text(
-        skipLabel,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      child: Text(skipLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
 
     final skipDescription = widget.skipGuideDescription;
-    final guidedSkip =
-        widget.skipGuideFlowId != null && skipDescription != null
-            ? GuideTarget(
-                step: GuideStep(
-                  key: _skipGuideKey,
-                  title: widget.skipGuideTitle,
-                  description: skipDescription,
-                ),
-                child: skipButton,
-              )
-            : skipButton;
+    final guidedSkip = widget.skipGuideFlowId != null && skipDescription != null
+        ? GuideTarget(
+            step: GuideStep(
+              key: _skipGuideKey,
+              title: widget.skipGuideTitle,
+              description: skipDescription,
+            ),
+            child: skipButton,
+          )
+        : skipButton;
 
     return Row(
       children: [
@@ -501,5 +573,14 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
         Expanded(flex: 2, child: startButton),
       ],
     );
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 }

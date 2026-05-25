@@ -249,6 +249,7 @@ class _BlindListenPlayerScreenState
       debugPrint('盲听完成处理出错: $e');
     }
 
+    if (!mounted) return;
     await maybeShowLearningNotificationPrompt(context, ref);
 
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
@@ -516,7 +517,10 @@ class _BlindListenPlayerScreenState
           title: l10n.blindListenAppBarTitle,
           onClose: _handleExit,
           onOpenSettings: _openSettings,
-          current: _globalSentenceIdx(sentences, playerState.playingSentenceIndex),
+          current: _globalSentenceIdx(
+            sentences,
+            playerState.playingSentenceIndex,
+          ),
           total: player.totalSentenceCount,
           progressText: _buildProgressText(
             l10n,
@@ -700,6 +704,7 @@ class _BlindListenPlayerScreenState
             playerState.currentRepeatCount,
             playerState.settings.repeatCount,
           ),
+          statusSuffixText: _formatSpeed(playerState.settings.playbackSpeed),
           l10n: l10n,
           theme: theme,
         ),
@@ -756,6 +761,15 @@ String _buildProgressText(
     paragraphTotal,
   );
   return '$paragraphPart · $sentencePart';
+}
+
+/// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+String _formatSpeed(double speed) {
+  if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+  if ((speed * 10).roundToDouble() == speed * 10) {
+    return '${speed.toStringAsFixed(1)}x';
+  }
+  return '${speed.toStringAsFixed(2)}x';
 }
 
 bool _isBlindMainPlaybackActive(BlindListenPlayerState state) {

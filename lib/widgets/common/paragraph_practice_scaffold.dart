@@ -39,6 +39,7 @@ class ParagraphPracticeScaffold extends StatelessWidget {
   final VoidCallback onCenter;
   final bool isManualMode;
   final String playCountText;
+  final String? statusSuffixText;
   final AppLocalizations l10n;
   final ThemeData theme;
 
@@ -62,6 +63,7 @@ class ParagraphPracticeScaffold extends StatelessWidget {
     required this.onCenter,
     required this.isManualMode,
     required this.playCountText,
+    this.statusSuffixText,
     required this.l10n,
     required this.theme,
   });
@@ -72,15 +74,9 @@ class ParagraphPracticeScaffold extends StatelessWidget {
       appBar: AppBar(
         title: Text(title),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: onClose,
-        ),
+        leading: IconButton(icon: const Icon(Icons.close), onPressed: onClose),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune),
-            onPressed: onOpenSettings,
-          ),
+          IconButton(icon: const Icon(Icons.tune), onPressed: onOpenSettings),
         ],
       ),
       body: Column(
@@ -116,6 +112,7 @@ class ParagraphPracticeScaffold extends StatelessWidget {
             onCenter: onCenter,
             isManualMode: isManualMode,
             playCountText: playCountText,
+            statusSuffixText: statusSuffixText,
             l10n: l10n,
             theme: theme,
           ),

@@ -29,13 +29,12 @@ class _StaticBlindListenPlayer extends TestBlindListenPlayer {
   Future<void> startPlaying() async {}
 }
 
-
 void main() {
   Widget createTestWidget({
     Locale locale = const Locale('en'),
     BlindListenPlayerState? playerState,
     TestBlindListenPlayer Function(BlindListenPlayerState initialState)?
-        playerFactory,
+    playerFactory,
   }) {
     final sentences = createTestSentences(count: 4);
     final initialState =
@@ -105,6 +104,23 @@ void main() {
       expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
     });
 
+    testWidgets('底部状态标签显示当前播放速度', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: const BlindListenPlayerState(
+            currentParagraphIndex: 0,
+            totalParagraphs: 2,
+            currentRepeatCount: 1,
+            settings: BlindListenSettings(playbackSpeed: 1.3),
+          ),
+          playerFactory: _StaticBlindListenPlayer.new,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Auto · Round 1/1 · 1.3x'), findsOneWidget);
+    });
+
     testWidgets('文本显隐开关位于句子列表下方', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
@@ -168,9 +184,7 @@ void main() {
       expect(find.text('Try to recall what you just heard'), findsNothing);
     });
 
-    testWidgets('WaitingForUser 态即使 isPlaying 为 true 也显示播放图标', (
-      tester,
-    ) async {
+    testWidgets('WaitingForUser 态即使 isPlaying 为 true 也显示播放图标', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: const BlindListenPlayerState(

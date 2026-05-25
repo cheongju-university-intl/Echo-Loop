@@ -159,8 +159,7 @@ class LearningSessionState {
       shadowingSentences: clearShadowingSentences
           ? null
           : (shadowingSentences ?? this.shadowingSentences),
-      shadowingStartIndex:
-          shadowingStartIndex ?? this.shadowingStartIndex,
+      shadowingStartIndex: shadowingStartIndex ?? this.shadowingStartIndex,
       shadowingTargetPlayCount:
           shadowingTargetPlayCount ?? this.shadowingTargetPlayCount,
       retellCatchUpStage: clearRetellCatchUp
@@ -428,8 +427,9 @@ class LearningSession extends _$LearningSession {
       'enterBlindListenMode',
       audioItemId,
       sentenceCount: allSentences.length,
-      firstSentenceText:
-          allSentences.isNotEmpty ? allSentences.first.text : null,
+      firstSentenceText: allSentences.isNotEmpty
+          ? allSentences.first.text
+          : null,
     );
 
     final blindPlayer = ref.read(blindListenPlayerProvider.notifier);
@@ -567,8 +567,9 @@ class LearningSession extends _$LearningSession {
       'enterListenAndRepeatMode',
       audioItemId,
       sentenceCount: difficultSentences.length,
-      firstSentenceText:
-          difficultSentences.isNotEmpty ? difficultSentences.first.text : null,
+      firstSentenceText: difficultSentences.isNotEmpty
+          ? difficultSentences.first.text
+          : null,
     );
 
     // 存储难句数据供 Screen 初始化 ListenAndRepeatController
@@ -633,19 +634,18 @@ class LearningSession extends _$LearningSession {
       'enterRetellMode',
       audioItemId,
       sentenceCount: retellSentences.length,
-      firstSentenceText:
-          retellSentences.isNotEmpty ? retellSentences.first.text : null,
+      firstSentenceText: retellSentences.isNotEmpty
+          ? retellSentences.first.text
+          : null,
     );
 
     // 初始化复述播放器：优先用调用方覆盖值（briefing 弹窗里用户手动选的档位），
     // 否则按音频难度 + 学习阶段联合算可见词比例。
     // 补练场景按 catchUpStage 算（补练 firstLearn 就走 firstLearn 的曲线）。
     final effectiveStage = catchUpStage ?? progress.currentStage;
-    final autoRatio = overrideKeywordRatio ??
-        KeywordRatio.forDifficultyAndStage(
-          progress.difficulty,
-          effectiveStage,
-        );
+    final autoRatio =
+        overrideKeywordRatio ??
+        KeywordRatio.forDifficultyAndStage(progress.difficulty, effectiveStage);
     final player = ref.read(retellPlayerProvider.notifier);
     player.initialize(
       paragraphs,
@@ -709,8 +709,9 @@ class LearningSession extends _$LearningSession {
       'enterReviewDifficultPracticeMode',
       audioItemId,
       sentenceCount: difficultSentences.length,
-      firstSentenceText:
-          difficultSentences.isNotEmpty ? difficultSentences.first.text : null,
+      firstSentenceText: difficultSentences.isNotEmpty
+          ? difficultSentences.first.text
+          : null,
     );
 
     // 初始化难句补练播放器（传入断点索引）
@@ -753,6 +754,10 @@ class LearningSession extends _$LearningSession {
     // 通用：清除 clip 防止残留影响 LP 的 absolutePositionStream
     final engine = ref.read(audioEngineProvider.notifier);
     await engine.clearClip();
+    final savedSettings = state.savedSettings;
+    if (savedSettings != null) {
+      await engine.setSpeed(savedSettings.playbackSpeed);
+    }
     // 按模式调用对应录音控制器的 fullReset
     if (mode == LearningMode.retell) {
       await ref.read(retellRecordingControllerProvider.notifier).fullReset();
@@ -793,9 +798,11 @@ class LearningSession extends _$LearningSession {
     final preview = firstSentenceText != null
         ? firstSentenceText.substring(0, min(40, firstSentenceText.length))
         : (lp.sentences.isNotEmpty
-            ? lp.sentences.first.text.substring(
-                0, min(40, lp.sentences.first.text.length))
-            : 'empty');
+              ? lp.sentences.first.text.substring(
+                  0,
+                  min(40, lp.sentences.first.text.length),
+                )
+              : 'empty');
     AppLogger.log(
       'Session',
       '🎬 $mode: '

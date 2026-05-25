@@ -36,6 +36,9 @@ class PracticePlaybackFooter extends StatelessWidget {
   /// 预格式化的遍数文本
   final String playCountText;
 
+  /// 可选状态后缀（如盲听播放速度）
+  final String? statusSuffixText;
+
   /// 本地化
   final AppLocalizations l10n;
 
@@ -52,6 +55,7 @@ class PracticePlaybackFooter extends StatelessWidget {
     required this.onCenter,
     required this.isManualMode,
     required this.playCountText,
+    this.statusSuffixText,
     required this.l10n,
     required this.theme,
   });
@@ -79,6 +83,7 @@ class PracticePlaybackFooter extends StatelessWidget {
           PracticePlayCountLabel(
             isManualMode: isManualMode,
             playCountText: playCountText,
+            statusSuffixText: statusSuffixText,
             l10n: l10n,
             theme: theme,
           ),

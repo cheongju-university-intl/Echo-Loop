@@ -85,6 +85,7 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
 
             // 控制模式
             _buildControlModeSection(l10n, theme, settings, ref),
+            const SizedBox(height: AppSpacing.l),
 
             // 重复次数和停顿设置仅在自动模式下显示
             if (!settings.isManualMode) ...[
@@ -167,9 +168,60 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
               // 停顿模式详情
               _buildPauseModeDetail(l10n, theme, settings, ref),
             ],
+
+            const SizedBox(height: AppSpacing.l),
+
+            // 播放速度放在控制相关设置之后，作为本次盲听的全局播放参数。
+            _buildPlaybackSpeedSection(l10n, theme, settings, ref),
           ],
         ),
       ),
+    );
+  }
+
+  /// 播放速度滑块。
+  ///
+  /// 盲听速度仅对当前会话生效，步进为 0.05x，覆盖 0.5x-2.0x。
+  Widget _buildPlaybackSpeedSection(
+    AppLocalizations l10n,
+    ThemeData theme,
+    BlindListenSettings settings,
+    WidgetRef ref,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.playbackSpeed,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              _formatSpeed(settings.playbackSpeed),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: settings.playbackSpeed.clamp(0.5, 2.0),
+          min: 0.5,
+          max: 2.0,
+          divisions: 30,
+          label: _formatSpeed(settings.playbackSpeed),
+          onChanged: (value) {
+            final speed = (value * 20).round() / 20;
+            ref
+                .read(blindListenPlayerProvider.notifier)
+                .updateSettings(settings.copyWith(playbackSpeed: speed));
+          },
+        ),
+      ],
     );
   }
 
@@ -365,5 +417,14 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
         );
       }),
     );
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 }

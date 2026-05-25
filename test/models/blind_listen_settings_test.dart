@@ -1,4 +1,4 @@
-/// 盲听设置模型测试
+// 盲听设置模型测试
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/models/blind_listen_settings.dart';
 import 'package:echo_loop/models/intensive_listen_settings.dart'
@@ -14,6 +14,7 @@ void main() {
       expect(settings.fixedPauseSeconds, 10);
       expect(settings.pauseMultiplier, 0.5);
       expect(settings.controlMode, ShadowingControlMode.auto);
+      expect(settings.playbackSpeed, 1.0);
       expect(settings.isManualMode, false);
     });
 
@@ -59,6 +60,7 @@ void main() {
         fixedPauseSeconds: 30,
         pauseMultiplier: 2.0,
         controlMode: ShadowingControlMode.manual,
+        playbackSpeed: 1.3,
       );
 
       expect(updated.repeatCount, 3);
@@ -66,6 +68,21 @@ void main() {
       expect(updated.fixedPauseSeconds, 30);
       expect(updated.pauseMultiplier, 2.0);
       expect(updated.controlMode, ShadowingControlMode.manual);
+      expect(updated.playbackSpeed, 1.3);
+    });
+
+    test('入口播放速度选项符合盲听要求', () {
+      expect(BlindListenSettings.briefingPlaybackSpeedOptions, const [
+        0.5,
+        0.7,
+        0.8,
+        0.9,
+        1.0,
+        1.1,
+        1.3,
+        1.5,
+        2.0,
+      ]);
     });
 
     test('calculatePauseDuration 在各模式下正确计算', () {

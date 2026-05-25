@@ -1,6 +1,6 @@
 /// 盲听设置模型
 ///
-/// 控制盲听段落播放的重复次数和段间停顿模式。
+/// 控制盲听段落播放的播放速度、重复次数和段间停顿模式。
 /// 仅在会话内临时生效，不持久化。
 library;
 
@@ -23,15 +23,38 @@ class BlindListenSettings {
   /// 控制模式（默认 auto）
   final ShadowingControlMode controlMode;
 
+  /// 播放速度（0.5x-2.0x，默认 1.0x）
+  final double playbackSpeed;
+
   /// 是否为手动控制模式
   bool get isManualMode => controlMode == ShadowingControlMode.manual;
+
+  /// 入口弹窗使用的离散速度选项
+  static const List<double> briefingPlaybackSpeedOptions = [
+    0.5,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+    1.1,
+    1.3,
+    1.5,
+    2.0,
+  ];
 
   /// 固定间隔可选值（秒）
   static const List<int> fixedPauseOptions = [5, 10, 15, 20, 25, 30, 45, 60];
 
   /// 倍数可选值
   static const List<double> multiplierOptions = [
-    0.3, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0,
+    0.3,
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
   ];
 
   const BlindListenSettings({
@@ -40,6 +63,7 @@ class BlindListenSettings {
     this.fixedPauseSeconds = 10,
     this.pauseMultiplier = 0.5,
     this.controlMode = ShadowingControlMode.auto,
+    this.playbackSpeed = 1.0,
   });
 
   /// 从弹窗回调的 pauseMultiplier 创建设置
@@ -60,8 +84,7 @@ class BlindListenSettings {
   /// - 倍数模式: pauseMultiplier × 段长
   Duration calculatePauseDuration(Duration paragraphDuration) {
     final ms = switch (pauseMode) {
-      PauseMode.smart =>
-        (paragraphDuration.inMilliseconds * 0.5).round(),
+      PauseMode.smart => (paragraphDuration.inMilliseconds * 0.5).round(),
       PauseMode.fixed => fixedPauseSeconds * 1000,
       PauseMode.multiplier =>
         (paragraphDuration.inMilliseconds * pauseMultiplier).round(),
@@ -75,6 +98,7 @@ class BlindListenSettings {
     int? fixedPauseSeconds,
     double? pauseMultiplier,
     ShadowingControlMode? controlMode,
+    double? playbackSpeed,
   }) {
     return BlindListenSettings(
       repeatCount: repeatCount ?? this.repeatCount,
@@ -82,6 +106,7 @@ class BlindListenSettings {
       fixedPauseSeconds: fixedPauseSeconds ?? this.fixedPauseSeconds,
       pauseMultiplier: pauseMultiplier ?? this.pauseMultiplier,
       controlMode: controlMode ?? this.controlMode,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 }

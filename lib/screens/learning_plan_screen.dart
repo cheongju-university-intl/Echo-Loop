@@ -141,7 +141,6 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           }
         },
       );
-
     });
   }
 
@@ -239,8 +238,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         return estimateBlindListenSessionDuration(
           sentences: ref.read(listeningPracticeProvider).sentences,
           fullAudioDuration: ref.read(audioEngineProvider).totalDuration,
-          skipSilenceEnabled:
-              ref.read(appSettingsProvider).skipSilenceEnabled,
+          skipSilenceEnabled: ref.read(appSettingsProvider).skipSilenceEnabled,
         );
       case SubStageType.reviewDifficultPractice:
         // 难句补练 = 难句总时长 × 2（盲听 + 跟读）
@@ -288,12 +286,14 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       sentences: sentences,
       stageLabel: reviewStageLabel(l10n, stage),
       estimatedDurationText: estimatedText,
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      onStartPractice: (targetDuration, pauseMultiplier, playbackSpeed) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
           targetDuration,
         );
-        final settings = BlindListenSettings.fromMultiplier(pauseMultiplier);
+        final settings = BlindListenSettings.fromMultiplier(
+          pauseMultiplier,
+        ).copyWith(playbackSpeed: playbackSpeed);
         await ref
             .read(learningSessionProvider.notifier)
             .enterBlindListenMode(
@@ -527,12 +527,14 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       estimatedDurationText: estimatedDuration != null
           ? formatEstimatedDuration(l10n, estimatedDuration)
           : null,
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      onStartPractice: (targetDuration, pauseMultiplier, playbackSpeed) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
           targetDuration,
         );
-        final settings = BlindListenSettings.fromMultiplier(pauseMultiplier);
+        final settings = BlindListenSettings.fromMultiplier(
+          pauseMultiplier,
+        ).copyWith(playbackSpeed: playbackSpeed);
         await ref
             .read(learningSessionProvider.notifier)
             .enterBlindListenMode(
@@ -831,7 +833,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
     // 暂停学习按钮仅在已开始学习且当前未暂停时才会渲染，引导也只在此时
     // 触发；和「自由练习 / 按计划学习」flow 隔离，让用户开始学习后再看到。
-    final showPauseLearningGuide = hasTranscript &&
+    final showPauseLearningGuide =
+        hasTranscript &&
         (progress?.isStarted ?? false) &&
         !(progress?.isPaused ?? false);
 
@@ -952,8 +955,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
               audioItemId: widget.audioItemId,
               audioItemName: audioItem.name,
               startLearningStep: hasTranscript ? stepStartLearning : null,
-              pauseLearningStep:
-                  showPauseLearningGuide ? stepPauseLearning : null,
+              pauseLearningStep: showPauseLearningGuide
+                  ? stepPauseLearning
+                  : null,
               onPressed: hasTranscript && !isLockedReview
                   ? () => _handleStartLearning(context, progress)
                   : null,
@@ -1035,10 +1039,7 @@ class _AppBarTitle extends StatelessWidget {
   final String audioName;
   final List<String> collectionNames;
 
-  const _AppBarTitle({
-    required this.audioName,
-    required this.collectionNames,
-  });
+  const _AppBarTitle({required this.audioName, required this.collectionNames});
 
   @override
   Widget build(BuildContext context) {
@@ -1109,7 +1110,9 @@ class _ProgressCard extends ConsumerWidget {
         : ref.watch(learningPlanForAudioProvider(audioItem!.id));
     final completedKeys = audioItem == null
         ? const <String>{}
-        : ref.watch(learningProgressNotifierProvider).completionsFor(audioItem!.id);
+        : ref
+              .watch(learningProgressNotifierProvider)
+              .completionsFor(audioItem!.id);
     final percent = progress?.progressPercent(plan, completedKeys) ?? 0.0;
     final percentText = '${(percent * 100).round()}%';
 
@@ -1507,7 +1510,11 @@ class _FirstStudySection extends ConsumerWidget {
               final subStage = subStages[index];
               final stepData = stepDataMap[subStage]!;
               final isCompleted =
-                  progress?.isSubStageCompleted(firstLearnStage, subStage, completedKeys) ??
+                  progress?.isSubStageCompleted(
+                    firstLearnStage,
+                    subStage,
+                    completedKeys,
+                  ) ??
                   false;
               final isCurrent =
                   progress?.isCurrentSubStage(firstLearnStage, subStage) ??
@@ -1525,7 +1532,11 @@ class _FirstStudySection extends ConsumerWidget {
                 if (passCount > 0) {
                   parts.add(l10n.blindListenPassInfo(passCount));
                 }
-                if (progress?.isSubStageCompleted(firstLearnStage, subStage, completedKeys) ??
+                if (progress?.isSubStageCompleted(
+                      firstLearnStage,
+                      subStage,
+                      completedKeys,
+                    ) ??
                     false) {
                   parts.add(
                     l10n.difficultyLabel(
@@ -1562,7 +1573,8 @@ class _FirstStudySection extends ConsumerWidget {
 
               // 已完成或过去阶段跳过的步骤都支持点击进入自由练习。
               // （过去阶段跳过的复述：用户当时关掉了复述、现在重开后想补做）
-              final isPast = progress != null &&
+              final isPast =
+                  progress != null &&
                   firstLearnStage.index < progress!.currentStage.index;
               final canFreePlay = isCompleted || isPast;
               VoidCallback? onTap;
@@ -1672,12 +1684,14 @@ class _FirstStudySection extends ConsumerWidget {
       estimatedDurationText: estimatedDuration != null
           ? formatEstimatedDuration(l10n, estimatedDuration)
           : null,
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      onStartPractice: (targetDuration, pauseMultiplier, playbackSpeed) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
           targetDuration,
         );
-        final settings = BlindListenSettings.fromMultiplier(pauseMultiplier);
+        final settings = BlindListenSettings.fromMultiplier(
+          pauseMultiplier,
+        ).copyWith(playbackSpeed: playbackSpeed);
         await ref
             .read(learningSessionProvider.notifier)
             .enterBlindListenMode(
@@ -2224,12 +2238,14 @@ class _ReviewRoundSection extends ConsumerWidget {
       estimatedDurationText: estimatedDuration != null
           ? formatEstimatedDuration(l10n, estimatedDuration)
           : null,
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      onStartPractice: (targetDuration, pauseMultiplier, playbackSpeed) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
           targetDuration,
         );
-        final settings = BlindListenSettings.fromMultiplier(pauseMultiplier);
+        final settings = BlindListenSettings.fromMultiplier(
+          pauseMultiplier,
+        ).copyWith(playbackSpeed: playbackSpeed);
         await ref
             .read(learningSessionProvider.notifier)
             .enterBlindListenMode(
@@ -2376,8 +2392,7 @@ class _ReviewRoundSection extends ConsumerWidget {
       skippedKeys: progress?.skippedSubStageKeys ?? const {},
     );
     final completedCount = _completedSubStageCount(completedKeys);
-    final timingText =
-        _reviewTimingText(context, completedKeys: completedKeys);
+    final timingText = _reviewTimingText(context, completedKeys: completedKeys);
     final unlockText = _unlockStatusText();
     // 当前轮次显示实时状态，其余轮次显示解锁状态，都没有则显示固定间隔
     final statusText = timingText ?? unlockText ?? review.interval;
@@ -2476,7 +2491,11 @@ class _ReviewRoundSection extends ConsumerWidget {
               final subStage = subStages[index];
               final subStageData = _subStageData(context, subStage);
               final isCompleted =
-                  progress?.isSubStageCompleted(review.stage, subStage, completedKeys) ??
+                  progress?.isSubStageCompleted(
+                    review.stage,
+                    subStage,
+                    completedKeys,
+                  ) ??
                   false;
               final isCurrent =
                   progress?.isCurrentSubStage(review.stage, subStage) ?? false;
@@ -2500,7 +2519,8 @@ class _ReviewRoundSection extends ConsumerWidget {
 
               // 已完成或过去阶段跳过的子步骤都支持点击进入自由练习。
               // （过去阶段跳过的复述：用户当时关掉了复述、现在重开后想补做）
-              final isPast = progress != null &&
+              final isPast =
+                  progress != null &&
                   review.stage.index < progress!.currentStage.index;
               final canFreePlay = isCompleted || isPast;
               VoidCallback? onTap;
@@ -2743,9 +2763,9 @@ class _BottomButton extends ConsumerWidget {
           .read(learningProgressNotifierProvider.notifier)
           .deleteProgress(audioItemId);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.resetLearningProgressDone)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.resetLearningProgressDone)));
       }
     }
   }
@@ -2833,10 +2853,10 @@ class _BottomButton extends ConsumerWidget {
       final pauseButton = FilledButton.tonal(
         onPressed: () => _confirmAndPause(context, ref),
         style: FilledButton.styleFrom(
-          backgroundColor:
-              Theme.of(context).colorScheme.surfaceContainerHighest,
-          foregroundColor:
-              Theme.of(context).colorScheme.onSurfaceVariant,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest,
+          foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         child: Text(
           l10n.pauseLearning,
@@ -2889,11 +2909,13 @@ List<SubStageType> _orderedSubStagesForDisplay({
   required Set<String> skippedKeys,
 }) {
   final planned = plan.subStagesFor(stage);
-  final extras = stage.allSubStages.where((s) {
-    if (planned.contains(s)) return false;
-    final key = '${stage.key}:${s.key}';
-    return completedKeys.contains(key) || skippedKeys.contains(key);
-  }).toList(growable: false);
+  final extras = stage.allSubStages
+      .where((s) {
+        if (planned.contains(s)) return false;
+        final key = '${stage.key}:${s.key}';
+        return completedKeys.contains(key) || skippedKeys.contains(key);
+      })
+      .toList(growable: false);
   return [...planned, ...extras];
 }
 

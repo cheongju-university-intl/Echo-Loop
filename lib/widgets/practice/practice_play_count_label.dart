@@ -2,6 +2,7 @@
 ///
 /// 自动模式：显示 "自动 · 第 1/3 遍"，弱化样式。
 /// 手动模式：显示 "手动"，高亮样式。
+/// 可选 [statusSuffixText] 用于追加当前会话参数，例如播放速度。
 /// 用于所有学习页面（精听、跟读、难句补练、收藏复习、复述、盲听）。
 library;
 
@@ -18,6 +19,9 @@ class PracticePlayCountLabel extends StatelessWidget {
   /// 预格式化的遍数文本（如 "第 1/3 遍"）
   final String playCountText;
 
+  /// 可选状态后缀（如 "1.3x"），由具体练习页面决定是否展示。
+  final String? statusSuffixText;
+
   /// 本地化
   final AppLocalizations l10n;
 
@@ -28,6 +32,7 @@ class PracticePlayCountLabel extends StatelessWidget {
     super.key,
     required this.isManualMode,
     required this.playCountText,
+    this.statusSuffixText,
     required this.l10n,
     required this.theme,
   });
@@ -42,8 +47,11 @@ class PracticePlayCountLabel extends StatelessWidget {
 
   /// 手动模式：高亮 "手动"
   Widget _buildManualLabel() {
+    final suffix = statusSuffixText;
     return Text(
-      l10n.practiceControlModeManual,
+      suffix == null
+          ? l10n.practiceControlModeManual
+          : '${l10n.practiceControlModeManual} · $suffix',
       style: theme.textTheme.bodySmall?.copyWith(
         color: theme.colorScheme.primary,
         fontWeight: FontWeight.w600,
@@ -53,8 +61,11 @@ class PracticePlayCountLabel extends StatelessWidget {
 
   /// 自动模式：弱化 "自动 · 第 1/3 遍"
   Widget _buildAutoLabel() {
+    final suffix = statusSuffixText;
     return Text(
-      '${l10n.practiceControlModeAuto} · $playCountText',
+      suffix == null
+          ? '${l10n.practiceControlModeAuto} · $playCountText'
+          : '${l10n.practiceControlModeAuto} · $playCountText · $suffix',
       style: theme.textTheme.bodySmall?.copyWith(
         color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
       ),

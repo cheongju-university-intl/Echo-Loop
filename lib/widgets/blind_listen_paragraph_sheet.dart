@@ -18,8 +18,12 @@ Future<void> showBlindListenParagraphSheet({
   required List<Sentence> sentences,
   String? stageLabel,
   String? estimatedDurationText,
-  required void Function(Duration targetDuration, double pauseMultiplier)
-      onStartPractice,
+  required void Function(
+    Duration targetDuration,
+    double pauseMultiplier,
+    double playbackSpeed,
+  )
+  onStartPractice,
 }) {
   final l10n = AppLocalizations.of(context)!;
   return showParagraphSelectionSheet(
@@ -30,11 +34,13 @@ Future<void> showBlindListenParagraphSheet({
     sentences: sentences,
     defaultSeconds: -1,
     showPauseMultiplier: true,
+    showPlaybackSpeed: true,
     pauseMultiplierOptions: const [0.5, 1.0, 1.5, 2.0, 3.0],
     stageLabel: stageLabel,
     estimatedDurationText: estimatedDurationText,
     // 盲听不显示可见词比例（仅复述用），第三个回调参数忽略
-    onStartPractice: (duration, multiplier, _) =>
-        onStartPractice(duration, multiplier),
+    onStartPractice: (_, _, _) {},
+    onStartPracticeWithPlaybackSpeed: (duration, multiplier, _, speed) =>
+        onStartPractice(duration, multiplier, speed),
   );
 }
