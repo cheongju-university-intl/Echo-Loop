@@ -836,6 +836,8 @@
   "privacyPolicy": "隐私政策",
   "writeFeedback": "意见反馈",
 
+  "viewSourceCode": "查看源代码",
+
   "updateAvailable": "发现新版本 v{version}",
   "@updateAvailable": {
     "placeholders": {

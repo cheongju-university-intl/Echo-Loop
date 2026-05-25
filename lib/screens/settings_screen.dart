@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -293,10 +294,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       message = l10n.clearCacheEmpty;
     } else if (totalFreed > 0) {
       message = l10n.clearCacheSuccessWithSize(formatBytes(totalFreed));
-      ref.read(analyticsServiceProvider).track(
-        Events.cacheCleared,
-        {EventParams.bytesFreed: totalFreed},
-      );
+      ref.read(analyticsServiceProvider).track(Events.cacheCleared, {
+        EventParams.bytesFreed: totalFreed,
+      });
     } else {
       message = l10n.clearCacheSuccess;
     }
@@ -361,6 +361,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: Text(l10n.writeFeedback),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => launchUrl(Uri.parse('mailto:support@echo-loop.top')),
+            ),
+            ListTile(
+              leading: SizedBox(
+                width: 32,
+                height: 32,
+                child: Center(
+                  child: FaIcon(
+                    FontAwesomeIcons.github,
+                    size: 22,
+                  ),
+                ),
+              ),
+              title: Text(l10n.viewSourceCode),
+              subtitle: const Text(
+                'github.com/echo-loop/Echo-Loop',
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => launchUrl(
+                Uri.parse('https://github.com/echo-loop/Echo-Loop/'),
+              ),
             ),
           ],
         ),
@@ -550,8 +571,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           subtitle: const Text('AI 转录完成后按本地音频静音微调句边界'),
           trailing: Switch(
             value: settings.subtitleAutoAlignEnabled,
-            onChanged: (value) =>
-                ref.read(appSettingsProvider.notifier).setSubtitleAutoAlignEnabled(value),
+            onChanged: (value) => ref
+                .read(appSettingsProvider.notifier)
+                .setSubtitleAutoAlignEnabled(value),
           ),
         ),
         ListTile(
@@ -1294,13 +1316,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       selected: isSelected,
       onTap: () {
         if (!isSelected) {
-          ref.read(analyticsServiceProvider).track(
-            Events.nativeLanguageChanged,
-            {
-              EventParams.previousLanguage: settings.nativeLanguage,
-              EventParams.newLanguage: code,
-            },
-          );
+          ref
+              .read(analyticsServiceProvider)
+              .track(Events.nativeLanguageChanged, {
+                EventParams.previousLanguage: settings.nativeLanguage,
+                EventParams.newLanguage: code,
+              });
         }
         controller.setNativeLanguage(code);
         Navigator.pop(context);
@@ -1396,13 +1417,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       selected: isSelected,
       onTap: () {
         if (!isSelected) {
-          ref.read(analyticsServiceProvider).track(
-            Events.themeModeChanged,
-            {
-              EventParams.previousMode: settings.themeMode.name,
-              EventParams.newMode: mode.name,
-            },
-          );
+          ref.read(analyticsServiceProvider).track(Events.themeModeChanged, {
+            EventParams.previousMode: settings.themeMode.name,
+            EventParams.newMode: mode.name,
+          });
         }
         controller.setThemeMode(mode);
         Navigator.pop(context);
@@ -1493,13 +1511,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       selected: isSelected,
       onTap: () {
         if (!isSelected) {
-          ref.read(analyticsServiceProvider).track(
-            Events.appLocaleChanged,
-            {
-              EventParams.previousLocale: settings.locale?.languageCode ?? 'system',
-              EventParams.newLocale: locale?.languageCode ?? 'system',
-            },
-          );
+          ref.read(analyticsServiceProvider).track(Events.appLocaleChanged, {
+            EventParams.previousLocale:
+                settings.locale?.languageCode ?? 'system',
+            EventParams.newLocale: locale?.languageCode ?? 'system',
+          });
         }
         controller.setLocale(locale);
         Navigator.pop(context);

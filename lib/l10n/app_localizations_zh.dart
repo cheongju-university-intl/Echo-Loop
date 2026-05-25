@@ -2002,6 +2002,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get writeFeedback => '意见反馈';
 
   @override
+  String get viewSourceCode => '查看源代码';
+
+  @override
   String updateAvailable(String version) {
     return '发现新版本 v$version';
   }

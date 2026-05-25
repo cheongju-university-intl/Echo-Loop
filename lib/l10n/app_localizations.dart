@@ -3686,6 +3686,12 @@ abstract class AppLocalizations {
   /// **'Write Feedback'**
   String get writeFeedback;
 
+  /// No description provided for @viewSourceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'View Source Code'**
+  String get viewSourceCode;
+
   /// No description provided for @updateAvailable.
   ///
   /// In en, this message translates to:

@@ -1112,6 +1112,8 @@
   "privacyPolicy": "Privacy Policy",
   "writeFeedback": "Write Feedback",
 
+  "viewSourceCode": "View Source Code",
+
   "updateAvailable": "New Version v{version}",
   "@updateAvailable": {
     "placeholders": {

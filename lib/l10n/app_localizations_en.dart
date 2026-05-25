@@ -2063,6 +2063,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get writeFeedback => 'Write Feedback';
 
   @override
+  String get viewSourceCode => 'View Source Code';
+
+  @override
   String updateAvailable(String version) {
     return 'New Version v$version';
   }
