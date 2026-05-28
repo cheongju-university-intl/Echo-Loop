@@ -15,13 +15,13 @@ void main() {
       expect(normalizeForCache('hello   world'), 'hello world');
     });
 
-    test('去除尾部标点', () {
-      expect(normalizeForCache('hello world.'), 'hello world');
-      expect(normalizeForCache('hello world!'), 'hello world');
-      expect(normalizeForCache('hello world?'), 'hello world');
-      expect(normalizeForCache('hello world;'), 'hello world');
-      expect(normalizeForCache('hello world:'), 'hello world');
-      expect(normalizeForCache('hello world...'), 'hello world');
+    test('保留尾部标点', () {
+      expect(normalizeForCache('hello world.'), 'hello world.');
+      expect(normalizeForCache('hello world!'), 'hello world!');
+      expect(normalizeForCache('hello world?'), 'hello world?');
+      expect(normalizeForCache('hello world;'), 'hello world;');
+      expect(normalizeForCache('hello world:'), 'hello world:');
+      expect(normalizeForCache('hello world...'), 'hello world...');
     });
 
     test('不去除中间标点', () {
@@ -30,7 +30,7 @@ void main() {
     });
 
     test('综合归一化', () {
-      expect(normalizeForCache('  Hello,  World!  '), 'hello, world');
+      expect(normalizeForCache('  Hello,  World!  '), 'hello, world!');
     });
 
     test('空字符串', () {
@@ -51,7 +51,7 @@ void main() {
 
     test('归一化后相同的文本生成相同哈希', () {
       final hash1 = hashText('Hello World.');
-      final hash2 = hashText('  hello   world  ');
+      final hash2 = hashText('  hello   world.  ');
       expect(hash1, hash2);
     });
 
@@ -59,6 +59,7 @@ void main() {
       final hash1 = hashText('Hello');
       final hash2 = hashText('World');
       expect(hash1, isNot(hash2));
+      expect(hashText('Hello.'), isNot(hashText('Hello?')));
     });
 
     test('哈希值为 64 字符十六进制字符串', () {
