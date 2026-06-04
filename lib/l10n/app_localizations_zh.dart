@@ -2027,6 +2027,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get writeFeedback => '意见反馈';
 
   @override
+  String get rateUs => '评价我们';
+
+  @override
   String get joinCommunity => '加入学习社群';
 
   @override

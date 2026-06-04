@@ -13,6 +13,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../config/api_config.dart';
+import '../config/app_store_config.dart';
 import '../models/app_update_info.dart';
 import 'app_logger.dart';
 
@@ -139,7 +140,7 @@ class AppUpdateChecker {
       final releaseNotes = entry['releaseNotes'];
       final downloadUrl = trackUrl is String && trackUrl.isNotEmpty
           ? trackUrl
-          : 'https://apps.apple.com/app/id6760324074';
+          : appStoreProductUri.toString();
       final notes = releaseNotes is String && releaseNotes.isNotEmpty
           ? {'en': releaseNotes, 'zh': releaseNotes}
           : <String, String>{};

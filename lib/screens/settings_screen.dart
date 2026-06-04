@@ -29,6 +29,7 @@ import '../providers/new_user_guide_provider.dart';
 import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
+import '../config/app_store_config.dart';
 import '../features/auth/providers/auth_providers.dart';
 import '../features/auth/screens/account_screen.dart';
 import '../router/app_router.dart';
@@ -407,6 +408,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => launchUrl(Uri.parse('mailto:support@echo-loop.top')),
         ),
+        if (defaultTargetPlatform == TargetPlatform.iOS)
+          ListTile(
+            leading: _emojiIcon('⭐'),
+            title: Text(l10n.rateUs),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => launchUrl(
+              appStoreReviewUri,
+              mode: LaunchMode.externalApplication,
+            ),
+          ),
         ListTile(
           leading: _emojiIcon('👥'),
           title: Text(l10n.joinCommunity),

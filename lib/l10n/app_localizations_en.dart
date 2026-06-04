@@ -2088,6 +2088,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get writeFeedback => 'Write Feedback';
 
   @override
+  String get rateUs => 'Rate Us';
+
+  @override
   String get joinCommunity => 'Join Community';
 
   @override

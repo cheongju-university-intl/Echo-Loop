@@ -4,6 +4,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:echo_loop/providers/app_update_provider.dart';
@@ -102,6 +103,40 @@ void main() {
         await tester.scrollUntilVisible(find.textContaining('Version'), 200);
         await tester.pumpAndSettle();
         expect(find.text('Version 1.0.0 (Debug)'), findsOneWidget);
+      });
+
+      testWidgets('iOS 显示评价我们入口', (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        try {
+          await tester.pumpWidget(
+            createTestScreen(
+              const SettingsScreen(),
+              overrides: buildOverrides(),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text('Rate Us'), findsOneWidget);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+
+      testWidgets('非 iOS 不显示评价我们入口', (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        try {
+          await tester.pumpWidget(
+            createTestScreen(
+              const SettingsScreen(),
+              overrides: buildOverrides(),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text('Rate Us'), findsNothing);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
       });
 
       testWidgets('已登录时账号区显示登录邮箱', (tester) async {

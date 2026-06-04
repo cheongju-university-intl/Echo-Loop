@@ -3,6 +3,24 @@
 > 最后更新：2026-06-04
 > 当前焦点：用户事件统计与本地 usage counter（已完成）
 
+## 已完成：iOS 我的页新增 App Store 评价入口
+
+在“我的”tab 的 About 区域为 iOS 用户新增“评价我们”入口，点击后直接通过 App Store 客户端打开 Echo Loop 的写评价页面。App Store ID 统一收敛到配置文件，更新检查的兜底商店链接也复用同一配置，避免后续维护时出现 ID 不一致。
+
+### 实现
+- [x] 新增 `lib/config/app_store_config.dart`，集中管理 App Store App ID、应用详情页和写评价页链接
+- [x] `SettingsScreen` 在 iOS 平台显示“评价我们 / Rate Us”入口，非 iOS 平台隐藏
+- [x] 点击入口使用 `itms-apps://itunes.apple.com/app/id6760324074?action=write-review` 并以外部应用方式打开
+- [x] 新增中英文 i18n 文案并重新生成本地化代码
+- [x] 设置页测试覆盖 iOS 显示入口、非 iOS 隐藏入口
+
+### 验证
+- [x] `flutter analyze lib/config/app_store_config.dart lib/screens/settings_screen.dart lib/services/app_update_checker.dart test/screens/settings_screen_test.dart`：No issues found
+- [x] `flutter test test/screens/settings_screen_test.dart`：19 tests passed
+- [x] `scripts/check.sh`：全量 `flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2437 tests passed，11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，后续 `asr_engine_test.dart` / `app_test.dart` 失败在本地 App debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次 iOS 设置入口改动无关
+
+**完成时间**: 2026-06-04 22:52 +0800
+
 ## 已完成：用户事件统计与本地 usage counter
 
 建立本地使用统计层，为后续产品体验节奏、功能使用状态和用户引导时机判断提供可查询的累计计数。统计层采用 SharedPreferences 持久化，所有 key 统一使用 `usage_` 前缀；远端 analytics 仍复用现有 `AnalyticsService`。

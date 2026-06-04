@@ -3728,6 +3728,12 @@ abstract class AppLocalizations {
   /// **'Write Feedback'**
   String get writeFeedback;
 
+  /// No description provided for @rateUs.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate Us'**
+  String get rateUs;
+
   /// No description provided for @joinCommunity.
   ///
   /// In en, this message translates to:
