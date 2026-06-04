@@ -241,10 +241,15 @@ Thanks to [Yang Yan](https://sfs.muc.edu.cn/info/1063/3729.htm) (School of Forei
 ```bash
 git clone git@github.com:echo-loop/Echo-Loop.git
 cd Echo-Loop
+cp .dev.env.template .dev.env   # fill in Supabase / Google / API base URL
 flutter pub get
 dart run build_runner build
-flutter run -d <ios|android|macos>
+flutter run -d <ios|android|macos> --dart-define-from-file=.dev.env
 ```
+
+> Compile-time variables (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `GOOGLE_WEB_CLIENT_ID`, `API_BASE_URL`)
+> live in `.dev.env` (debug) / `.prod.env` (release) and are injected via `--dart-define-from-file`.
+> Both files are gitignored — do not commit them. `.prod.env` uses the same keys with the production `API_BASE_URL`.
 
 </details>
 
@@ -342,17 +347,18 @@ dart run build_runner build
 **Build**
 
 ```bash
-flutter build macos
-flutter build apk
-flutter build ios
+# Compile-time variables are injected from an env file (.dev.env for debug, .prod.env for release)
+flutter build macos --dart-define-from-file=.prod.env
+flutter build apk   --dart-define-from-file=.prod.env
+flutter build ios   --dart-define-from-file=.prod.env
 
-# Specify API base URL
-flutter build macos --dart-define=API_BASE_URL=https://dev.echo-loop.top
-flutter build ios   --dart-define=API_BASE_URL=https://www.echo-loop.top
-
-# Run on device (with API base URL)
-flutter run --release -d <DEVICE_ID> --dart-define=API_BASE_URL=https://dev.echo-loop.top
+# Run on device
+flutter run --release -d <DEVICE_ID> --dart-define-from-file=.dev.env
 ```
+
+> The release scripts `scripts/run_simulator.sh` (reads `.dev.env`) and
+> `scripts/release_{android,ios,macos}.sh` (read `.prod.env`) already pass
+> `--dart-define-from-file` for you.
 
 **Requirements**
 

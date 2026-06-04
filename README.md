@@ -259,10 +259,15 @@ flowchart LR
 ```bash
 git clone git@github.com:echo-loop/Echo-Loop.git
 cd Echo-Loop
+cp .dev.env.template .dev.env   # 填入 Supabase / Google / API 地址等编译期变量
 flutter pub get
 dart run build_runner build
-flutter run -d <ios|android|macos>
+flutter run -d <ios|android|macos> --dart-define-from-file=.dev.env
 ```
+
+> 编译期环境变量（`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`GOOGLE_WEB_CLIENT_ID`、`API_BASE_URL`）
+> 统一放在 `.dev.env`（调试）/ `.prod.env`（发布），通过 `--dart-define-from-file` 注入。
+> 这两个文件已被 `.gitignore`，请勿提交。`.prod.env` 用相同的键，把 `API_BASE_URL` 换成生产地址即可。
 
 </details>
 
@@ -360,17 +365,17 @@ dart run build_runner build
 **构建**
 
 ```bash
-flutter build macos
-flutter build apk
-flutter build ios
+# 编译期变量从 env 文件注入（dev 用 .dev.env，发布用 .prod.env）
+flutter build macos --dart-define-from-file=.prod.env
+flutter build apk   --dart-define-from-file=.prod.env
+flutter build ios   --dart-define-from-file=.prod.env
 
-# 指定 API 地址
-flutter build macos --dart-define=API_BASE_URL=https://dev.echo-loop.top
-flutter build ios   --dart-define=API_BASE_URL=https://www.echo-loop.top
-
-# 真机运行（指定 API 地址）
-flutter run --release -d <DEVICE_ID> --dart-define=API_BASE_URL=https://dev.echo-loop.top
+# 真机运行
+flutter run --release -d <DEVICE_ID> --dart-define-from-file=.dev.env
 ```
+
+> 发布脚本 `scripts/run_simulator.sh`（读 `.dev.env`）、`scripts/release_{android,ios,macos}.sh`（读 `.prod.env`）
+> 已内置 `--dart-define-from-file`，无需手动传参。
 
 **环境要求**
 
