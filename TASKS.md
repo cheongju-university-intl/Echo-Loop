@@ -1,7 +1,27 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-04
-> 当前焦点：Android Google 账号登录与 GMS 门控（已完成）
+> 当前焦点：用户事件统计与本地 usage counter（已完成）
+
+## 已完成：用户事件统计与本地 usage counter
+
+建立本地使用统计层，为后续产品体验节奏、功能使用状态和用户引导时机判断提供可查询的累计计数。统计层采用 SharedPreferences 持久化，所有 key 统一使用 `usage_` 前缀；远端 analytics 仍复用现有 `AnalyticsService`。
+
+### 实现
+- [x] 新增 `UsageEvent`、`UsageCounters`、`UsageCounterStore`、`UsageTracker` 和 Riverpod provider
+- [x] SharedPreferences key 统一为 `usage_counters_v1`、`usage_prompt_state_v1`、`usage_last_recorded_at_ms`
+- [x] usage 本地计数不受 analytics consent 影响；远端上报仍由 `AnalyticsService` 处理 consent，且本地计数异常不会阻断原 analytics 上报
+- [x] 接入音频上传、字幕上传、AI 转录开始/完成、AI 翻译/解析/意群点击、学习子阶段完成、首次学习完成、收藏句子/单词、收藏复习/单词卡入口与完成、录音完成、学习任务点击
+- [x] AI 翻译/解析/意群按用户点击计数，缓存命中也会累计
+- [x] 测试环境提供 no-op usage override；纯 provider 单元测试未注入 SharedPreferences 时使用内存 store fallback
+
+### 验证
+- [x] `flutter analyze lib/features/usage test/features/usage/usage_tracker_test.dart`：No issues found
+- [x] `flutter test test/features/usage/usage_tracker_test.dart`：6 tests passed
+- [x] `flutter test test/providers/learning_progress_provider_test.dart test/providers/transcription_task_provider_test.dart`：99 tests passed
+- [x] `flutter test test/features/usage/usage_tracker_test.dart test/widgets/manage_subtitles_sheet_test.dart test/providers/learning_session/bookmark_review_test.dart test/providers/learning_session/retell_player_provider_test.dart test/providers/review_difficult_practice_provider_test.dart test/providers/flashcard/flashcard_provider_test.dart test/screens/favorites_screen_test.dart`：86 tests passed
+
+**完成时间**: 2026-06-04 22:05 +0800
 
 ## 已完成：Android Google 账号登录与 GMS 门控
 

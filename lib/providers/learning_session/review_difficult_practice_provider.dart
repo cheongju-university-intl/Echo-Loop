@@ -13,6 +13,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../models/difficult_practice_settings.dart';
 import '../../models/intensive_listen_settings.dart' show PauseMode;
@@ -728,11 +730,18 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
         next.currentAttempt != null) {
       final attempt = next.currentAttempt!;
       _repeatEngine!.onRecordingFinished(attempt.filePath, attempt.score);
-      ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-        ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
-        EventParams.mode: 'difficult_practice',
-        if (attempt.score != null) EventParams.score: attempt.score!,
-      });
+      ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.recordingCompleted,
+            analyticsParams: {
+              ...ref.audioEventParams(
+                ref.read(learningSessionProvider).audioItemId,
+              ),
+              EventParams.mode: 'difficult_practice',
+              if (attempt.score != null) EventParams.score: attempt.score!,
+            },
+          );
     }
 
     // 录音取消/超时

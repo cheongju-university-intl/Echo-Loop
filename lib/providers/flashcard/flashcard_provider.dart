@@ -19,6 +19,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../models/audio_item.dart' as model;
 import '../../models/flashcard_item.dart';
@@ -372,10 +374,15 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       // 最后一张 → 完成
       _engine.markCompleted();
       _saveStudyTime();
-      ref.read(analyticsServiceProvider).track(Events.flashcardComplete, {
-        EventParams.totalCards: state.words.length,
-        EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
-      });
+      ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.flashcardReviewCompleted,
+            analyticsParams: {
+              EventParams.totalCards: state.words.length,
+              EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
+            },
+          );
       state = state.copyWith(
         isCompleted: true,
         phase: const FlashcardSessionCompleted(),

@@ -17,6 +17,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/app_database.dart' as db;
 import '../../services/app_logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -136,11 +138,14 @@ class BookmarkReview extends _$BookmarkReview {
       _periodicSaveTimer?.cancel();
       if (_sentences.isNotEmpty) {
         ref
-            .read(analyticsServiceProvider)
-            .track(Events.bookmarkReviewComplete, {
-              EventParams.totalSentencesCount: _sentences.length,
-              EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
-            });
+            .read(usageTrackerProvider)
+            .record(
+              UsageEvent.bookmarkSentenceReviewCompleted,
+              analyticsParams: {
+                EventParams.totalSentencesCount: _sentences.length,
+                EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
+              },
+            );
       }
       _saveAndRefreshStudyTime();
       _lifecycleListener.dispose();

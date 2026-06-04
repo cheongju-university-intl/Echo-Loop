@@ -62,6 +62,7 @@ Widget createTestApp(
   // 默认 overrides：所有 Provider 使用测试替身
   final defaultOverrides = <Override>[
     analyticsOverride(),
+    usageOverride(),
     ...studyTimeOverrides(),
     ...learningSettingsOverrides(),
     appSettingsProvider.overrideWith(
@@ -118,6 +119,7 @@ Widget createTestScreen(
 }) {
   final defaultOverrides = <Override>[
     analyticsOverride(),
+    usageOverride(),
     ...studyTimeOverrides(),
     appSettingsProvider.overrideWith(
       () => TestAppSettings(AppSettingsState(locale: locale)),
@@ -222,6 +224,7 @@ Future<void> pumpFullApp(
         ),
         packageInfoProvider.overrideWithValue(packageInfo),
         analyticsOverride(),
+        usageOverride(),
         ...studyTimeOverrides(),
         ...learningSettingsOverrides(),
         appDatabaseProvider.overrideWithValue(

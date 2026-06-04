@@ -14,6 +14,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../models/sentence.dart';
@@ -472,11 +474,16 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
         next.currentAttempt != null) {
       final attempt = next.currentAttempt!;
       _engine.onRecordingFinished(attempt.filePath, attempt.score);
-      ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-        ...ref.audioEventParams(_engine.config.audioItemId),
-        EventParams.mode: 'listen_repeat',
-        if (attempt.score != null) EventParams.score: attempt.score!,
-      });
+      ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.recordingCompleted,
+            analyticsParams: {
+              ...ref.audioEventParams(_engine.config.audioItemId),
+              EventParams.mode: 'listen_repeat',
+              if (attempt.score != null) EventParams.score: attempt.score!,
+            },
+          );
     }
 
     // 录音取消/超时 → 通知 engine

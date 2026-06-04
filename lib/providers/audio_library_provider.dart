@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 import 'package:universal_io/io.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
+import '../features/usage/usage_event.dart';
+import '../features/usage/usage_providers.dart';
 import '../utils/app_data_dir.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../database/app_database.dart' as db;
@@ -169,10 +171,15 @@ class AudioLibrary extends _$AudioLibrary {
   Future<void> addAudioItem(AudioItem item) async {
     state = state.copyWith(audioItems: [...state.audioItems, item]);
     await _upsertItem(item);
-    ref.read(analyticsServiceProvider).track(Events.audioUpload, {
-      EventParams.audioId: item.id,
-      EventParams.audioName: item.name,
-    });
+    ref
+        .read(usageTrackerProvider)
+        .record(
+          UsageEvent.audioUpload,
+          analyticsParams: {
+            EventParams.audioId: item.id,
+            EventParams.audioName: item.name,
+          },
+        );
   }
 
   Future<void> removeAudioItem(String id) async {

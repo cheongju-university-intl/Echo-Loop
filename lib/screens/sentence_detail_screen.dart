@@ -13,6 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
+import '../features/usage/usage_event.dart';
+import '../features/usage/usage_providers.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart' as model;
@@ -133,11 +135,23 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
 
       // 埋点：收藏/取消收藏句子
       final isAdding = !_isBookmarked;
-      ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
+      final analyticsParams = {
         ...ref.audioEventParams(args.audioItemId),
         EventParams.sentenceIndex: args.sentenceIndex,
         EventParams.action: _isBookmarked ? 'remove' : 'add',
-      });
+      };
+      if (isAdding) {
+        await ref
+            .read(usageTrackerProvider)
+            .record(
+              UsageEvent.bookmarkSentenceSaved,
+              analyticsParams: analyticsParams,
+            );
+      } else {
+        ref
+            .read(analyticsServiceProvider)
+            .track(Events.bookmarkToggle, analyticsParams);
+      }
 
       // 价值锚点：只在「添加收藏」时尝试触发通知权限 pre-prompt
       if (isAdding) {

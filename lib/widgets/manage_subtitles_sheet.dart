@@ -7,8 +7,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_io/io.dart';
-import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
+import '../features/usage/usage_event.dart';
+import '../features/usage/usage_providers.dart';
 import '../models/audio_item.dart';
 import '../database/providers.dart';
 import '../providers/audio_library_provider.dart';
@@ -529,8 +530,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                     width: 28,
                     height: 28,
                   ),
-                  tooltip:
-                      MaterialLocalizations.of(context).closeButtonTooltip,
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 ),
               ],
             ),
@@ -905,10 +905,15 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             ),
           );
 
-      ref.read(analyticsServiceProvider).track(Events.subtitleUploaded, {
-        EventParams.audioId: audioItem.id,
-        EventParams.audioName: audioItem.name,
-      });
+      ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.subtitleUploaded,
+            analyticsParams: {
+              EventParams.audioId: audioItem.id,
+              EventParams.audioName: audioItem.name,
+            },
+          );
       if (context.mounted) Navigator.pop(context);
     } on SubtitleParseException catch (e) {
       if (!mounted) return;
@@ -921,10 +926,12 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       _showInlineError(_InlineError(kind, subtitleParseErrorMessage(l10n, e)));
     } catch (e) {
       if (!mounted) return;
-      _showInlineError(_InlineError(
-        _UploadErrorKind.generic,
-        '${l10n.pickTranscriptFileFailed}: $e',
-      ));
+      _showInlineError(
+        _InlineError(
+          _UploadErrorKind.generic,
+          '${l10n.pickTranscriptFileFailed}: $e',
+        ),
+      );
     }
   }
 
@@ -996,10 +1003,15 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     ref
         .read(transcriptionTaskManagerProvider.notifier)
         .startTranscription(audioItem, _selectedLanguage);
-    ref.read(analyticsServiceProvider).track(Events.transcriptionStarted, {
-      EventParams.audioId: audioItem.id,
-      EventParams.audioName: audioItem.name,
-    });
+    ref
+        .read(usageTrackerProvider)
+        .record(
+          UsageEvent.aiTranscriptionStarted,
+          analyticsParams: {
+            EventParams.audioId: audioItem.id,
+            EventParams.audioName: audioItem.name,
+          },
+        );
   }
 
   /// 处理删除字幕

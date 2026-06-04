@@ -15,6 +15,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
@@ -243,13 +245,18 @@ class RetellPlayer extends _$RetellPlayer {
           next.phase == RetellRecordingPhase.idle &&
           next.currentAttempt != null) {
         final attempt = next.currentAttempt!;
-        ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-          ...ref.audioEventParams(
-            ref.read(learningSessionProvider).audioItemId,
-          ),
-          EventParams.mode: 'retell',
-          if (attempt.score != null) EventParams.score: attempt.score!,
-        });
+        ref
+            .read(usageTrackerProvider)
+            .record(
+              UsageEvent.recordingCompleted,
+              analyticsParams: {
+                ...ref.audioEventParams(
+                  ref.read(learningSessionProvider).audioItemId,
+                ),
+                EventParams.mode: 'retell',
+                if (attempt.score != null) EventParams.score: attempt.score!,
+              },
+            );
       }
     });
 
@@ -389,11 +396,23 @@ class RetellPlayer extends _$RetellPlayer {
     }
 
     // 埋点：收藏/取消收藏句子
-    ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
+    final analyticsParams = {
       ...ref.audioEventParams(audioItemId),
       EventParams.sentenceIndex: sentence.index,
       EventParams.action: isCurrentlyBookmarked ? 'remove' : 'add',
-    });
+    };
+    if (!isCurrentlyBookmarked) {
+      await ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.bookmarkSentenceSaved,
+            analyticsParams: analyticsParams,
+          );
+    } else {
+      ref
+          .read(analyticsServiceProvider)
+          .track(Events.bookmarkToggle, analyticsParams);
+    }
 
     // DB 操作完成后更新内存
     final newSet = Set<int>.from(state.bookmarkedSentenceIndices);

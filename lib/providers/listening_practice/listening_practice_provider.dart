@@ -3,6 +3,8 @@ import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
@@ -723,12 +725,24 @@ class ListeningPractice extends _$ListeningPractice {
     // 埋点：收藏/取消收藏句子
     if (state.currentAudioItem != null) {
       final item = state.currentAudioItem!;
-      ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
+      final analyticsParams = {
         EventParams.audioId: item.id,
         EventParams.audioName: item.name,
         EventParams.sentenceIndex: index,
         EventParams.action: isRemoving ? 'remove' : 'add',
-      });
+      };
+      if (!isRemoving) {
+        await ref
+            .read(usageTrackerProvider)
+            .record(
+              UsageEvent.bookmarkSentenceSaved,
+              analyticsParams: analyticsParams,
+            );
+      } else {
+        ref
+            .read(analyticsServiceProvider)
+            .track(Events.bookmarkToggle, analyticsParams);
+      }
     }
 
     // 价值锚点：只在「添加收藏」时尝试触发通知权限 pre-prompt

@@ -2,9 +2,10 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../analytics/analytics_providers.dart';
 import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
+import '../features/usage/usage_event.dart';
+import '../features/usage/usage_providers.dart';
 import '../database/app_database.dart';
 import '../database/providers.dart';
 import '../models/dict_entry.dart';
@@ -47,10 +48,15 @@ class SavedWordList extends _$SavedWordList {
     );
 
     // 埋点：收藏单词
-    ref.read(analyticsServiceProvider).track(Events.wordSave, {
-      EventParams.word: word,
-      ...ref.audioEventParams(audioItemId),
-    });
+    ref
+        .read(usageTrackerProvider)
+        .record(
+          UsageEvent.wordSaved,
+          analyticsParams: {
+            EventParams.word: word,
+            ...ref.audioEventParams(audioItemId),
+          },
+        );
 
     // 价值锚点：首次收藏单词 → 尝试触发通知权限 pre-prompt
     unawaited(

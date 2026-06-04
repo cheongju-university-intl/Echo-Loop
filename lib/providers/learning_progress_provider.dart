@@ -8,6 +8,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
+import '../features/usage/usage_event.dart';
+import '../features/usage/usage_providers.dart';
 import '../database/enums.dart';
 import '../database/providers.dart';
 import '../database/app_database.dart' as db;
@@ -16,7 +18,6 @@ import '../models/learning_progress.dart';
 import '../services/app_logger.dart';
 import 'learning_plan_provider.dart';
 import 'learning_settings_provider.dart';
-import 'notification_permission_provider.dart';
 import 'time_provider.dart';
 
 part 'learning_progress_provider.g.dart';
@@ -383,19 +384,28 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     // 埋点：阶段推进（最后一个子步骤完成时触发）
     if (advancedToNextStage) {
-      final analytics = ref.read(analyticsServiceProvider);
       final nextStage = updated.currentStage;
       final audioParams = ref.audioEventParams(audioItemId);
-      analytics.track(Events.stageAdvance, {
-        ...audioParams,
-        EventParams.fromStage: stage.name,
-        EventParams.toStage: nextStage.name,
-      });
+      ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.subStageCompleted,
+            analyticsParams: {
+              ...audioParams,
+              EventParams.fromStage: stage.name,
+              EventParams.toStage: nextStage.name,
+            },
+          );
       if (stage == LearningStage.firstLearn) {
-        analytics.track(Events.firstLearnComplete, {
-          ...audioParams,
-          EventParams.totalDurationMs: newTotalDuration,
-        });
+        ref
+            .read(usageTrackerProvider)
+            .record(
+              UsageEvent.firstLearnCompleted,
+              analyticsParams: {
+                ...audioParams,
+                EventParams.totalDurationMs: newTotalDuration,
+              },
+            );
       }
     }
 

@@ -6,7 +6,6 @@
 /// 公共 Notifier/DAO 替身已抽到 shared/，本文件仅保留 widget test 特化部分。
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,11 +13,12 @@ import 'package:echo_loop/analytics/analytics_channel.dart';
 import 'package:echo_loop/analytics/analytics_providers.dart';
 import 'package:echo_loop/analytics/analytics_service.dart';
 import 'package:echo_loop/analytics/consent_manager.dart';
+import 'package:echo_loop/features/usage/usage_counters.dart';
+import 'package:echo_loop/features/usage/usage_event.dart';
+import 'package:echo_loop/features/usage/usage_providers.dart';
+import 'package:echo_loop/features/usage/usage_tracker.dart';
 import 'package:echo_loop/models/audio_engine_state.dart';
 import 'package:echo_loop/models/audio_item.dart';
-import 'package:echo_loop/models/intensive_listen_settings.dart';
-import 'package:echo_loop/models/playback_settings.dart';
-import 'package:echo_loop/models/retell_settings.dart';
 import 'package:echo_loop/models/sentence.dart';
 import 'package:echo_loop/models/speech_practice_models.dart';
 import 'package:echo_loop/providers/app_update_provider.dart';
@@ -28,13 +28,11 @@ import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
 import 'package:echo_loop/providers/retell_recording_controller_provider.dart';
 import 'package:echo_loop/providers/speech/speech_recording_controller.dart';
 import 'package:echo_loop/providers/transcription_task_provider.dart';
-import 'package:echo_loop/services/asr/offline_asr_engine.dart';
 import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/models/app_update_info.dart';
 import 'package:echo_loop/providers/learning_settings_provider.dart';
 import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/services/study_event_recorder.dart';
-import 'package:echo_loop/services/study_time_service.dart';
 import 'package:echo_loop/services/transcription_api_client.dart';
 import 'package:echo_loop/database/daos/sentence_ai_cache_dao.dart';
 
@@ -213,6 +211,27 @@ Override analyticsOverride() {
   return analyticsServiceProvider.overrideWithValue(
     createTestAnalyticsServiceSync(),
   );
+}
+
+/// 返回 usageTrackerProvider 的 override。
+///
+/// 大多数 widget 测试只关心业务流程，不需要真实写入 SharedPreferences。
+Override usageOverride() {
+  return usageTrackerProvider.overrideWithValue(_NoOpUsageTracker());
+}
+
+class _NoOpUsageTracker implements UsageTracker {
+  @override
+  UsageCounters loadCounters() => const UsageCounters();
+
+  @override
+  Future<void> record(
+    UsageEvent event, {
+    Map<String, Object>? analyticsParams,
+  }) async {}
+
+  @override
+  Future<void> resetForTests() async {}
 }
 
 // ========== 通知权限 ==========

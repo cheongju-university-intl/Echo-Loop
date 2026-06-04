@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
+import '../features/usage/usage_event.dart';
+import '../features/usage/usage_providers.dart';
 import '../config/api_config.dart';
 import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
@@ -416,14 +418,19 @@ class _TaskCard extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () async {
-          ref.read(analyticsServiceProvider).track(Events.studyTaskTapped, {
-            EventParams.audioId: task.audioId,
-            EventParams.audioName: task.audioName,
-            EventParams.taskType: task.type.name.toLowerCase(),
-            EventParams.stage: task.stage.name,
-            EventParams.subStage: task.subStage.name,
-            EventParams.isOverdue: task.isOverdue ? 1 : 0,
-          });
+          ref
+              .read(usageTrackerProvider)
+              .record(
+                UsageEvent.studyTaskTapped,
+                analyticsParams: {
+                  EventParams.audioId: task.audioId,
+                  EventParams.audioName: task.audioName,
+                  EventParams.taskType: task.type.name.toLowerCase(),
+                  EventParams.stage: task.stage.name,
+                  EventParams.subStage: task.subStage.name,
+                  EventParams.isOverdue: task.isOverdue ? 1 : 0,
+                },
+              );
           if (!context.mounted) return;
           context.push(AppRoutes.audioLearningPlan(task.audioId));
         },
