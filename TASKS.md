@@ -1,7 +1,57 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-04
-> 当前焦点：用户事件统计与本地 usage counter（已完成）
+> 最后更新：2026-06-05
+> 当前焦点：AI 翻译/解析 v2 认证与登录弹窗（已完成）
+
+## 已完成：AI 翻译/解析 v2 认证与登录弹窗
+
+将 AI 翻译和句子解析改为与意群功能一致的认证策略：新版本客户端调用 v2 API 并携带 Supabase access token；旧版 v1 API 保持不变，避免老版本用户立即无法使用。Flutter 端仅在本地 L1/L2 缓存未命中、必须访问云端 L3 API 时要求登录，未登录用户点击翻译、解析或意群时统一展示可关闭的登录弹窗，不使用 snackbar。
+
+### 实现
+- [x] Flutter 翻译请求切换到 `POST /api/v2/ai/translate`
+- [x] Flutter 解析请求切换到 `POST /api/v2/ai/analyze`
+- [x] 请求 AI v2 API 时统一通过 `Authorization: Bearer <Supabase access token>` 发送认证信息
+- [x] `SentenceAiProvider` 对翻译、解析、意群统一使用 `AiFeatureAuthRequiredException` 表达未登录且需要远端请求
+- [x] 翻译/解析 L1/L2 缓存命中仍允许未登录读取，避免老数据和缓存体验被破坏
+- [x] 标注页翻译、解析、意群三类入口未登录时统一展示登录弹窗，支持关闭、取消或跳转登录页
+- [x] 后端新增 `/api/v2/ai/translate` 和 `/api/v2/ai/analyze`，复制 v1 业务逻辑后仅在入口增加 Bearer token 校验
+- [x] v1 翻译、解析、意群 API 保持不变，支持后续独立灰度下线
+
+### 验证
+- [x] `flutter gen-l10n`
+- [x] `dart format lib/services/sentence_ai_api_client.dart lib/providers/sentence_ai_provider.dart lib/widgets/practice/annotation_content_view.dart lib/widgets/practice/sentence_annotation_card.dart test/services/sentence_ai_api_client_test.dart test/providers/sentence_ai_provider_test.dart test/widgets/annotation_content_view_auth_test.dart`
+- [x] `flutter analyze lib/services/sentence_ai_api_client.dart lib/providers/sentence_ai_provider.dart lib/widgets/practice/annotation_content_view.dart lib/widgets/practice/sentence_annotation_card.dart test/services/sentence_ai_api_client_test.dart test/providers/sentence_ai_provider_test.dart test/widgets/annotation_content_view_auth_test.dart`：No issues found
+- [x] `flutter test test/services/sentence_ai_api_client_test.dart test/providers/sentence_ai_provider_test.dart test/widgets/annotation_content_view_auth_test.dart`：35 tests passed
+- [x] 后端 `pnpm exec biome format --write apps/app/app/api/v2/ai/translate/route.ts apps/app/app/api/v2/ai/analyze/route.ts apps/app/app/api/v2/ai/analyze/cleanup.ts apps/app/__tests__/sentence-ai-v2-auth.test.ts`
+- [x] 后端 `pnpm exec vitest run __tests__/sense-groups-v2-auth.test.ts __tests__/sentence-ai-v2-auth.test.ts`：4 tests passed
+- [x] 后端 `pnpm --filter app typecheck`：通过
+- [x] `scripts/check.sh`：全量 `flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2444 tests passed，11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，后续 `asr_engine_test.dart` / `app_test.dart` 失败在本地 App debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次 AI 认证改动无关
+
+**完成时间**: 2026-06-05 18:25 +0800
+
+## 已完成：意群 v2 认证与登录弹窗
+
+为意群功能新增认证保护，同时保留旧版 v1 API，避免老版本客户端立即被禁止访问。Flutter 端改为只在需要请求后端 L3 意群 API 时要求 Supabase access token；已有本地 L1/L2 缓存仍可离线/未登录读取。未登录用户点击意群且本地无缓存时展示可关闭的登录弹窗，支持取消或跳转登录页。
+
+### 实现
+- [x] Flutter 意群请求切换到 `POST /api/v2/ai/sense-groups`
+- [x] 请求 v2 API 时通过 `Authorization: Bearer <Supabase access token>` 发送认证信息
+- [x] `SentenceAiProvider` 在 L1/L2 缓存未命中、即将访问 L3 API 前校验 access token，未登录时抛出明确的认证异常
+- [x] 标注页点击意群时读取 Supabase session；未登录且需要远端请求时展示登录弹窗，不使用 snackbar
+- [x] 后端新增 `/api/v2/ai/sense-groups`，复制 v1 业务逻辑后仅在入口增加 Bearer token 校验
+- [x] v1 API 保持不变，支持后续按版本灰度下线
+- [x] 补充中英文登录提示文案并重新生成本地化代码
+
+### 验证
+- [x] `flutter gen-l10n`
+- [x] `dart format lib/services/sentence_ai_api_client.dart lib/providers/sentence_ai_provider.dart lib/utils/sense_group_service.dart lib/widgets/practice/annotation_content_view.dart test/services/sentence_ai_api_client_test.dart test/providers/sentence_ai_provider_test.dart test/widgets/annotation_content_view_auth_test.dart`
+- [x] `flutter analyze lib/services/sentence_ai_api_client.dart lib/providers/sentence_ai_provider.dart lib/utils/sense_group_service.dart lib/widgets/practice/annotation_content_view.dart test/services/sentence_ai_api_client_test.dart test/providers/sentence_ai_provider_test.dart test/widgets/annotation_content_view_auth_test.dart`：No issues found
+- [x] `flutter test test/services/sentence_ai_api_client_test.dart test/providers/sentence_ai_provider_test.dart test/widgets/annotation_content_view_auth_test.dart`：32 tests passed
+- [x] 后端 `pnpm exec vitest run __tests__/sense-groups-v2-auth.test.ts`：2 tests passed
+- [x] 后端 `pnpm --filter app typecheck`：通过
+- [x] `scripts/check.sh`：全量 `flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2441 tests passed，11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，后续 `asr_engine_test.dart` / `app_test.dart` 失败在本地 App debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次意群认证改动无关
+
+**完成时间**: 2026-06-05 15:21 +0800
 
 ## 已完成：iOS 我的页新增 App Store 评价入口
 

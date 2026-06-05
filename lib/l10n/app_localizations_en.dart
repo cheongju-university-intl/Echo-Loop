@@ -2545,6 +2545,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Sense group splitting failed, please retry';
 
   @override
+  String get senseGroupSignInRequiredTitle => 'Sign in to use AI features';
+
+  @override
+  String get senseGroupSignInRequiredMessage =>
+      'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.';
+
+  @override
   String get senseGroupNotAvailable =>
       'Only available for AI-transcribed audio';
 

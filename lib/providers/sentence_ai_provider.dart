@@ -17,6 +17,14 @@ import '../models/sentence_ai_result.dart';
 import '../services/sentence_ai_api_client.dart';
 import '../utils/text_normalize.dart';
 
+/// 请求云端 AI 功能但当前用户未登录。
+class AiFeatureAuthRequiredException implements Exception {
+  const AiFeatureAuthRequiredException();
+
+  @override
+  String toString() => 'AiFeatureAuthRequiredException';
+}
+
 /// AI 句子翻译/解析服务
 ///
 /// 通过三级缓存（内存 → SQLite → API）获取句子的翻译和解析结果。
@@ -49,6 +57,7 @@ class SentenceAiNotifier {
   Future<SentenceTranslation> getTranslation(
     String text, {
     required String targetLanguage,
+    String? accessToken,
     CancelToken? cancelToken,
   }) async {
     final hash = hashText(text);
@@ -67,6 +76,7 @@ class SentenceAiNotifier {
       hash,
       text,
       targetLanguage: targetLanguage,
+      accessToken: accessToken,
       cancelToken: cancelToken,
     );
     _pendingTranslations[cacheKey] = future;
@@ -83,6 +93,7 @@ class SentenceAiNotifier {
   Future<SentenceAnalysis> getAnalysis(
     String text, {
     required String targetLanguage,
+    String? accessToken,
     CancelToken? cancelToken,
   }) async {
     final hash = hashText(text);
@@ -101,6 +112,7 @@ class SentenceAiNotifier {
       hash,
       text,
       targetLanguage: targetLanguage,
+      accessToken: accessToken,
       cancelToken: cancelToken,
     );
     _pendingAnalyses[cacheKey] = future;
@@ -114,6 +126,7 @@ class SentenceAiNotifier {
   /// 获取意群拆分（三级缓存查找）
   Future<SenseGroupResult> getSenseGroups(
     String text, {
+    String? accessToken,
     CancelToken? cancelToken,
   }) async {
     final hash = hashText(text);
@@ -138,7 +151,12 @@ class SentenceAiNotifier {
     }
 
     AppLogger.log('SenseGroup', 'L1 未命中，开始查找 | "$text"');
-    final future = _fetchSenseGroups(hash, text, cancelToken: cancelToken);
+    final future = _fetchSenseGroups(
+      hash,
+      text,
+      accessToken: accessToken,
+      cancelToken: cancelToken,
+    );
     _pendingSenseGroups[hash] = future;
     try {
       return await future;
@@ -275,6 +293,7 @@ class SentenceAiNotifier {
     String hash,
     String text, {
     required String targetLanguage,
+    String? accessToken,
     CancelToken? cancelToken,
   }) async {
     final cacheKey = '$hash:$targetLanguage';
@@ -295,9 +314,14 @@ class SentenceAiNotifier {
     }
 
     // L3: API 调用
+    if (accessToken == null || accessToken.isEmpty) {
+      AppLogger.log('SentenceAI', '翻译 L3 需要登录，未发现 Supabase access token');
+      throw const AiFeatureAuthRequiredException();
+    }
     final translation = await _apiClient.translate(
       text,
       targetLanguage: targetLanguage,
+      accessToken: accessToken,
       cancelToken: cancelToken,
     );
     // 写入 L1 + L2
@@ -315,6 +339,7 @@ class SentenceAiNotifier {
     String hash,
     String text, {
     required String targetLanguage,
+    String? accessToken,
     CancelToken? cancelToken,
   }) async {
     final cacheKey = '$hash:$targetLanguage';
@@ -335,9 +360,14 @@ class SentenceAiNotifier {
     }
 
     // L3: API 调用
+    if (accessToken == null || accessToken.isEmpty) {
+      AppLogger.log('SentenceAI', '解析 L3 需要登录，未发现 Supabase access token');
+      throw const AiFeatureAuthRequiredException();
+    }
     final analysis = await _apiClient.analyze(
       text,
       targetLanguage: targetLanguage,
+      accessToken: accessToken,
       cancelToken: cancelToken,
     );
     // 写入 L1 + L2
@@ -360,6 +390,7 @@ class SentenceAiNotifier {
   Future<SenseGroupResult> _fetchSenseGroups(
     String hash,
     String text, {
+    String? accessToken,
     CancelToken? cancelToken,
   }) async {
     // L2: SQLite 缓存（JSON 损坏或字段不一致时跳过，fallthrough 到 L3）
@@ -389,10 +420,15 @@ class SentenceAiNotifier {
     }
 
     // L3: API 调用
+    if (accessToken == null || accessToken.isEmpty) {
+      AppLogger.log('SenseGroup', 'L3 需要登录，未发现 Supabase access token');
+      throw const AiFeatureAuthRequiredException();
+    }
     AppLogger.log('SenseGroup', 'L3 调用 API...');
     final sw = Stopwatch()..start();
     final result = await _apiClient.splitSenseGroups(
       text,
+      accessToken: accessToken,
       cancelToken: cancelToken,
     );
     sw.stop();

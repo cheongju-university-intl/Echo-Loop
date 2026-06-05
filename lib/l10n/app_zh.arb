@@ -1027,6 +1027,8 @@
   "annotationBtnTranslation": "翻译",
   "annotationBtnAnalysis": "解析",
   "senseGroupLoadFailed": "意群拆分失败，请重试",
+  "senseGroupSignInRequiredTitle": "登录后使用 AI 功能",
+  "senseGroupSignInRequiredMessage": "AI 翻译、解析和意群拆分需要使用云端 AI 服务。登录后可以继续生成新结果，已缓存的结果仍可正常查看。",
   "senseGroupNotAvailable": "仅 AI 转录的音频支持意群拆分",
   "wordTimestampsNotFound": "词级字幕未找到，请重启应用重试",
 

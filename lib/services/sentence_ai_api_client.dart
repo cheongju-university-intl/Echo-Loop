@@ -51,15 +51,17 @@ class SentenceAiApiClient {
   /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
   Future<SentenceTranslation> translate(
     String text, {
+    required String accessToken,
     String? targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v1/ai/translate',
+      '/api/v2/ai/translate',
       data: {
         'text': text,
         if (targetLanguage != null) 'targetLanguage': targetLanguage,
       },
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       cancelToken: cancelToken,
     );
     return SentenceTranslation.fromJson(response.data!);
@@ -71,15 +73,17 @@ class SentenceAiApiClient {
   /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
   Future<SentenceAnalysis> analyze(
     String text, {
+    required String accessToken,
     String? targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v1/ai/analyze',
+      '/api/v2/ai/analyze',
       data: {
         'text': text,
         if (targetLanguage != null) 'targetLanguage': targetLanguage,
       },
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       cancelToken: cancelToken,
     );
     return SentenceAnalysis.fromJson(response.data!);
@@ -107,11 +111,13 @@ class SentenceAiApiClient {
   /// 调用后端 AI 意群拆分接口，返回意群列表（含中文翻译）。
   Future<SenseGroupResult> splitSenseGroups(
     String text, {
+    required String accessToken,
     CancelToken? cancelToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v1/ai/sense-groups',
+      '/api/v2/ai/sense-groups',
       data: {'text': text},
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       cancelToken: cancelToken,
     );
     return SenseGroupResult.fromJson(response.data!);

@@ -22,8 +22,16 @@ void main() {
     test('正常响应返回 SentenceTranslation', () async {
       when(
         () => mockDio.post<Map<String, dynamic>>(
-          '/api/v1/ai/translate',
+          '/api/v2/ai/translate',
           data: {'text': 'Hello world'},
+          options: any(
+            named: 'options',
+            that: isA<Options>().having(
+              (o) => o.headers?['Authorization'],
+              'Authorization',
+              'Bearer access-token',
+            ),
+          ),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
@@ -34,15 +42,19 @@ void main() {
         ),
       );
 
-      final result = await client.translate('Hello world');
+      final result = await client.translate(
+        'Hello world',
+        accessToken: 'access-token',
+      );
       expect(result.translation, '你好世界');
     });
 
     test('服务器错误抛出 DioException', () async {
       when(
         () => mockDio.post<Map<String, dynamic>>(
-          '/api/v1/ai/translate',
+          '/api/v2/ai/translate',
           data: {'text': 'test'},
+          options: any(named: 'options'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
@@ -53,7 +65,10 @@ void main() {
         ),
       );
 
-      expect(() => client.translate('test'), throwsA(isA<DioException>()));
+      expect(
+        () => client.translate('test', accessToken: 'access-token'),
+        throwsA(isA<DioException>()),
+      );
     });
 
     test('支持 CancelToken', () async {
@@ -61,8 +76,9 @@ void main() {
 
       when(
         () => mockDio.post<Map<String, dynamic>>(
-          '/api/v1/ai/translate',
+          '/api/v2/ai/translate',
           data: {'text': 'test'},
+          options: any(named: 'options'),
           cancelToken: cancelToken,
         ),
       ).thenThrow(
@@ -73,7 +89,11 @@ void main() {
       );
 
       expect(
-        () => client.translate('test', cancelToken: cancelToken),
+        () => client.translate(
+          'test',
+          accessToken: 'access-token',
+          cancelToken: cancelToken,
+        ),
         throwsA(
           isA<DioException>().having(
             (e) => e.type,
@@ -89,8 +109,16 @@ void main() {
     test('正常响应返回 SentenceAnalysis', () async {
       when(
         () => mockDio.post<Map<String, dynamic>>(
-          '/api/v1/ai/analyze',
+          '/api/v2/ai/analyze',
           data: {'text': 'She has been studying.'},
+          options: any(
+            named: 'options',
+            that: isA<Options>().having(
+              (o) => o.headers?['Authorization'],
+              'Authorization',
+              'Bearer access-token',
+            ),
+          ),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
@@ -107,7 +135,10 @@ void main() {
         ),
       );
 
-      final result = await client.analyze('She has been studying.');
+      final result = await client.analyze(
+        'She has been studying.',
+        accessToken: 'access-token',
+      );
       expect(result.grammar, '现在完成进行时');
       expect(result.vocabulary, 'study: 学习');
       expect(result.listening, '表示持续进行的动作');
@@ -116,8 +147,9 @@ void main() {
     test('服务器错误抛出 DioException', () async {
       when(
         () => mockDio.post<Map<String, dynamic>>(
-          '/api/v1/ai/analyze',
+          '/api/v2/ai/analyze',
           data: {'text': 'test'},
+          options: any(named: 'options'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(
@@ -127,7 +159,10 @@ void main() {
         ),
       );
 
-      expect(() => client.analyze('test'), throwsA(isA<DioException>()));
+      expect(
+        () => client.analyze('test', accessToken: 'access-token'),
+        throwsA(isA<DioException>()),
+      );
     });
   });
 
@@ -279,6 +314,43 @@ void main() {
       );
 
       expect(() => client.analyzeWord('test'), throwsA(isA<DioException>()));
+    });
+  });
+
+  group('splitSenseGroups', () {
+    test('调用 v2 认证接口并发送 Bearer token', () async {
+      when(
+        () => mockDio.post<Map<String, dynamic>>(
+          '/api/v2/ai/sense-groups',
+          data: {'text': 'Hello world'},
+          options: any(
+            named: 'options',
+            that: isA<Options>().having(
+              (o) => o.headers?['Authorization'],
+              'Authorization',
+              'Bearer access-token',
+            ),
+          ),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          data: {
+            'medium': ['Hello world'],
+            'fine': ['Hello', 'world'],
+          },
+          statusCode: 200,
+          requestOptions: RequestOptions(),
+        ),
+      );
+
+      final result = await client.splitSenseGroups(
+        'Hello world',
+        accessToken: 'access-token',
+      );
+
+      expect(result.medium, ['Hello world']);
+      expect(result.fine, ['Hello', 'world']);
     });
   });
 

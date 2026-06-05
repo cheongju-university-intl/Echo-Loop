@@ -1362,6 +1362,8 @@
   "annotationBtnTranslation": "Translate",
   "annotationBtnAnalysis": "Analysis",
   "senseGroupLoadFailed": "Sense group splitting failed, please retry",
+  "senseGroupSignInRequiredTitle": "Sign in to use AI features",
+  "senseGroupSignInRequiredMessage": "AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.",
   "senseGroupNotAvailable": "Only available for AI-transcribed audio",
   "wordTimestampsNotFound": "Word-level timestamps not found. Please restart the app to retry.",
 

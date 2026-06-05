@@ -10,7 +10,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../features/auth/providers/auth_providers.dart';
 import '../../features/usage/usage_event.dart';
 import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
@@ -29,6 +31,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/sense_group_service.dart';
 import '../../utils/sense_group_timing.dart';
 import '../../providers/new_user_guide_provider.dart';
+import '../../router/app_router.dart';
 import '../guide_flow.dart';
 import 'sentence_annotation_card.dart';
 import 'sense_group_action_bar.dart';
@@ -122,7 +125,6 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
   // --- 意群快捷菜单 Overlay ---
   OverlayEntry? _actionBarOverlay;
-  int? _actionBarGroupIndex;
   Timer? _actionBarTimer;
 
   /// 缓存预加载 generation counter（防竞态）
@@ -230,6 +232,10 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final endMs = widget.sentenceEndMs ?? 0;
     final ai = widget.aiNotifier;
     if (ai == null) return;
+    final accessToken = ref
+        .read(supabaseSessionProvider)
+        .valueOrNull
+        ?.accessToken;
 
     ref.read(usageTrackerProvider).record(UsageEvent.senseGroupTapped);
 
@@ -237,6 +243,7 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
       final (result, timings) = await _sgService.requestSenseGroups(
         text: widget.text,
         ai: ai,
+        accessToken: accessToken,
         sentenceStartMs: startMs,
         sentenceEndMs: endMs,
         wordTimestamps: _wordTimestamps,
@@ -265,6 +272,10 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
         _activeChunks = result.medium;
       });
       widget.onTimingsChanged?.call(timings);
+    } on AiFeatureAuthRequiredException {
+      if (mounted) {
+        await _showAiFeatureSignInDialog();
+      }
     } catch (e) {
       AppLogger.log('SenseGroup', '请求意群失败: $e');
       if (mounted) {
@@ -279,6 +290,39 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
         );
       }
     }
+  }
+
+  /// 展示云端 AI 能力的登录引导弹窗。
+  ///
+  /// 只在确实需要请求 L3 API 且当前无 Supabase session 时出现；
+  /// 已缓存的 L1/L2 结果不会触发登录门槛。
+  Future<void> _showAiFeatureSignInDialog() async {
+    final l10n = AppLocalizations.of(context);
+    final shouldOpenLogin = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          l10n?.senseGroupSignInRequiredTitle ??
+              'Sign in to use sense group splitting',
+        ),
+        content: Text(
+          l10n?.senseGroupSignInRequiredMessage ??
+              'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n?.cancel ?? 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n?.authSignInButton ?? 'Sign In'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || shouldOpenLogin != true) return;
+    context.push(AppRoutes.login);
   }
 
   /// 意群粒度切换回调
@@ -341,7 +385,6 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   /// 显示意群快捷菜单
   void _showActionBar(int index, Rect badgeRect) {
     _dismissActionBar();
-    _actionBarGroupIndex = index;
 
     final chunks = _activeChunks ?? _senseGroupResult?.medium ?? [];
     if (index >= chunks.length) return;
@@ -387,7 +430,6 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     _actionBarTimer = null;
     _actionBarOverlay?.remove();
     _actionBarOverlay = null;
-    _actionBarGroupIndex = null;
   }
 
   /// 收藏/取消收藏意群
@@ -464,6 +506,10 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
         ? ai?.getCachedAnalysis(widget.text, targetLanguage: nativeLanguage)
         : null;
     final cachedAnalysisText = cachedAnalysis?.toDisplayString();
+    final accessToken = ref
+        .watch(supabaseSessionProvider)
+        .valueOrNull
+        ?.accessToken;
 
     // 局部 watch 已收藏意群文本集合，避免全局重建
     final savedTextsAsync = ref.watch(savedSenseGroupTextsProvider);
@@ -536,11 +582,19 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                           ref
                               .read(usageTrackerProvider)
                               .record(UsageEvent.translationTapped);
-                          final result = await ai.getTranslation(
-                            widget.text,
-                            targetLanguage: nativeLanguage,
-                          );
-                          return result.translation;
+                          try {
+                            final result = await ai.getTranslation(
+                              widget.text,
+                              targetLanguage: nativeLanguage,
+                              accessToken: accessToken,
+                            );
+                            return result.translation;
+                          } on AiFeatureAuthRequiredException {
+                            if (mounted) {
+                              await _showAiFeatureSignInDialog();
+                            }
+                            rethrow;
+                          }
                         }
                       : null,
                   onRequestAnalysis: ai != null
@@ -548,11 +602,19 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                           ref
                               .read(usageTrackerProvider)
                               .record(UsageEvent.analysisTapped);
-                          final result = await ai.getAnalysis(
-                            widget.text,
-                            targetLanguage: nativeLanguage,
-                          );
-                          return result.toDisplayString();
+                          try {
+                            final result = await ai.getAnalysis(
+                              widget.text,
+                              targetLanguage: nativeLanguage,
+                              accessToken: accessToken,
+                            );
+                            return result.toDisplayString();
+                          } on AiFeatureAuthRequiredException {
+                            if (mounted) {
+                              await _showAiFeatureSignInDialog();
+                            }
+                            rethrow;
+                          }
                         }
                       : null,
                   cachedTranslation: cachedTranslation,

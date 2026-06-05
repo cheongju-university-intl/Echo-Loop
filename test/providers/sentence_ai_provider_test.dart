@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:echo_loop/database/daos/sentence_ai_cache_dao.dart';
+import 'package:echo_loop/models/sense_group_result.dart';
 import 'package:echo_loop/models/sentence_ai_result.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
@@ -40,6 +41,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: '你好世界'));
@@ -48,10 +50,18 @@ void main() {
       ).thenAnswer((_) async {});
 
       // 第一次：API 调用
-      await notifier.getTranslation(text, targetLanguage: lang);
+      await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
 
       // 第二次：L1 命中，不再调 DAO 或 API
-      final result = await notifier.getTranslation(text, targetLanguage: lang);
+      final result = await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
       expect(result.translation, '你好世界');
 
       // API 只调了一次
@@ -59,6 +69,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
@@ -69,7 +80,11 @@ void main() {
         () => mockDao.getByHash(any(), l2TranslationType),
       ).thenAnswer((_) async => '{"translation":"你好世界"}');
 
-      final result = await notifier.getTranslation(text, targetLanguage: lang);
+      final result = await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
       expect(result.translation, '你好世界');
 
       // 不应调用 API
@@ -77,6 +92,7 @@ void main() {
         () => mockApi.translate(
           any(),
           targetLanguage: any(named: 'targetLanguage'),
+          accessToken: any(named: 'accessToken'),
           cancelToken: any(named: 'cancelToken'),
         ),
       );
@@ -90,6 +106,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: '你好世界'));
@@ -97,7 +114,11 @@ void main() {
         () => mockDao.upsert(any(), l2TranslationType, any()),
       ).thenAnswer((_) async {});
 
-      final result = await notifier.getTranslation(text, targetLanguage: lang);
+      final result = await notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
       expect(result.translation, '你好世界');
 
       // 验证写入 SQLite
@@ -105,6 +126,26 @@ void main() {
 
       // 验证 L1 也已缓存
       expect(notifier.getCachedTranslation(text)?.translation, '你好世界');
+    });
+
+    test('L2 未命中且无 accessToken 时抛出登录需求，不调用 API', () async {
+      when(
+        () => mockDao.getByHash(any(), l2TranslationType),
+      ).thenAnswer((_) async => null);
+
+      expect(
+        () => notifier.getTranslation(text, targetLanguage: lang),
+        throwsA(isA<AiFeatureAuthRequiredException>()),
+      );
+
+      verifyNever(
+        () => mockApi.translate(
+          any(),
+          targetLanguage: any(named: 'targetLanguage'),
+          accessToken: any(named: 'accessToken'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
     });
 
     test('并发请求去重', () async {
@@ -117,6 +158,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) => completer.future);
@@ -125,8 +167,16 @@ void main() {
       ).thenAnswer((_) async {});
 
       // 同时发起两个请求
-      final f1 = notifier.getTranslation(text, targetLanguage: lang);
-      final f2 = notifier.getTranslation(text, targetLanguage: lang);
+      final f1 = notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
+      final f2 = notifier.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
 
       completer.complete(const SentenceTranslation(translation: '你好'));
 
@@ -141,6 +191,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
@@ -156,7 +207,11 @@ void main() {
             '{"analysis":{"grammar":"现在完成进行时","vocabulary":"study","listening":"持续动作"}}',
       );
 
-      final result = await notifier.getAnalysis(text, targetLanguage: lang);
+      final result = await notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
       expect(result.grammar, '现在完成进行时');
       expect(result.vocabulary, 'study');
       expect(result.listening, '持续动作');
@@ -170,6 +225,7 @@ void main() {
         () => mockApi.analyze(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
@@ -183,10 +239,34 @@ void main() {
         () => mockDao.upsert(any(), l2AnalysisType, any()),
       ).thenAnswer((_) async {});
 
-      final result = await notifier.getAnalysis(text, targetLanguage: lang);
+      final result = await notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
       expect(result.grammar, 'g');
 
       verify(() => mockDao.upsert(any(), l2AnalysisType, any())).called(1);
+    });
+
+    test('L2 未命中且无 accessToken 时抛出登录需求，不调用 API', () async {
+      when(
+        () => mockDao.getByHash(any(), l2AnalysisType),
+      ).thenAnswer((_) async => null);
+
+      expect(
+        () => notifier.getAnalysis(text, targetLanguage: lang),
+        throwsA(isA<AiFeatureAuthRequiredException>()),
+      );
+
+      verifyNever(
+        () => mockApi.analyze(
+          any(),
+          targetLanguage: any(named: 'targetLanguage'),
+          accessToken: any(named: 'accessToken'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
     });
   });
 
@@ -206,12 +286,17 @@ void main() {
         () => mockApi.translate(
           any(),
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: 't'));
       when(() => mockDao.upsert(any(), any(), any())).thenAnswer((_) async {});
 
-      await notifier.getTranslation('test', targetLanguage: lang);
+      await notifier.getTranslation(
+        'test',
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
       expect(notifier.getCachedTranslation('test'), isNotNull);
 
       notifier.clearMemoryCache();
@@ -231,6 +316,7 @@ void main() {
         () => mockApi.analyze(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
@@ -245,7 +331,11 @@ void main() {
       ).thenAnswer((_) async {});
 
       // 第一次：API 调用写入 L1
-      await notifier.getAnalysis(text, targetLanguage: lang);
+      await notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
 
       // 重置 mock 交互记录
       reset(mockDao);
@@ -260,6 +350,7 @@ void main() {
         () => mockApi.analyze(
           any(),
           targetLanguage: any(named: 'targetLanguage'),
+          accessToken: any(named: 'accessToken'),
           cancelToken: any(named: 'cancelToken'),
         ),
       );
@@ -275,6 +366,7 @@ void main() {
         () => mockApi.analyze(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) => completer.future);
@@ -283,8 +375,16 @@ void main() {
       ).thenAnswer((_) async {});
 
       // 同时发起两个请求
-      final f1 = notifier.getAnalysis(text, targetLanguage: lang);
-      final f2 = notifier.getAnalysis(text, targetLanguage: lang);
+      final f1 = notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
+      final f2 = notifier.getAnalysis(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
 
       completer.complete(
         const SentenceAnalysis(grammar: 'g', vocabulary: 'v', listening: 'u'),
@@ -301,6 +401,7 @@ void main() {
         () => mockApi.analyze(
           text,
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
@@ -316,13 +417,18 @@ void main() {
         () => mockApi.translate(
           any(),
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenThrow(Exception('network error'));
 
       // API 抛异常
       expect(
-        () => notifier.getTranslation('fail test', targetLanguage: lang),
+        () => notifier.getTranslation(
+          'fail test',
+          targetLanguage: lang,
+          accessToken: 'token',
+        ),
         throwsA(isA<Exception>()),
       );
 
@@ -342,6 +448,7 @@ void main() {
         () => mockApi.translate(
           any(),
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: 't'));
@@ -355,6 +462,7 @@ void main() {
         () => mockApi.analyze(
           any(),
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
@@ -365,8 +473,16 @@ void main() {
         ),
       );
 
-      await notifier.getTranslation('test', targetLanguage: lang);
-      await notifier.getAnalysis('test', targetLanguage: lang);
+      await notifier.getTranslation(
+        'test',
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
+      await notifier.getAnalysis(
+        'test',
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
 
       // 确认两者都有缓存
       expect(notifier.getCachedTranslation('test'), isNotNull);
@@ -379,6 +495,63 @@ void main() {
     });
   });
 
+  group('getSenseGroups auth', () {
+    const text = 'Hello world';
+    final hash = hashText(text);
+
+    test('L2 未命中且无 accessToken 时抛出登录需求，不调用 API', () async {
+      when(
+        () => mockDao.getByHash(hash, 'sense_groups'),
+      ).thenAnswer((_) async => null);
+
+      expect(
+        () => notifier.getSenseGroups(text),
+        throwsA(isA<AiFeatureAuthRequiredException>()),
+      );
+
+      verifyNever(
+        () => mockApi.splitSenseGroups(
+          any(),
+          accessToken: any(named: 'accessToken'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
+    });
+
+    test('有 accessToken 时调用 v2 API 并写入缓存', () async {
+      when(
+        () => mockDao.getByHash(hash, 'sense_groups'),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockApi.splitSenseGroups(
+          text,
+          accessToken: 'token',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const SenseGroupResult(
+          medium: ['Hello world'],
+          fine: ['Hello', 'world'],
+        ),
+      );
+      when(
+        () => mockDao.upsert(hash, 'sense_groups', any()),
+      ).thenAnswer((_) async {});
+
+      final result = await notifier.getSenseGroups(text, accessToken: 'token');
+
+      expect(result.medium, ['Hello world']);
+      verify(
+        () => mockApi.splitSenseGroups(
+          text,
+          accessToken: 'token',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+      verify(() => mockDao.upsert(hash, 'sense_groups', any())).called(1);
+    });
+  });
+
   group('hashText 一致性', () {
     test('归一化后相同的文本命中同一缓存', () async {
       when(
@@ -388,12 +561,17 @@ void main() {
         () => mockApi.translate(
           any(),
           targetLanguage: lang,
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: 'x'));
       when(() => mockDao.upsert(any(), any(), any())).thenAnswer((_) async {});
 
-      await notifier.getTranslation('Hello World.', targetLanguage: lang);
+      await notifier.getTranslation(
+        'Hello World.',
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
 
       // 归一化后与 "hello world." 和 "  HELLO   WORLD.  " 相同
       final hash1 = hashText('Hello World.');
@@ -418,6 +596,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: 'zh-CN',
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: '你好'));
@@ -426,6 +605,7 @@ void main() {
       final zhResult = await notifier.getTranslation(
         text,
         targetLanguage: 'zh-CN',
+        accessToken: 'token',
       );
       expect(zhResult.translation, '你好');
 
@@ -437,6 +617,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: 'zh-TW',
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer((_) async => const SentenceTranslation(translation: '你好'));
@@ -444,6 +625,7 @@ void main() {
       final twResult = await notifier.getTranslation(
         text,
         targetLanguage: 'zh-TW',
+        accessToken: 'token',
       );
       expect(twResult.translation, '你好');
 
@@ -452,6 +634,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: 'zh-CN',
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);
@@ -459,6 +642,7 @@ void main() {
         () => mockApi.translate(
           text,
           targetLanguage: 'zh-TW',
+          accessToken: 'token',
           cancelToken: any(named: 'cancelToken'),
         ),
       ).called(1);

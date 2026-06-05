@@ -7,6 +7,7 @@ library;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/sentence_ai_provider.dart';
 import '../../services/app_logger.dart';
 import '../../models/sense_group_result.dart';
 import '../../models/sentence_ai_result.dart';
@@ -383,7 +384,8 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         });
         _notifyToolbar();
       }
-    } catch (_) {
+    } catch (error) {
+      if (error is AiFeatureAuthRequiredException) rethrow;
       if (mounted) {
         setState(() {
           _translationExpanded = false;
@@ -424,7 +426,8 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         });
         _notifyToolbar();
       }
-    } catch (_) {
+    } catch (error) {
+      if (error is AiFeatureAuthRequiredException) rethrow;
       if (mounted) {
         setState(() {
           _analysisExpanded = false;

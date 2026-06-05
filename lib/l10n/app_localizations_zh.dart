@@ -2466,6 +2466,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get senseGroupLoadFailed => '意群拆分失败，请重试';
 
   @override
+  String get senseGroupSignInRequiredTitle => '登录后使用 AI 功能';
+
+  @override
+  String get senseGroupSignInRequiredMessage =>
+      'AI 翻译、解析和意群拆分需要使用云端 AI 服务。登录后可以继续生成新结果，已缓存的结果仍可正常查看。';
+
+  @override
   String get senseGroupNotAvailable => '仅 AI 转录的音频支持意群拆分';
 
   @override

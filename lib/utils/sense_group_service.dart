@@ -65,11 +65,12 @@ class SenseGroupService {
   requestSenseGroups({
     required String text,
     required SentenceAiNotifier ai,
+    required String? accessToken,
     required int sentenceStartMs,
     required int sentenceEndMs,
     List<WordTimestamp>? wordTimestamps,
   }) async {
-    final result = await ai.getSenseGroups(text);
+    final result = await ai.getSenseGroups(text, accessToken: accessToken);
     final timings = computeTimings(
       chunks: result.medium,
       wordTimestamps: wordTimestamps ?? const [],
