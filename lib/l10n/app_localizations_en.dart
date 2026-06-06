@@ -2555,6 +2555,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.';
 
   @override
+  String get senseGroupSyntheticTimingNoticeTitle => 'Timing may be inaccurate';
+
+  @override
+  String get senseGroupSyntheticTimingNoticeMessage =>
+      'This sense group playback timing is estimated from your uploaded subtitles and may be inaccurate.';
+
+  @override
   String get transcriptionSignInRequiredTitle =>
       'Sign in to use AI transcription';
 
@@ -2564,7 +2571,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get senseGroupNotAvailable =>
-      'Only available for AI-transcribed audio';
+      'Sense group playback is not available for this audio yet';
 
   @override
   String get wordTimestampsNotFound =>

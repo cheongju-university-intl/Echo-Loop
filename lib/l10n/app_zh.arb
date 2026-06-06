@@ -1030,9 +1030,11 @@
   "senseGroupLoadFailed": "意群拆分失败，请重试",
   "senseGroupSignInRequiredTitle": "登录后使用 AI 功能",
   "senseGroupSignInRequiredMessage": "AI 翻译、解析和意群拆分需要使用云端 AI 服务。登录后可以继续生成新结果，已缓存的结果仍可正常查看。",
+  "senseGroupSyntheticTimingNoticeTitle": "意群时间可能不准",
+  "senseGroupSyntheticTimingNoticeMessage": "这个意群播放时间是从你上传的字幕推测出来的，可能不准确。",
   "transcriptionSignInRequiredTitle": "登录后使用 AI 转录",
   "transcriptionSignInRequiredMessage": "AI 转录需要使用云端转录服务。登录后可以继续用 AI 生成字幕。",
-  "senseGroupNotAvailable": "仅 AI 转录的音频支持意群拆分",
+  "senseGroupNotAvailable": "当前音频暂不支持意群播放",
   "wordTimestampsNotFound": "词级字幕未找到，请重启应用重试",
 
   "recycleBinTitle": "回收站",

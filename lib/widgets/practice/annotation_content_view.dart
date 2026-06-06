@@ -13,10 +13,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_providers.dart';
+import '../../features/onboarding_survey/providers/onboarding_survey_provider.dart'
+    show sharedPreferencesProvider;
 import '../../features/usage/usage_event.dart';
 import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/audio_item.dart' as app_model;
 import '../../models/sense_group_result.dart';
 import '../../models/speech_practice_models.dart';
 import '../../models/word_timestamp.dart';
@@ -29,6 +32,7 @@ import '../../services/app_logger.dart';
 import '../../services/transcription_api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/sense_group_service.dart';
+import '../../utils/sense_group_timing_notice_store.dart';
 import '../../utils/sense_group_timing.dart';
 import '../../providers/new_user_guide_provider.dart';
 import '../../router/app_router.dart';
@@ -122,6 +126,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
   /// 意群播放 session（用于取消）
   int? _sgPlaybackSession;
+
+  /// 上传字幕推测时间提示是否正在展示，防止快速连点弹出多个对话框。
+  bool _isShowingSyntheticTimingNotice = false;
 
   // --- 意群快捷菜单 Overlay ---
   OverlayEntry? _actionBarOverlay;
@@ -355,6 +362,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final timings = _senseGroupTimings;
     if (timings == null || index >= timings.length) return;
 
+    final shouldContinue = await _ensureSyntheticTimingNoticeAcknowledged();
+    if (!mounted || !shouldContinue) return;
+
     // 停止主播放
     widget.onStopMainPlayer?.call();
 
@@ -373,6 +383,57 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     if (mounted && _sgPlaybackSession == sessionId) {
       setState(() => _playingSenseGroupIndex = null);
     }
+  }
+
+  /// 确保用户已知晓上传字幕生成的意群时间只是推测值。
+  ///
+  /// AI 转录字幕自带词级时间戳；本地上传字幕的词级时间戳由字幕片段按词长
+  /// 推算，意群播放边界可能不准，因此首次播放前展示一次阻塞提示。
+  Future<bool> _ensureSyntheticTimingNoticeAcknowledged() async {
+    final audioItemId = widget.audioItemId;
+    if (audioItemId == null) return true;
+    if (_isShowingSyntheticTimingNotice) return false;
+
+    final noticeStore = SenseGroupTimingNoticeStore(
+      ref.read(sharedPreferencesProvider),
+    );
+    if (noticeStore.hasSeenSyntheticTimingNotice) return true;
+
+    final audioItem = await ref.read(audioItemDaoProvider).getById(audioItemId);
+    if (!mounted || widget.audioItemId != audioItemId) return false;
+    if (audioItem?.transcriptSource != app_model.TranscriptSource.local.index) {
+      return true;
+    }
+
+    try {
+      _isShowingSyntheticTimingNotice = true;
+      final l10n = AppLocalizations.of(context);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            l10n?.senseGroupSyntheticTimingNoticeTitle ??
+                'Timing may be inaccurate',
+          ),
+          content: Text(
+            l10n?.senseGroupSyntheticTimingNoticeMessage ??
+                'This sense group playback timing is estimated from your uploaded subtitles and may be inaccurate.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l10n?.guideDone ?? 'Got it'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _isShowingSyntheticTimingNotice = false;
+    }
+    if (!mounted) return false;
+    await noticeStore.markSyntheticTimingNoticeSeen();
+    return true;
   }
 
   /// 停止意群播放

@@ -12,9 +12,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import '../database/providers.dart';
 import '../models/audio_item.dart';
+import '../models/word_timestamp.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/subtitle_parser.dart';
+import 'synthetic_word_timestamps.dart';
 import 'transcript_stats.dart';
 
 /// 选择字幕文件并返回其原始字符串内容（不复制到沙盒）。用户取消返回 null。
@@ -119,10 +121,19 @@ Future<void> uploadTranscriptForAudio(
     // 统计字幕句子数和单词数
     final stats = await getTranscriptStatsFromSrt(content);
 
-    // 字幕内容入 DB 列；transcriptPath 置 null
+    // 本地字幕没有真实词级时间戳，保存时按字符长度生成近似词级时间戳。
+    final wordTimestampsJson = encodeWordTimestamps(
+      await generateSyntheticWordTimestampsFromSrt(content),
+    );
+
+    // 字幕内容 + 近似词级时间戳原子写入 DB；transcriptPath 置 null。
     await ref
         .read(audioItemDaoProvider)
-        .updateTranscriptSrt(audioItem.id, content);
+        .saveTranscriptContent(
+          audioItem.id,
+          srt: content,
+          wordTimestampsJson: wordTimestampsJson,
+        );
 
     // 更新音频项的统计数据与来源
     if (!context.mounted) return;

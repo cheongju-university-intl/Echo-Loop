@@ -4568,6 +4568,18 @@ abstract class AppLocalizations {
   /// **'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.'**
   String get senseGroupSignInRequiredMessage;
 
+  /// No description provided for @senseGroupSyntheticTimingNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Timing may be inaccurate'**
+  String get senseGroupSyntheticTimingNoticeTitle;
+
+  /// No description provided for @senseGroupSyntheticTimingNoticeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This sense group playback timing is estimated from your uploaded subtitles and may be inaccurate.'**
+  String get senseGroupSyntheticTimingNoticeMessage;
+
   /// No description provided for @transcriptionSignInRequiredTitle.
   ///
   /// In en, this message translates to:
@@ -4583,7 +4595,7 @@ abstract class AppLocalizations {
   /// No description provided for @senseGroupNotAvailable.
   ///
   /// In en, this message translates to:
-  /// **'Only available for AI-transcribed audio'**
+  /// **'Sense group playback is not available for this audio yet'**
   String get senseGroupNotAvailable;
 
   /// No description provided for @wordTimestampsNotFound.

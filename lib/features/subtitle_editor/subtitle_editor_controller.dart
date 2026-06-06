@@ -18,6 +18,7 @@ import '../../providers/learning_progress_provider.dart';
 import '../../providers/listening_practice/listening_practice_provider.dart';
 import '../../utils/app_data_dir.dart';
 import '../../utils/srt_generator.dart';
+import '../../utils/synthetic_word_timestamps.dart';
 import '../../utils/word_timestamp_sync.dart';
 import 'subtitle_edit_engine.dart';
 
@@ -480,12 +481,11 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
 
       final srt = _generateSrt(state.sentences);
 
-      // 词级时间戳同步（仅 AI 转录有词级数据）：按最终句子边界对齐边界词，
-      // 丢弃被删除区间的词。无词级数据（本地字幕）则保留原词级列不动。
+      // 词级时间戳同步：AI 转录使用真实词级数据按句子边界同步；
+      // 没有词级数据时按字幕句子懒生成近似词级时间戳，供意群播放复用。
       final dao = _ref.read(audioItemDaoProvider);
       int? syncedWordCount;
       String? syncedWordsJson;
-      bool updateWords = false;
       if (item.transcriptSource == TranscriptSource.ai) {
         final json = await dao.getWordTimestamps(item.id);
         final words = json == null ? null : decodeWordTimestamps(json);
@@ -496,20 +496,18 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
           );
           syncedWordsJson = encodeWordTimestamps(synced);
           syncedWordCount = synced.length;
-          updateWords = true;
         }
       }
+      syncedWordsJson ??= encodeWordTimestamps(
+        generateSyntheticWordTimestamps(state.sentences),
+      );
 
       // 字幕内容（+ 同步后的词级时间戳）原子写入 DB 列。
-      if (updateWords) {
-        await dao.saveTranscriptContent(
-          item.id,
-          srt: srt,
-          wordTimestampsJson: syncedWordsJson,
-        );
-      } else {
-        await dao.updateTranscriptSrt(item.id, srt);
-      }
+      await dao.saveTranscriptContent(
+        item.id,
+        srt: srt,
+        wordTimestampsJson: syncedWordsJson,
+      );
 
       final wordCount =
           syncedWordCount ??

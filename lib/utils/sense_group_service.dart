@@ -13,6 +13,7 @@ import '../models/word_timestamp.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../services/transcription_api_client.dart';
 import 'sense_group_timing.dart';
+import 'synthetic_word_timestamps.dart';
 
 /// 意群数据服务
 class SenseGroupService {
@@ -27,8 +28,6 @@ class SenseGroupService {
   }) async {
     final audioItem = await dao.getById(audioItemId);
     if (audioItem == null) return null;
-    // 仅 AI 转录有词级时间戳
-    if (audioItem.transcriptSource != TranscriptSource.ai.index) return null;
 
     // 1. 优先从 audio_items 表读取
     final json = audioItem.wordTimestampsJson;
@@ -39,7 +38,18 @@ class SenseGroupService {
       await dao.updateWordTimestamps(audioItemId, null);
     }
 
-    // 2. DB 未命中，从 API 拉取并保存
+    // 2. 非 AI 字幕没有远端词级数据，缺失时从 DB 中的 SRT 懒生成并回写。
+    if (audioItem.transcriptSource != TranscriptSource.ai.index) {
+      final srt =
+          audioItem.transcriptSrt ?? await dao.getTranscriptSrt(audioItemId);
+      if (srt == null || srt.isEmpty) return null;
+      final words = await generateSyntheticWordTimestampsFromSrt(srt);
+      if (words.isEmpty) return null;
+      await dao.updateWordTimestamps(audioItemId, encodeWordTimestamps(words));
+      return words;
+    }
+
+    // 3. AI 转录 DB 未命中，从 API 拉取并保存
     final sha256 = audioItem.audioSha256;
     final language = audioItem.transcriptLanguage;
     if (sha256 == null || language == null) return null;

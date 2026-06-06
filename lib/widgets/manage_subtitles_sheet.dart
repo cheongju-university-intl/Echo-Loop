@@ -23,6 +23,8 @@ import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
+import '../models/word_timestamp.dart';
+import '../utils/synthetic_word_timestamps.dart';
 import '../utils/transcript_picker.dart';
 import '../utils/transcript_stats.dart';
 import 'guide_flow.dart';
@@ -895,10 +897,19 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
 
       final stats = await getTranscriptStatsFromSrt(content);
 
-      // 字幕内容入 DB 列；transcriptPath 置 null（不再复制到沙盒）
+      // 本地字幕没有真实词级时间戳，保存时按字符长度生成近似词级时间戳。
+      final wordTimestampsJson = encodeWordTimestamps(
+        await generateSyntheticWordTimestampsFromSrt(content),
+      );
+
+      // 字幕内容 + 近似词级时间戳原子写入 DB；transcriptPath 置 null。
       await ref
           .read(audioItemDaoProvider)
-          .updateTranscriptSrt(audioItem.id, content);
+          .saveTranscriptContent(
+            audioItem.id,
+            srt: content,
+            wordTimestampsJson: wordTimestampsJson,
+          );
 
       if (!context.mounted) return;
       ref

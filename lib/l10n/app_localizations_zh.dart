@@ -2476,6 +2476,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'AI 翻译、解析和意群拆分需要使用云端 AI 服务。登录后可以继续生成新结果，已缓存的结果仍可正常查看。';
 
   @override
+  String get senseGroupSyntheticTimingNoticeTitle => '意群时间可能不准';
+
+  @override
+  String get senseGroupSyntheticTimingNoticeMessage =>
+      '这个意群播放时间是从你上传的字幕推测出来的，可能不准确。';
+
+  @override
   String get transcriptionSignInRequiredTitle => '登录后使用 AI 转录';
 
   @override
@@ -2483,7 +2490,7 @@ class AppLocalizationsZh extends AppLocalizations {
       'AI 转录需要使用云端转录服务。登录后可以继续用 AI 生成字幕。';
 
   @override
-  String get senseGroupNotAvailable => '仅 AI 转录的音频支持意群拆分';
+  String get senseGroupNotAvailable => '当前音频暂不支持意群播放';
 
   @override
   String get wordTimestampsNotFound => '词级字幕未找到，请重启应用重试';

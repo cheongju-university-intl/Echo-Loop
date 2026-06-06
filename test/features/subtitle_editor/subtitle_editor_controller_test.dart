@@ -9,6 +9,7 @@ import 'package:echo_loop/models/audio_engine_state.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/models/learning_progress.dart';
 import 'package:echo_loop/models/sentence.dart';
+import 'package:echo_loop/models/word_timestamp.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
@@ -518,6 +519,13 @@ void main() {
       final savedSrt = audioItemDao.transcriptSrtStore[audioItem.id];
       expect(savedSrt, isNotNull);
       expect(savedSrt!, contains('-->'));
+      final savedWords = decodeWordTimestamps(
+        audioItemDao.wordTimestampsStore[audioItem.id]!,
+      );
+      expect(savedWords, isNotNull);
+      expect(savedWords!.map((w) => w.word).take(2), ['First', 'sentence.']);
+      expect(savedWords.first.startTime, Duration.zero);
+      expect(savedWords.last.endTime, const Duration(seconds: 12));
       expect(
         await bookmarkDao.getBookmarkedIndices(audioItem.id),
         contains(1),
