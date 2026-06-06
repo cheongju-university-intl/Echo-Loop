@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_waveform/just_waveform.dart';
@@ -167,6 +169,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
   DateTime? _playheadAnchorAt;
   bool _hasLoaded = false;
   bool _didInitZoom = false;
+  String _baselineSubtitleHash = '';
 
   /// 进入编辑页时的原始句子数量。
   ///
@@ -192,6 +195,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
     try {
       final duration = await _audioEngine.loadAudio(state.audioItem, 1.0);
       final sentences = await _audioEngine.loadTranscript(state.audioItem);
+      _baselineSubtitleHash = _subtitleHash(sentences);
       _baselineSentenceCount = sentences.length;
       state = state.copyWith(
         isLoading: false,
@@ -387,7 +391,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
       isPlaying: false,
       playbackMode: SubtitleEditorPlaybackMode.idle,
       playbackPosition: _positionForSelected(next, selectedIndex),
-      isDirty: true,
+      isDirty: _sentencesChanged(next),
     );
   }
 
@@ -407,7 +411,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
       isPlaying: false,
       playbackMode: SubtitleEditorPlaybackMode.idle,
       playbackPosition: _positionForSelected(next, selectedIndex),
-      isDirty: true,
+      isDirty: _sentencesChanged(next),
     );
   }
 
@@ -442,7 +446,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
     if (wasPlaying) _cancelPlaybackSession();
     state = state.copyWith(
       sentences: next,
-      isDirty: true,
+      isDirty: _sentencesChanged(next),
       playingSentenceIndex: wasPlaying ? null : state.playingSentenceIndex,
       isPlaying: wasPlaying ? false : state.isPlaying,
       playbackMode: wasPlaying
@@ -454,7 +458,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
   /// 还原句子列表，用于删除后的撤销操作。
   ///
   /// 直接用调用方在删除前捕获的快照覆盖当前列表，并停止任何播放。
-  /// 撤销后仍视为已修改（[isDirty] = true），由用户决定是否保存。
+  /// 撤销后按当前字幕是否等于进入编辑页时的原始字幕重新计算 [isDirty]。
   void restoreSentences(List<Sentence> snapshot) {
     _cancelPlaybackSession();
     state = state.copyWith(
@@ -462,7 +466,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
       playingSentenceIndex: null,
       isPlaying: false,
       playbackMode: SubtitleEditorPlaybackMode.idle,
-      isDirty: true,
+      isDirty: _sentencesChanged(snapshot),
     );
   }
 
@@ -478,14 +482,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
         throw StateError('Transcript file is not available');
       }
 
-      final srt = generateSrtContent([
-        for (final sentence in state.sentences)
-          TranscriptSentence(
-            text: sentence.text,
-            startTime: sentence.startTime,
-            endTime: sentence.endTime,
-          ),
-      ]);
+      final srt = _generateSrt(state.sentences);
       final target = File(fullTranscriptPath);
       final tmp = File('$fullTranscriptPath.tmp');
       await tmp.writeAsString(srt);
@@ -544,6 +541,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
       }
 
       _baselineSentenceCount = state.sentences.length;
+      _baselineSubtitleHash = _subtitleHash(state.sentences);
       if (!mounted) return true;
       state = state.copyWith(
         isSaving: false,
@@ -705,6 +703,29 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
       return Duration.zero;
     }
     return sentences[selectedIndex].startTime;
+  }
+
+  /// 字幕是否相对进入编辑页或上次保存后的基线发生了实质变化。
+  ///
+  /// dirty 状态只看最终可保存的 SRT 内容，不看用户操作历史；删除后撤销、
+  /// 边界拖回原位都会回到未修改状态，避免保存按钮误激活。
+  bool _sentencesChanged(List<Sentence> current) {
+    return _subtitleHash(current) != _baselineSubtitleHash;
+  }
+
+  String _subtitleHash(List<Sentence> sentences) {
+    return sha256.convert(utf8.encode(_generateSrt(sentences))).toString();
+  }
+
+  String _generateSrt(List<Sentence> sentences) {
+    return generateSrtContent([
+      for (final sentence in sentences)
+        TranscriptSentence(
+          text: sentence.text,
+          startTime: sentence.startTime,
+          endTime: sentence.endTime,
+        ),
+    ]);
   }
 
   Future<void> _loadWaveform() async {

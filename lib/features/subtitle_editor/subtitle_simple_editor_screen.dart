@@ -104,8 +104,15 @@ class _SubtitleSimpleEditorScreenState
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.s),
                 child: FilledButton.tonal(
+                  key: const ValueKey('subtitle-editor-save-button'),
                   // AppBar 内收紧默认主题的大 padding，保持紧凑
                   style: FilledButton.styleFrom(
+                    backgroundColor: state.isDirty && !state.isSaving
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                    foregroundColor: state.isDirty && !state.isSaving
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : null,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.m,
                       vertical: AppSpacing.s,

@@ -335,7 +335,26 @@ void main() {
     expect(state().isDirty, isTrue);
   });
 
-  test('restoreSentences 撤销删除：还原快照并保持已修改状态', () async {
+  test('adjustSentenceBoundary 拖回原始边界后不再视为已修改', () async {
+    final notifier = controller();
+    await notifier.load();
+    notifier.selectSentence(1); // [4s, 8s]
+
+    notifier.adjustSelectedSentenceBoundary(
+      BoundaryEdge.end,
+      const Duration(seconds: 7),
+    );
+    expect(state().isDirty, isTrue);
+
+    notifier.adjustSelectedSentenceBoundary(
+      BoundaryEdge.end,
+      const Duration(seconds: 8),
+    );
+    expect(state().sentences[1].endTime, const Duration(seconds: 8));
+    expect(state().isDirty, isFalse);
+  });
+
+  test('restoreSentences 撤销删除：还原到原始字幕后不再视为已修改', () async {
     final notifier = controller();
     await notifier.load();
     final snapshot = List<Sentence>.from(state().sentences);
@@ -346,7 +365,7 @@ void main() {
     notifier.restoreSentences(snapshot);
     expect(state().sentences.length, 3);
     expect(state().sentences[1].text, 'Second sentence.');
-    expect(state().isDirty, isTrue);
+    expect(state().isDirty, isFalse);
     expect(state().isPlaying, isFalse);
   });
 
@@ -512,6 +531,34 @@ void main() {
         isTrue,
         reason: '句子数量未变，学习进度应保留',
       );
+    });
+
+    test('保存成功后重置字幕基线，未继续修改时不再保存', () async {
+      final c = saveContainer();
+      addTearDown(c.dispose);
+      // 保持监听，避免 autoDispose 在 await 期间销毁控制器。
+      c.listen(subtitleEditorControllerProvider(audioItem), (_, _) {});
+      final notifier = c.read(
+        subtitleEditorControllerProvider(audioItem).notifier,
+      );
+      await notifier.load();
+
+      notifier.adjustSentenceBoundary(
+        0,
+        BoundaryEdge.end,
+        const Duration(seconds: 3),
+      );
+      expect(c.read(subtitleEditorControllerProvider(audioItem)).isDirty, true);
+
+      final saved = await notifier.save();
+      expect(saved, isTrue);
+      expect(
+        c.read(subtitleEditorControllerProvider(audioItem)).isDirty,
+        false,
+      );
+
+      final savedAgain = await notifier.save();
+      expect(savedAgain, isFalse);
     });
 
     test('删除句子（句子数量变化）清空学习进度和收藏', () async {

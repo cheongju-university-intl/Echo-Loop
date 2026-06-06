@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:echo_loop/features/subtitle_editor/subtitle_edit_engine.dart';
+import 'package:echo_loop/features/subtitle_editor/subtitle_editor_controller.dart';
 import 'package:echo_loop/features/subtitle_editor/subtitle_simple_editor_screen.dart';
 import 'package:echo_loop/features/subtitle_editor/subtitle_waveform_view.dart';
 import 'package:echo_loop/models/audio_engine_state.dart';
@@ -10,6 +11,7 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/widgets/guide_flow.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:just_waveform/just_waveform.dart';
@@ -494,6 +496,57 @@ void main() {
       expect(find.text('0.5x'), findsOneWidget);
       expect(find.text('1.5x'), findsOneWidget);
       expect(find.text('2.0x'), findsOneWidget);
+
+      audioEngine.disposeController();
+    });
+
+    testWidgets('保存按钮激活时使用更深的主色背景', (tester) async {
+      final audioItem = createTestAudioItem();
+      final audioEngine = _ScreenTestAudioEngine(
+        duration: const Duration(seconds: 10),
+        sentences: _sentences(),
+      );
+
+      await tester.pumpWidget(
+        createTestScreen(
+          SubtitleSimpleEditorScreen(audioItem: audioItem),
+          overrides: [audioEngineProvider.overrideWith(() => audioEngine)],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final saveFinder = find.byKey(
+        const ValueKey('subtitle-editor-save-button'),
+      );
+      FilledButton saveButton = tester.widget(saveFinder);
+      final theme = Theme.of(tester.element(saveFinder));
+
+      expect(saveButton.onPressed, isNull);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SubtitleSimpleEditorScreen)),
+      );
+      container
+          .read(subtitleEditorControllerProvider(audioItem).notifier)
+          .adjustSentenceBoundary(
+            0,
+            BoundaryEdge.end,
+            const Duration(seconds: 2),
+          );
+      await tester.pump();
+
+      saveButton = tester.widget(saveFinder);
+      final background = saveButton.style?.backgroundColor?.resolve({
+        WidgetState.pressed,
+      });
+      final foreground = saveButton.style?.foregroundColor?.resolve({
+        WidgetState.pressed,
+      });
+
+      expect(saveButton.onPressed, isNotNull);
+      expect(background, theme.colorScheme.primary);
+      expect(foreground, theme.colorScheme.onPrimary);
 
       audioEngine.disposeController();
     });
