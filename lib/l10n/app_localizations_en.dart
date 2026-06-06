@@ -3485,6 +3485,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stopPlayback => 'Stop playback';
 
   @override
+  String get editWord => 'Edit word';
+
+  @override
+  String get splitSentenceHere => 'Split sentence here';
+
+  @override
+  String get wordEditAction => 'Edit';
+
+  @override
+  String get wordSplitBeforeAction => 'Split';
+
+  @override
   String get saveSubtitleEdits => 'Save subtitle changes';
 
   @override

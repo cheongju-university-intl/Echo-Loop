@@ -3351,6 +3351,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stopPlayback => '停止播放';
 
   @override
+  String get editWord => '编辑单词';
+
+  @override
+  String get splitSentenceHere => '从此处分句';
+
+  @override
+  String get wordEditAction => '编辑';
+
+  @override
+  String get wordSplitBeforeAction => '断句';
+
+  @override
   String get saveSubtitleEdits => '保存字幕修改';
 
   @override

@@ -6218,6 +6218,30 @@ abstract class AppLocalizations {
   /// **'Stop playback'**
   String get stopPlayback;
 
+  /// No description provided for @editWord.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit word'**
+  String get editWord;
+
+  /// No description provided for @splitSentenceHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Split sentence here'**
+  String get splitSentenceHere;
+
+  /// No description provided for @wordEditAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get wordEditAction;
+
+  /// No description provided for @wordSplitBeforeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get wordSplitBeforeAction;
+
   /// No description provided for @saveSubtitleEdits.
   ///
   /// In en, this message translates to:
