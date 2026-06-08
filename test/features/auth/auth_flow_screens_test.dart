@@ -367,7 +367,7 @@ void main() {
     );
   });
 
-  testWidgets('用户取消 Google 登录后返回原页面且不显示错误', (tester) async {
+  testWidgets('用户取消 Google 登录后停留在主登录页且不显示错误', (tester) async {
     final router = _authRouter(
       initialLocation: AppRoutes.study,
       isAppleSignInSupported: false,
@@ -387,7 +387,9 @@ void main() {
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Source Page'), findsOneWidget);
+    expect(find.text('Sign in to Echo Loop'), findsOneWidget);
+    expect(find.text('Continue with Email Code'), findsOneWidget);
+    expect(find.text('Source Page'), findsNothing);
     expect(find.text('Something went wrong. Try again.'), findsNothing);
     expect(find.text('Settings'), findsNothing);
   });

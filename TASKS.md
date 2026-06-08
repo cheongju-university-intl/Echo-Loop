@@ -1,7 +1,24 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-08
-> 当前焦点：修复学习统计柱状图亚像素溢出
+> 当前焦点：修复 Android Google 登录取消后的返回目标
+
+## 已完成：修复 Android Google 登录取消后的返回目标
+
+Android Google 授权弹窗中点击取消也属于本次登录尝试失败；现在取消后会停留在登录主页面，让用户继续选择邮箱验证码等其它登录方式，而不是直接返回来源页或“我的”Tab。
+
+### 实现
+- [x] Google 登录取消分支改为 `AuthAttemptResult.failure`，复用失败时留在主登录页的统一导航策略
+- [x] 保持取消路径静默处理，不显示泛化错误 snackbar
+- [x] 更新登录流程回归测试，覆盖取消后仍在登录主页面并可选择邮箱验证码
+
+### 验证
+- [x] `dart format lib/features/auth/screens/login_screen.dart test/features/auth/auth_flow_screens_test.dart`
+- [x] `flutter analyze lib/features/auth/screens/login_screen.dart test/features/auth/auth_flow_screens_test.dart`：No issues found
+- [x] `flutter test test/features/auth/auth_flow_screens_test.dart`：33 passed
+- [x] `scripts/check.sh`：仓库既有测试桩缺失 `LearningSettingsNotifier.reloadFromPrefs` 实现导致全量 `flutter analyze` 报错（与本次登录改动无关），已在后续 commit 补齐测试桩实现修复
+
+**完成时间**: 2026-06-08 15:17 +0800
 
 ## 已完成：修复学习统计柱状图亚像素溢出
 

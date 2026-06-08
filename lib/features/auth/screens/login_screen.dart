@@ -234,7 +234,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       if (_isCanceledGoogleSignIn(error)) {
         AppLogger.log('AuthGoogle', 'login canceled by user');
-        _finishAuthAttempt(AuthAttemptResult.canceled);
+        _finishAuthAttempt(AuthAttemptResult.failure);
         return;
       }
       AppLogger.log('AuthGoogle', 'login failed error=$error');
