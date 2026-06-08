@@ -81,7 +81,7 @@ void main() {
       (w) =>
           w is SwitchListTile &&
           w.title is Text &&
-          (w.title as Text).data == 'Auto-play my recording',
+          (w.title as Text).data == 'Auto-play retell recording',
     );
     expect(finder, findsOneWidget);
     expect(tester.widget<SwitchListTile>(finder).value, isFalse);
@@ -90,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final container = ProviderScope.containerOf(
-      tester.element(find.text('Auto-play my recording')),
+      tester.element(find.text('Auto-play retell recording')),
     );
     expect(
       container
@@ -131,7 +131,7 @@ void main() {
       (w) =>
           w is SwitchListTile &&
           w.title is Text &&
-          (w.title as Text).data == 'Auto-play my recording',
+          (w.title as Text).data == 'Auto-play retell recording',
     );
     expect(tester.widget<SwitchListTile>(finder).value, isTrue);
   });

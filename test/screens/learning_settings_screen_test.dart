@@ -69,7 +69,7 @@ void main() {
       (w) =>
           w is SwitchListTile &&
           w.title is Text &&
-          (w.title as Text).data == 'Auto-play retell recordings',
+          (w.title as Text).data == 'Auto-play retell recording',
     );
     final autoPlayTile = tester.widget<SwitchListTile>(autoPlayFinder);
     expect(autoPlayTile.value, isFalse);
@@ -104,7 +104,7 @@ void main() {
       (w) =>
           w is SwitchListTile &&
           w.title is Text &&
-          (w.title as Text).data == 'Auto-play retell recordings',
+          (w.title as Text).data == 'Auto-play retell recording',
     );
     await tester.tap(autoPlayFinder);
     await tester.pumpAndSettle();
@@ -146,7 +146,7 @@ void main() {
       (w) =>
           w is SwitchListTile &&
           w.title is Text &&
-          (w.title as Text).data == 'Auto-play retell recordings',
+          (w.title as Text).data == 'Auto-play retell recording',
     );
     final autoPlayTile = tester.widget<SwitchListTile>(autoPlayFinder);
     expect(autoPlayTile.value, isTrue);

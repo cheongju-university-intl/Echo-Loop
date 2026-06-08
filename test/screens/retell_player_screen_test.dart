@@ -500,12 +500,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Review your pronunciation after retelling?'),
+        find.text('Auto-play your recording after retelling?'),
         findsOneWidget,
       );
       expect(player.postEvaluationPauseCalls, 0);
 
-      await tester.tap(find.text('Keep Off'));
+      await tester.tap(find.text('Not Now'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
@@ -587,7 +587,7 @@ void main() {
 
       // 不应弹出首次提示
       expect(
-        find.text('Review your pronunciation after retelling?'),
+        find.text('Auto-play your recording after retelling?'),
         findsNothing,
       );
       // 直接自动回放，回放结束前不启动倒计时
