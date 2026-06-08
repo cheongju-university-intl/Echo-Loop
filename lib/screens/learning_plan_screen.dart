@@ -121,24 +121,28 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           .read(listeningPracticeProvider.notifier)
           .loadAudio(audioItem);
 
-      // 监听字幕变化（上传/AI转录完成后重新加载字幕）
+      // 监听字幕变化（上传/AI转录完成后重新加载字幕）。
+      //
+      // 字幕内容入库后，AI 转录完成不会再写 transcriptPath；学习计划页必须
+      // 监听 transcriptSource / 统计字段等模型列，否则当前页内 LP 仍保留空句子，
+      // 点击「开始学习」会在 sentences.isEmpty 分支静默返回。
       ref.listenManual(
         audioLibraryProvider.select(
-          (s) => s.audioItems
-              .where((i) => i.id == widget.audioItemId)
-              .firstOrNull
-              ?.transcriptPath,
+          (s) =>
+              s.audioItems.where((i) => i.id == widget.audioItemId).firstOrNull,
         ),
         (prev, next) {
-          if (prev != next && next != null) {
-            final updated = ref
-                .read(audioLibraryProvider.notifier)
-                .getItemById(widget.audioItemId);
-            if (updated != null) {
-              _loadAudioFuture = ref
-                  .read(listeningPracticeProvider.notifier)
-                  .loadAudio(updated);
-            }
+          if (next == null) return;
+          final transcriptChanged =
+              prev?.transcriptPath != next.transcriptPath ||
+              prev?.transcriptSource != next.transcriptSource ||
+              prev?.transcriptLanguage != next.transcriptLanguage ||
+              prev?.sentenceCount != next.sentenceCount ||
+              prev?.wordCount != next.wordCount;
+          if (transcriptChanged) {
+            _loadAudioFuture = ref
+                .read(listeningPracticeProvider.notifier)
+                .loadAudio(next, forceTranscriptReload: true);
           }
         },
       );
@@ -1680,9 +1684,7 @@ class _FirstStudySection extends ConsumerWidget {
                   onTap = () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          l10n.listenAndRepeatNoDifficultSentences,
-                        ),
+                        content: Text(l10n.listenAndRepeatNoDifficultSentences),
                         duration: const Duration(seconds: 3),
                       ),
                     );
@@ -2484,10 +2486,7 @@ class _ReviewRoundSection extends ConsumerWidget {
           pauseMultiplier: pauseMultiplier,
         );
         // 补做语义：跳过的复习难句补练完成后回收为已完成
-        notifier.setCatchUp(
-          review.stage,
-          SubStageType.reviewDifficultPractice,
-        );
+        notifier.setCatchUp(review.stage, SubStageType.reviewDifficultPractice);
         if (context.mounted) {
           context.push(
             AppRoutes.reviewDifficultPractice(collectionId, audioItemId),

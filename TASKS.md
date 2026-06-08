@@ -1,7 +1,24 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-08
-> 当前焦点：修复 Android Google 登录取消后的返回目标
+> 当前焦点：修复 AI 转录完成后学习计划页开始学习无响应
+
+## 已完成：修复 AI 转录完成后学习计划页开始学习无响应
+
+学习计划页打开期间完成 AI 转录后，转录结果已写入 DB 字幕内容列，音频模型的 `transcriptPath` 仍为 null。此前页面只监听 `transcriptPath` 变化，导致本页内 `ListeningPractice` 仍保留空句子；按钮显示为可用，但点击「开始学习」会在空句子分支静默返回。现在页面会监听字幕来源、语言、句数、词数等字幕可用性字段，并强制重载字幕内容。
+
+### 实现
+- [x] 学习计划页字幕变化监听从 `transcriptPath` 扩展为当前 `AudioItem` 的字幕相关字段
+- [x] 转录完成后调用 `loadAudio(..., forceTranscriptReload: true)`，绕过同音频去重守卫并重新读取 DB 字幕内容
+- [x] 补充回归测试：`transcriptPath` 仍为 null、`transcriptSource` 变为 AI 后，当前页面点击「开始学习」立即弹出练习面板
+
+### 验证
+- [x] `dart format lib/screens/learning_plan_screen.dart test/screens/learning_plan_screen_test.dart`
+- [x] `flutter analyze lib/screens/learning_plan_screen.dart test/screens/learning_plan_screen_test.dart`：No issues found
+- [x] `flutter test test/screens/learning_plan_screen_test.dart`：38 passed
+- [x] `scripts/check.sh`：`flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2588 passed、11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，`asr_engine_test.dart` / `app_test.dart` 失败在本地 debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次学习计划页字幕刷新修复无关
+
+**完成时间**: 2026-06-08 16:39 +0800
 
 ## 已完成：修复 Android Google 登录取消后的返回目标
 

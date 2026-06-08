@@ -68,6 +68,20 @@ void main() {
     });
   }
 
+  /// 模拟 AI 转录完成后，LP 强制重载 DB 字幕内容并拿到新句子。
+  ///
+  /// 真实实现会从 audio_items.transcript_srt 读取字幕；测试中直接在
+  /// forceTranscriptReload=true 时填入句子，验证计划页监听和重载链路。
+  TestListeningPractice createTranscriptionReloadLp(
+    AudioItem initialItem,
+    List<Sentence> reloadedSentences,
+  ) {
+    return _TranscriptionReloadListeningPractice(
+      ListeningPracticeState(currentAudioItem: initialItem),
+      reloadedSentences,
+    );
+  }
+
   /// 构造「截至当前阶段所有过去阶段子步骤都完成」的 completedKeys。
   ///
   /// + 当前阶段中位于 currentSubStage 之前的子步骤也算完成。
@@ -94,7 +108,7 @@ void main() {
 
   /// 若 progressState 未显式指定 completionsByAudio，按 progressMap 中
   /// 每条进度的 currentStage/currentSubStage 自动推导（旧测试预期保留）。
-  LearningProgressState _withAutoCompletions(LearningProgressState? state) {
+  LearningProgressState withAutoCompletions(LearningProgressState? state) {
     final base = state ?? const LearningProgressState();
     if (base.completionsByAudio.isNotEmpty || base.progressMap.isEmpty) {
       return base;
@@ -115,6 +129,7 @@ void main() {
     AudioItem? audioItem,
     DateTime? fixedNow,
     ListeningPracticeState? lpState,
+    TestListeningPractice Function()? listeningPracticeOverride,
   }) {
     final item = audioItem ?? testAudioItem;
     final router = GoRouter(
@@ -159,20 +174,21 @@ void main() {
           () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
         ),
         listeningPracticeProvider.overrideWith(
-          () => TestListeningPractice(
-            lpState ??
-                (item.hasTranscript
-                    ? ListeningPracticeState(
-                        currentAudioItem: item,
-                        sentences: createTestSentences(),
-                      )
-                    : ListeningPracticeState(currentAudioItem: item)),
-          ),
+          listeningPracticeOverride ??
+              () => TestListeningPractice(
+                lpState ??
+                    (item.hasTranscript
+                        ? ListeningPracticeState(
+                            currentAudioItem: item,
+                            sentences: createTestSentences(),
+                          )
+                        : ListeningPracticeState(currentAudioItem: item)),
+              ),
         ),
         audioEngineProvider.overrideWith(() => TestAudioEngine()),
         learningProgressNotifierProvider.overrideWith(
           () =>
-              TestLearningProgressNotifier(_withAutoCompletions(progressState)),
+              TestLearningProgressNotifier(withAutoCompletions(progressState)),
         ),
         learningSessionProvider.overrideWith(() => TestLearningSession()),
         if (fixedNow != null) nowProvider.overrideWithValue(() => fixedNow),
@@ -577,6 +593,44 @@ void main() {
       // 当前子步骤是 blindListen，应弹出简报弹窗（步骤标签 + 弹窗标题都是 Blind Listening）
       expect(find.text('Blind Listening'), findsAtLeast(1));
       expect(find.text('Start Practice'), findsOneWidget);
+    });
+
+    testWidgets('AI 转录完成后 transcriptPath 仍为 null 时开始学习可立即弹出练习面板', (
+      tester,
+    ) async {
+      final pendingItem = testAudioItemNoTranscript;
+      final completedItem = pendingItem.copyWith(
+        transcriptPath: null,
+        transcriptSource: TranscriptSource.ai,
+        transcriptLanguage: 'en',
+        sentenceCount: 5,
+        wordCount: 25,
+      );
+      final reloadedSentences = createTestSentences();
+      final lp = createTranscriptionReloadLp(pendingItem, reloadedSentences);
+
+      await tester.pumpWidget(
+        createTestWidget(
+          audioItem: pendingItem,
+          listeningPracticeOverride: () => lp,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final appContext = tester.element(find.byType(LearningPlanScreen));
+      final container = ProviderScope.containerOf(appContext);
+      await container
+          .read(audioLibraryProvider.notifier)
+          .updateAudioItem(completedItem);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Start Learning'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Blind Listening'), findsAtLeast(1));
+      expect(find.text('Start Practice'), findsOneWidget);
+      final lpState = container.read(listeningPracticeProvider);
+      expect(lpState.sentences, hasLength(reloadedSentences.length));
     });
 
     testWidgets('简报弹窗点击开始练习后导航到盲听播放器', (tester) async {
@@ -1097,4 +1151,27 @@ void main() {
       expect(find.textContaining('1x'), findsWidgets);
     });
   });
+}
+
+class _TranscriptionReloadListeningPractice extends TestListeningPractice {
+  final List<Sentence> reloadedSentences;
+
+  _TranscriptionReloadListeningPractice(
+    super.initialState,
+    this.reloadedSentences,
+  );
+
+  @override
+  Future<void> loadAudio(
+    AudioItem audioItem, {
+    bool forceTranscriptReload = false,
+  }) async {
+    state = state.copyWith(
+      currentAudioItem: audioItem,
+      sentences: forceTranscriptReload ? reloadedSentences : state.sentences,
+      currentFullIndex: forceTranscriptReload && reloadedSentences.isNotEmpty
+          ? 0
+          : state.currentFullIndex,
+    );
+  }
 }
