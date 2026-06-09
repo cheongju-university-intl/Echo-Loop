@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
+import 'api_log_interceptor.dart';
 import '../models/sentence_ai_result.dart';
 import '../models/sense_group_result.dart';
 import '../models/word_analysis.dart';
@@ -33,13 +34,7 @@ class SentenceAiApiClient {
     SharedPreferences.getInstance().then(
       (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
     );
-    _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        logPrint: (obj) => print('[AI-API] $obj'),
-      ),
-    );
+    _dio.interceptors.add(ApiLogInterceptor(tag: 'AI-API'));
   }
 
   /// 用于测试的构造函数，允许注入 Dio 实例

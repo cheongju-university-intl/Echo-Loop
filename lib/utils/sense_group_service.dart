@@ -4,13 +4,12 @@
 /// 不包含 UI 状态或播放逻辑，由 [AnnotationContentView] 内部使用。
 library;
 
-import 'package:flutter/foundation.dart';
-
 import '../database/daos/audio_item_dao.dart';
 import '../models/audio_item.dart';
 import '../models/sense_group_result.dart';
 import '../models/word_timestamp.dart';
 import '../providers/sentence_ai_provider.dart';
+import '../services/app_logger.dart';
 import '../services/transcription_api_client.dart';
 import 'sense_group_timing.dart';
 import 'synthetic_word_timestamps.dart';
@@ -69,7 +68,7 @@ class SenseGroupService {
         return result.words;
       }
     } catch (e) {
-      debugPrint('获取词级时间戳失败: $e');
+      AppLogger.log('SenseGroup', '❌ 获取词级时间戳失败 | $e');
     }
     return null;
   }

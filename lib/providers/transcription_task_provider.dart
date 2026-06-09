@@ -162,7 +162,10 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
       _updateState(audioId, const TranscriptionUploading());
       final mimeType = _getMimeType(fullPath);
       final fileSize = await fileOps.getFileSize(fullPath);
-      print('[TRANSCRIPTION] Step 2: sha256=$sha256, size=$fileSize');
+      AppLogger.log(
+        'Transcription',
+        'Step 2 上传 | sha256=$sha256 size=$fileSize mime=$mimeType',
+      );
 
       final uploadResp = await api.getUploadUrl(
         sha256: sha256,
@@ -239,13 +242,17 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
       );
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return;
-      print('[TRANSCRIPTION] DioException: ${e.type} ${e.message} ${e.error}');
+      AppLogger.log(
+        'Transcription',
+        '❌ 转录失败(Dio) | type=${e.type} status=${e.response?.statusCode} '
+            'msg=${e.message ?? e.error} body=${e.response?.data}',
+      );
       _updateState(
         audioId,
         TranscriptionFailed(message: _userFriendlyError(e)),
       );
-    } catch (e) {
-      print('[TRANSCRIPTION] Error: $e');
+    } catch (e, st) {
+      AppLogger.log('Transcription', '❌ 转录失败(非网络) | $e\n$st');
       _updateState(audioId, const TranscriptionFailed(message: 'unknown'));
     }
   }
@@ -320,6 +327,10 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
         }
 
         if (status.isFailed) {
+          AppLogger.log(
+            'Transcription',
+            '❌ 后端任务失败 | jobId=$jobId errorMessage=${status.errorMessage}',
+          );
           _updateState(
             audioItem.id,
             const TranscriptionFailed(message: 'server'),
@@ -328,7 +339,11 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
         }
       } on DioException catch (e) {
         if (e.type == DioExceptionType.cancel) return;
-        // 轮询中的网络错误不立即失败，继续重试
+        // 轮询中的网络错误不立即失败，继续重试（拦截器已记录详情）
+        AppLogger.log(
+          'Transcription',
+          '轮询出错(将重试) | jobId=$jobId type=${e.type} status=${e.response?.statusCode}',
+        );
       }
     }
 

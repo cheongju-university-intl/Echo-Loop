@@ -10,6 +10,7 @@ import 'package:universal_io/io.dart';
 import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
 import '../models/word_timestamp.dart';
+import 'api_log_interceptor.dart';
 import '../utils/srt_generator.dart';
 
 part 'transcription_api_client.g.dart';
@@ -152,13 +153,7 @@ class TranscriptionApiClient {
     SharedPreferences.getInstance().then(
       (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
     );
-    _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        logPrint: (obj) => print('[DIO] $obj'),
-      ),
-    );
+    _dio.interceptors.add(ApiLogInterceptor(tag: 'DIO'));
   }
 
   /// 用于测试的构造函数，允许注入 Dio 实例
@@ -197,8 +192,10 @@ class TranscriptionApiClient {
   }) async {
     final file = File(filePath);
     final fileLength = await file.length();
-    // 直接 PUT 原始字节流到 R2 presigned URL
-    await Dio().put<void>(
+    // 直接 PUT 原始字节流到 R2 presigned URL（挂日志拦截器，便于排查上传失败）
+    final uploadDio = Dio()
+      ..interceptors.add(ApiLogInterceptor(tag: 'R2-UPLOAD'));
+    await uploadDio.put<void>(
       uploadUrl,
       data: file.openRead(),
       options: Options(
