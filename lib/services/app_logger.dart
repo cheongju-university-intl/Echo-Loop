@@ -3,9 +3,15 @@
 /// 环形缓冲区存储最近的日志，供开发者选项中的日志页面查看。
 /// 全局单例，通过 [AppLogger.instance] 访问。
 /// 调用 [AppLogger.log] 记录日志，同时会 print 到控制台。
+///
+/// 此外可通过 [AppLogger.initFileSink] 开启**落盘**：每条日志同步写入文件并
+/// flush，保证崩溃（含 native SIGABRT，进程被杀、内存缓冲丢失）前的日志仍在磁盘上，
+/// 供日志页导出排查。Worker isolate 的日志可用 [AppLogger.formatLine] 按同样格式
+/// 直接追加到同一文件（静态字段不跨 isolate 共享，故 isolate 内需自行写文件）。
 library;
 
 import 'dart:collection';
+import 'dart:io';
 
 /// 单条日志
 class LogEntry {
@@ -20,14 +26,7 @@ class LogEntry {
   });
 
   @override
-  String toString() {
-    final t =
-        '${time.hour.toString().padLeft(2, '0')}:'
-        '${time.minute.toString().padLeft(2, '0')}:'
-        '${time.second.toString().padLeft(2, '0')}.'
-        '${time.millisecond.toString().padLeft(3, '0')}';
-    return '$t [$tag] $message';
-  }
+  String toString() => AppLogger.formatLine(time, tag, message);
 }
 
 /// 应用内日志服务（环形缓冲区，最多保留 500 条）
@@ -36,17 +35,85 @@ class AppLogger {
   static final instance = AppLogger._();
 
   static const _maxEntries = 500;
+
+  /// 落盘日志文件大小上限，超过则在启动时保留尾部，避免无限增长。
+  static const _maxFileBytes = 512 * 1024;
+
   final _entries = Queue<LogEntry>();
   final _listeners = <void Function()>[];
+
+  /// 落盘日志文件路径（[initFileSink] 设置，仅主 isolate 有效）。
+  static String? _filePath;
 
   /// 所有日志条目（只读）
   List<LogEntry> get entries => List.unmodifiable(_entries);
 
-  /// 记录日志并 print 到控制台
+  /// 统一的单行日志格式：`HH:MM:SS.mmm [tag] message`。
+  ///
+  /// 主 isolate 内存缓冲与各 isolate 落盘共用此格式，保证导出后可读、可对齐。
+  static String formatLine(DateTime time, String tag, String message) {
+    final t =
+        '${time.hour.toString().padLeft(2, '0')}:'
+        '${time.minute.toString().padLeft(2, '0')}:'
+        '${time.second.toString().padLeft(2, '0')}.'
+        '${time.millisecond.toString().padLeft(3, '0')}';
+    return '$t [$tag] $message';
+  }
+
+  /// 开启日志落盘（主 isolate 启动时调用一次）。
+  ///
+  /// 超过 [_maxFileBytes] 时只保留尾部，避免文件无限增长。失败静默忽略
+  /// （日志不应影响主流程）。
+  static Future<void> initFileSink(String filePath) async {
+    _filePath = filePath;
+    try {
+      final f = File(filePath);
+      if (await f.exists() && await f.length() > _maxFileBytes) {
+        final content = await f.readAsString();
+        final keep = content.length > _maxFileBytes ~/ 2
+            ? content.substring(content.length - _maxFileBytes ~/ 2)
+            : content;
+        await f.writeAsString('--- 日志已截断，保留尾部 ---\n$keep');
+      }
+    } catch (_) {
+      // 忽略：落盘失败不影响内存日志与主流程。
+    }
+  }
+
+  /// 读取已落盘的完整日志（含 Worker isolate 写入的部分），供日志页导出。
+  ///
+  /// 未开启落盘或读取失败时返回 null，调用方应回退到内存缓冲。
+  static Future<String?> readPersistedLog() async {
+    final path = _filePath;
+    if (path == null) return null;
+    try {
+      final f = File(path);
+      if (!await f.exists()) return null;
+      return await f.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 同步追加一行到落盘文件并 flush，保证崩溃前已落盘。
+  static void _appendToFile(String line) {
+    final path = _filePath;
+    if (path == null) return;
+    try {
+      File(
+        path,
+      ).writeAsStringSync('$line\n', mode: FileMode.append, flush: true);
+    } catch (_) {
+      // 忽略：落盘失败不影响内存日志与主流程。
+    }
+  }
+
+  /// 记录日志：print 到控制台 + 内存缓冲 + 落盘（若已开启）。
   static void log(String tag, String message) {
     final entry = LogEntry(time: DateTime.now(), tag: tag, message: message);
     // ignore: avoid_print
     print(entry);
+    _appendToFile(entry.toString());
     final logger = instance;
     logger._entries.addLast(entry);
     if (logger._entries.length > _maxEntries) {

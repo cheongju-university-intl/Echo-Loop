@@ -33,3 +33,19 @@ Future<Directory> _resolve() async {
   }
   return dir;
 }
+
+/// 持久化日志文件路径（落盘日志，跨进程/跨崩溃保留，供日志页导出）。
+Future<String> appLogFilePath() async {
+  final dir = await getAppDataDirectory();
+  return '${dir.path}/app.log';
+}
+
+/// ASR 推理崩溃面包屑文件路径。
+///
+/// Worker isolate 在调用 native 推理前同步写入、成功后清除；
+/// 若进程在 native 层 abort（SIGABRT，不可捕获）被杀，该文件残留，
+/// 下次启动据此判定"上次疑似崩在 ASR 推理"。
+Future<String> asrCrashMarkerPath() async {
+  final dir = await getAppDataDirectory();
+  return '${dir.path}/asr_crash.marker';
+}

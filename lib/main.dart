@@ -38,6 +38,7 @@ import 'providers/offline_asr_settings_provider.dart';
 import 'services/asr/asr_model_manager.dart';
 import 'services/asr/offline_asr_engine.dart';
 import 'services/app_logger.dart';
+import 'utils/app_data_dir.dart';
 import 'services/speech_practice_platform.dart';
 import 'services/storage_migration_service.dart';
 import 'features/official_collections/data/official_catalog_service.dart';
@@ -50,6 +51,12 @@ import 'features/auth/providers/auth_providers.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initTimeago();
+
+  // 开启日志落盘：每条日志同步写入文件并 flush，崩溃（含 native SIGABRT）前的
+  // 日志仍保留在磁盘，供日志页导出排查。失败静默忽略，不影响启动。
+  try {
+    await AppLogger.initFileSink(await appLogFilePath());
+  } catch (_) {}
 
   final packageInfo = await PackageInfo.fromPlatform();
 
@@ -295,10 +302,12 @@ class _EchoLoopAppState extends ConsumerState<EchoLoopApp>
       supabaseSessionProvider,
       (previous, next) {
         unawaited(
-          ref.read(authAnalyticsSyncProvider).syncSessionChange(
-            previous: previous?.valueOrNull,
-            current: next.valueOrNull,
-          ),
+          ref
+              .read(authAnalyticsSyncProvider)
+              .syncSessionChange(
+                previous: previous?.valueOrNull,
+                current: next.valueOrNull,
+              ),
         );
       },
       fireImmediately: true,

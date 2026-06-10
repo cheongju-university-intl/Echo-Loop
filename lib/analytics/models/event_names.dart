@@ -136,6 +136,9 @@ abstract class Events {
   /// 语音识别设置变更
   static const asrSettingChanged = 'asr_setting_changed';
 
+  /// 疑似上次崩溃在离线 ASR 推理（启动时发现残留面包屑文件）
+  static const asrInferenceCrashSuspected = 'asr_inference_crash_suspected';
+
   // ── 统计查看 ──
   /// 查看今日学习时长明细
   static const studyTimeViewed = 'study_time_viewed';

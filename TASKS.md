@@ -1,7 +1,66 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-10
-> 当前焦点：支持从链接导入音频
+> 当前焦点：修复 Android 结束录音闪退（ASR/NNAPI）
+
+## 已完成：移除独立网盘导入入口
+
+导入音频弹窗不再把“从网盘导入”做成第二个系统文件选择器入口；当前没有真实网盘登录/OAuth 能力前，只保留“从本地文件导入”和“从链接导入”。方式选择页使用短描述“选择手机或网盘中的音频文件”，进入选择文件页后再提示用户先安装并登录对应网盘，且少部分网盘可能不支持从文件选择器中直接选择。
+
+### 实现
+- [x] 导入方式选择页不展示独立“从网盘导入”入口
+- [x] 本地文件入口描述改为“选择手机或网盘中的音频文件”
+- [x] 选择音频文件页增加网盘前置提示：先安装并登录对应网盘，少部分网盘可能不支持从文件选择器中直接选择
+- [x] 清理不再使用的网盘导入本地化 getter
+- [x] 更新 Widget 回归测试：断言网盘入口不展示、本地入口说明包含网盘 App 提示
+
+### 验证
+- [x] `dart format lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`
+- [x] `flutter analyze lib/widgets/import_audio_sheet.dart lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：11 passed
+- [ ] `scripts/check.sh`：本次只改导入入口文案、l10n 和对应 widget 测试，按当前任务收尾规范仅运行直接相关检查，未跑全量检查
+
+**完成时间**: 2026-06-10 14:05 +0800
+
+## 已完成：Android 结束录音闪退兜底 + ASR 落盘日志
+
+上次按"AudioRecord 并发"修（commit `bbbf1c37`）未解决，重新定位到离线 ASR 的 native 推理路径：Android 默认用 NNAPI provider 跑 sherpa-onnx int8 模型，ColorOS/Android 16 的厂商 NNAPI 驱动在 decode 期触发 native abort（SIGABRT，Dart/Java 不可捕获，进程直接被杀）。兜底改为统一 CPU provider 避开崩溃路径；同时把日志落盘、Worker isolate 的 ASR 日志接入同一文件、加 native 推理崩溃面包屑，让无 logcat 的盲发也能自证落点。
+
+### 实现
+- [x] `_platformProvider()` Android 由 `nnapi` 改 `cpu`（保留 `AsrModelConfig.provider` 覆盖能力）
+- [x] `AppLogger` 增加落盘 sink：每条日志同步写文件 + flush，超限保留尾部
+- [x] Worker isolate 的 ASR 日志用 `_workerLog` 直接落盘到同一文件（此前为黑洞）
+- [x] native 推理前同步写崩溃面包屑、成功后 `finally` 清除；启动 `_initializeEngine` 检测残留并记录 + 上报 `asr_inference_crash_suspected`
+- [x] 日志页"复制"导出落盘完整日志（含跨进程历史与 Worker 日志）
+- [x] 新增事件常量 `Events.asrInferenceCrashSuspected`
+
+### 验证
+- [x] `flutter analyze`：改动文件 No issues（其余为仓库既有 warning/info）
+- [x] `flutter test test/services/app_logger_test.dart`：3 passed
+- [x] `flutter test`：2633 passed（11 skipped），无回归
+- [ ] 真机验证（OnePlus Ace 6T）：结束录音不再闪退、转写正常、日志页可见 ASR 全链路日志、杀进程后日志仍在 —— 待出包安装后由用户验证
+
+**完成时间**: 2026-06-10
+
+## 已完成：新增从网盘导入说明入口
+
+导入音频弹窗在 iOS / Android 新增“从网盘导入”入口。该入口先展示移动端说明，提醒用户先安装并登录对应网盘 App，再通过系统文件选择器从“位置/来源”中选择网盘文件；说明下方复用本地导入的同一套选择文件、已选列表、多选和添加流程，并把来源记录为 `cloud_drive`。桌面端不展示该入口，继续使用本地文件导入，因为桌面文件选择器本身已经能看到本机和已同步网盘目录。
+
+### 实现
+- [x] 导入方式选择页在 iOS / Android 新增“从网盘导入”入口，桌面端不展示
+- [x] 新增网盘导入二级说明页，按 iOS / Android 展示不同操作提示
+- [x] 复用本地导入 UI、系统文件选择器和现有音频注册流程，网盘导入记录 `AudioImportSourceType.cloudDrive`
+- [x] `AddAudioDialog` 支持配置导入来源和是否偏好 Downloads 初始目录，网盘导入保留与本地导入一致的选择文件 UI
+- [x] 补充中英文文案和本地化生成文件
+- [x] 补充 Widget 回归测试：桌面端隐藏入口、移动端入口展示、独立边框、说明页复用本地选择文件 UI、返回导入方式选择页
+
+### 验证
+- [x] `dart format lib/widgets/add_audio_dialog.dart lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`
+- [x] `flutter analyze lib/widgets/add_audio_dialog.dart lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：12 passed
+- [ ] `scripts/check.sh`：本次只改导入弹窗 UI、l10n 和对应 widget 测试，按当前任务收尾规范仅运行直接相关检查，未跑全量检查
+
+**完成时间**: 2026-06-10 12:08 +0800
 
 ## 已完成：邮箱验证码错误后停留在验证码页
 

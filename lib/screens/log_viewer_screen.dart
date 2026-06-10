@@ -42,11 +42,19 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
     });
   }
 
-  void _copyAll() {
-    final text = AppLogger.instance.entries.map((e) => e.toString()).join('\n');
-    Clipboard.setData(ClipboardData(text: text));
+  /// 复制日志：优先导出落盘文件（含 Worker isolate 的 ASR 推理日志、跨进程历史），
+  /// 落盘不可用时回退到内存缓冲。
+  Future<void> _copyAll() async {
+    final persisted = await AppLogger.readPersistedLog();
+    final text = (persisted != null && persisted.trim().isNotEmpty)
+        ? persisted
+        : AppLogger.instance.entries.map((e) => e.toString()).join('\n');
+    if (!mounted) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    final label = persisted != null ? '已复制完整日志（含落盘）' : '已复制到剪贴板';
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+      SnackBar(content: Text(label), duration: const Duration(seconds: 1)),
     );
   }
 

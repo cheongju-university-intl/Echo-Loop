@@ -4,6 +4,8 @@
 /// 独立于 [AppSettings]，遵循"Provider 按功能域拆分"原则。
 library;
 
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,11 +13,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
+import '../services/app_logger.dart';
 import '../services/asr/asr_model_manager.dart';
 import '../services/asr/offline_asr_engine.dart';
+import '../utils/app_data_dir.dart';
 import 'asr_engine_provider.dart';
 
 const _enabledKey = 'offline_asr_enabled';
+
+/// 进程内是否已检查过 ASR 崩溃面包屑（只检查一次）。
+bool _asrCrashMarkerChecked = false;
 const _backendKey = 'offline_asr_backend';
 String _downloadCompletedKey(String modelId) =>
     'offline_asr_downloaded_$modelId';
@@ -375,7 +382,29 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
     }
   }
 
+  /// 检查上次是否疑似崩溃在 ASR 推理（残留面包屑），有则记录+上报后清除。
+  ///
+  /// 进程内只检查一次。放在引擎初始化前——即真正再次跑 native 推理之前。
+  Future<void> _reportPreviousAsrCrashIfAny() async {
+    if (_asrCrashMarkerChecked) return;
+    _asrCrashMarkerChecked = true;
+    try {
+      final f = File(await asrCrashMarkerPath());
+      if (!await f.exists()) return;
+      final info = (await f.readAsString()).trim();
+      await f.delete();
+      AppLogger.log('ASRCrash', '⚠ 检测到上次疑似崩溃在 ASR 推理: $info');
+      ref.read(analyticsServiceProvider).track(
+        Events.asrInferenceCrashSuspected,
+        {'detail': info},
+      );
+    } catch (_) {
+      // 忽略：面包屑检查不应影响引擎初始化。
+    }
+  }
+
   Future<void> _initializeEngine(String modelId) async {
+    await _reportPreviousAsrCrashIfAny();
     final engine = ref.read(offlineAsrEngineProvider);
     final modelManager = ref.read(asrModelManagerProvider);
     final modelDir = await modelManager.modelDir(modelId);

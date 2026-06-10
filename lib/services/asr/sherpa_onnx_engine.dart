@@ -14,6 +14,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'audio_file_reader.dart';
 import '../app_logger.dart';
+import '../../utils/app_data_dir.dart';
 import 'offline_asr_engine.dart';
 
 /// sherpa-onnx 离线 ASR 引擎。
@@ -120,10 +121,19 @@ class _AsrWorker {
   ///
   /// 初始化失败时抛出 [StateError]。
   static Future<_AsrWorker> spawn(AsrModelConfig config) async {
+    // 主 isolate 解析路径后传入 Worker：日志落盘 + 崩溃面包屑。
+    final logFilePath = await appLogFilePath();
+    final crashMarkerPath = await asrCrashMarkerPath();
+
     final initPort = ReceivePort();
     final isolate = await Isolate.spawn(
       _isolateEntryPoint,
-      _InitPayload(sendPort: initPort.sendPort, config: config),
+      _InitPayload(
+        sendPort: initPort.sendPort,
+        config: config,
+        logFilePath: logFilePath,
+        crashMarkerPath: crashMarkerPath,
+      ),
     );
 
     final response = await initPort.first;
@@ -175,7 +185,19 @@ class _AsrWorker {
 class _InitPayload {
   final SendPort sendPort;
   final AsrModelConfig config;
-  const _InitPayload({required this.sendPort, required this.config});
+
+  /// 落盘日志文件路径（Worker isolate 内直接追加，静态字段不跨 isolate 共享）。
+  final String? logFilePath;
+
+  /// 崩溃面包屑文件路径（native 推理前同步写、成功后清除）。
+  final String? crashMarkerPath;
+
+  const _InitPayload({
+    required this.sendPort,
+    required this.config,
+    this.logFilePath,
+    this.crashMarkerPath,
+  });
 }
 
 /// 转录请求（主线程 → Worker）。
@@ -211,6 +233,12 @@ class _DisposeRequest {
 /// 可选创建 VAD（用于转录前裁剪静音段），
 /// 然后循环处理转录请求直到收到释放指令。
 void _isolateEntryPoint(_InitPayload init) {
+  final logFilePath = init.logFilePath;
+  final crashMarkerPath = init.crashMarkerPath;
+  // 诊断标识：写入崩溃面包屑，便于区分崩在哪个模型/provider。
+  final diag =
+      'model=${init.config.model.id} '
+      'provider=${init.config.provider ?? _platformProvider()}';
   try {
     sherpa.initBindings();
     final recognizer = _createRecognizer(init.config);
@@ -222,7 +250,14 @@ void _isolateEntryPoint(_InitPayload init) {
 
     commandPort.listen((message) {
       if (message is _TranscribeRequest) {
-        _handleTranscribe(recognizer, vad, message);
+        _handleTranscribe(
+          recognizer,
+          vad,
+          message,
+          logFilePath: logFilePath,
+          crashMarkerPath: crashMarkerPath,
+          diag: diag,
+        );
       } else if (message is _DisposeRequest) {
         vad?.free();
         recognizer.free();
@@ -234,6 +269,43 @@ void _isolateEntryPoint(_InitPayload init) {
     // 初始化失败，把错误信息发回主线程。
     init.sendPort.send('Init failed: $e');
   }
+}
+
+/// Worker isolate 内的日志：print + 直接追加到落盘文件（与主 isolate 同格式）。
+///
+/// 静态 [AppLogger] 字段不跨 isolate 共享，故 Worker 必须自行写文件，
+/// 这样 ASR 推理日志才能进入导出的日志（此前是黑洞）。
+void _workerLog(String? logFilePath, String tag, String message) {
+  final line = AppLogger.formatLine(DateTime.now(), tag, message);
+  // ignore: avoid_print
+  print(line);
+  if (logFilePath == null) return;
+  try {
+    File(
+      logFilePath,
+    ).writeAsStringSync('$line\n', mode: FileMode.append, flush: true);
+  } catch (_) {
+    // 忽略：落盘失败不影响推理。
+  }
+}
+
+/// 在调用 native 推理前同步写崩溃面包屑并 flush。
+///
+/// 若进程在 native 层 abort 被杀，该文件残留，下次启动据此判定"崩在 ASR 推理"。
+void _writeCrashMarker(String? path, String info) {
+  if (path == null) return;
+  try {
+    File(path).writeAsStringSync(info, flush: true);
+  } catch (_) {}
+}
+
+/// 清除崩溃面包屑（native 推理正常返回后调用）。
+void _clearCrashMarker(String? path) {
+  if (path == null) return;
+  try {
+    final f = File(path);
+    if (f.existsSync()) f.deleteSync();
+  } catch (_) {}
 }
 
 /// 创建 Silero VAD 实例（可选）。
@@ -335,8 +407,11 @@ Float32List _concat(List<Float32List> parts, int totalLen) {
 void _handleTranscribe(
   sherpa.OfflineRecognizer recognizer,
   sherpa.VoiceActivityDetector? vad,
-  _TranscribeRequest request,
-) {
+  _TranscribeRequest request, {
+  String? logFilePath,
+  String? crashMarkerPath,
+  String diag = '',
+}) {
   try {
     final audioData = readAudioFile(request.wavPath);
     if (audioData.samples.isEmpty) {
@@ -345,6 +420,19 @@ void _handleTranscribe(
       );
       return;
     }
+
+    // 即将进入 native 推理（VAD + decode）。先写崩溃面包屑：
+    // 若 native abort 杀进程，finally 不会执行，文件残留→下次启动可定位。
+    final durationSec = audioData.samples.length / audioData.sampleRate;
+    _writeCrashMarker(
+      crashMarkerPath,
+      AppLogger.formatLine(
+        DateTime.now(),
+        'ASRCrash',
+        'native 推理中 $diag wav=${request.wavPath} '
+            'audio=${durationSec.toStringAsFixed(1)}s',
+      ),
+    );
 
     // VAD 裁剪静音段（需要 16kHz 输入）。
     if (vad != null && audioData.sampleRate >= _vadSampleRate) {
@@ -359,7 +447,8 @@ void _handleTranscribe(
       }
       final rms = (sumSq / samples16k.length);
       // rms 未开根号，直接用平方均值即可判断量级。
-      AppLogger.log(
+      _workerLog(
+        logFilePath,
         'ASREngine',
         'VAD input: ${beforeSec.toStringAsFixed(1)}s, '
             'rms²=${rms.toStringAsExponential(2)}, '
@@ -381,14 +470,16 @@ void _handleTranscribe(
         (s, seg) => s + seg.length,
       );
       final afterSec = totalSpeechSamples / _vadSampleRate;
-      AppLogger.log(
+      _workerLog(
+        logFilePath,
         'ASREngine',
         'VAD: ${beforeSec.toStringAsFixed(1)}s → ${afterSec.toStringAsFixed(1)}s (${segments.length} segments)',
       );
 
       // 合并小段为 ≤30s 的 chunk，减少 whisper 调用次数。
       final chunks = _mergeSegments(segments, 30 * _vadSampleRate);
-      AppLogger.log(
+      _workerLog(
+        logFilePath,
         'ASREngine',
         '│ ${segments.length} segments → ${chunks.length} chunks',
       );
@@ -433,6 +524,10 @@ void _handleTranscribe(
     }
   } catch (e) {
     request.replyPort.send('Transcribe failed: $e');
+  } finally {
+    // 推理正常结束（含 Dart 异常被捕获）→ 清除面包屑。
+    // 仅当 native abort 杀进程、finally 未执行时，面包屑才残留。
+    _clearCrashMarker(crashMarkerPath);
   }
 }
 
@@ -467,12 +562,17 @@ sherpa.OfflineRecognizer _createRecognizer(AsrModelConfig config) {
   }
 }
 
-/// 获取当前平台的推理加速 provider。
+/// 获取当前平台的推理加速 provider，统一返回 `cpu`。
 ///
 /// iOS/macOS：CoreML 对 int8 量化模型反而更慢，使用 CPU。
-/// Android：尝试 NNAPI（GPU/DSP/NPU 加速），失败时 fallback 到 CPU。
+/// Android：曾用 NNAPI 走厂商 GPU/DSP/NPU 加速，但部分机型（如 OnePlus
+/// ColorOS / Android 16）的 NNAPI 驱动在 onnxruntime int8 推理时触发 native
+/// abort（SIGABRT，Dart/Java 无法捕获，进程直接被杀）。`_createRecognizer`
+/// 的 try/catch 只能兜住构造期 Dart 异常，挡不住 decode 期的 native abort，
+/// 故统一改用 CPU，稳定优先；int8 模型在移动端 CPU 上性能可接受。
+/// 仍可通过 [AsrModelConfig.provider] 显式覆盖（如日后做成设置项重开 NNAPI）。
 String _platformProvider() {
-  if (Platform.isAndroid) return 'nnapi';
+  // if (Platform.isAndroid) return 'nnapi';
   return 'cpu';
 }
 

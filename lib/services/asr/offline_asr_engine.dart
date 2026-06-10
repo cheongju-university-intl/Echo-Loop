@@ -46,7 +46,9 @@ class AsrModelConfig {
 
   /// 推理加速 provider（仅 sherpa-onnx 使用）。
   ///
-  /// null 时自动选择平台默认值（Android: nnapi, 其他: cpu）。
+  /// null 时自动选择平台默认值，当前所有平台均为 cpu
+  /// （Android NNAPI 在部分机型触发 native abort，已统一改用 cpu，详见
+  /// `sherpa_onnx_engine.dart` 的 `_platformProvider`）。
   final String? provider;
 
   /// Silero VAD 模型文件路径（可选）。

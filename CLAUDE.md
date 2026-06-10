@@ -197,3 +197,15 @@ flutter test integration_test -d macos
 - **规则**：所有平台（Android/iOS/macOS）的发布脚本和 CI workflow 都按"tag = 纯 SemVer，versionCode = commit count"约定走。打 tag 前必须先升级 `pubspec.yaml` 的 version 字段（workflow 会强制校验一致）
 - **相关代码**：`scripts/lib/build_number.sh`、`scripts/release_*.sh`、`.github/workflows/release.yml`、`lib/screens/settings_screen.dart`
 - **修复时间**：2026-05-20
+
+### 7.4 离线 ASR：Android NNAPI provider 在部分机型触发 native abort
+
+- **现象**：OnePlus Ace 6T / Android 16 (ColorOS) 跟读/复述点"结束录音"后闪退。先按 AudioRecord 并发改（见 commit `bbbf1c37`）**未解决**——根因不在录音
+- **根因**：Android 固定走离线 sherpa-onnx，`_platformProvider()` 默认返回 `nnapi`。onnxruntime 经厂商 NNAPI 驱动跑 int8 量化模型，ColorOS/Android 16 的 NNAPI 驱动在 `recognizer.decode()` 期触发 native abort（**SIGABRT，Dart/Java try-catch 无法捕获，进程直接被杀**）。`_createRecognizer` 的 try/catch 只能兜住构造期 Dart 异常，挡不住 decode 期的 native abort
+- **解法**：`_platformProvider()` 统一返回 `cpu`，把厂商 NNAPI 驱动整条移出 native 路径（保留 `AsrModelConfig.provider` 覆盖能力）
+- **规则**：
+  - native SIGABRT 是**不可 catch** 的——"兜底不崩"只能靠避开崩溃路径，不能靠包 try-catch
+  - 排查 native 崩溃必须**落盘日志 + 调用前同步 flush**：内存日志（`AppLogger` 环形缓冲）崩溃即丢；Worker isolate 的日志写的是该 isolate 自己的单例，到不了主 isolate 日志页，需在 isolate 内自行写文件（`_workerLog`）
+  - 无 logcat 时用"崩溃面包屑"自证落点：native 调用前同步写 marker 文件、成功后 `finally` 清除；进程被杀则 finally 不执行、marker 残留，下次启动检测并上报 `asr_inference_crash_suspected`
+- **相关代码**：`lib/services/asr/sherpa_onnx_engine.dart`、`lib/services/app_logger.dart`、`lib/providers/offline_asr_settings_provider.dart`、`lib/utils/app_data_dir.dart`
+- **修复时间**：2026-06-10
