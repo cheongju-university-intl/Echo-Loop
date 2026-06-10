@@ -69,6 +69,10 @@ class AudioLibrary extends _$AudioLibrary {
               transcriptLanguage: row.transcriptLanguage,
               remoteAudioId: row.remoteAudioId,
               originalDate: row.originalDate,
+              importSourceType: AudioImportSourceType.fromStorageValue(
+                row.importSourceType,
+              ),
+              importSourceUrl: row.importSourceUrl,
             ),
           )
           .toList();
@@ -371,6 +375,8 @@ class AudioLibrary extends _$AudioLibrary {
         transcriptLanguage: Value(item.transcriptLanguage),
         remoteAudioId: Value(item.remoteAudioId),
         originalDate: Value(item.originalDate),
+        importSourceType: Value(item.importSourceType?.storageValue),
+        importSourceUrl: Value(item.importSourceUrl),
         updatedAt: Value(DateTime.now()),
       ),
     );

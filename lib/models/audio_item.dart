@@ -20,6 +20,38 @@ enum TranscriptSource {
   }
 }
 
+/// 用户导入音频的来源类型。
+///
+/// 精选/官方合集不使用该字段，继续由 `remoteAudioId` 与合集 `source=official`
+/// 表达远端 catalog 身份。
+enum AudioImportSourceType {
+  /// 从设备本地文件导入。
+  local,
+
+  /// 从可直接下载的音频 URL 导入。
+  directUrl,
+
+  /// 从网盘来源导入。当前预留，后续接入网盘解析时使用。
+  cloudDrive;
+
+  String get storageValue {
+    return switch (this) {
+      AudioImportSourceType.local => 'local',
+      AudioImportSourceType.directUrl => 'direct_url',
+      AudioImportSourceType.cloudDrive => 'cloud_drive',
+    };
+  }
+
+  static AudioImportSourceType? fromStorageValue(String? value) {
+    return switch (value) {
+      'local' => AudioImportSourceType.local,
+      'direct_url' => AudioImportSourceType.directUrl,
+      'cloud_drive' => AudioImportSourceType.cloudDrive,
+      _ => null,
+    };
+  }
+}
+
 class AudioItem {
   final String id;
   final String name;
@@ -55,6 +87,16 @@ class AudioItem {
   /// 用户自建音频为 null。供官方合集详情页「最早/最新发布」排序用。
   final DateTime? originalDate;
 
+  /// 用户导入来源类型。
+  ///
+  /// 仅用户导入音频使用；官方/精选合集音频保持 null，避免和 catalog 同步身份混淆。
+  final AudioImportSourceType? importSourceType;
+
+  /// 用户导入来源 URL。
+  ///
+  /// 直链导入记录原始下载 URL；本地文件导入不记录设备绝对路径，保持 null。
+  final String? importSourceUrl;
+
   AudioItem({
     required this.id,
     required this.name,
@@ -70,6 +112,8 @@ class AudioItem {
     this.transcriptLanguage,
     this.remoteAudioId,
     this.originalDate,
+    this.importSourceType,
+    this.importSourceUrl,
   });
 
   /// 音频文件是否已就绪（在本地可播）。
@@ -113,6 +157,8 @@ class AudioItem {
     'transcriptLanguage': transcriptLanguage,
     'remoteAudioId': remoteAudioId,
     'originalDate': originalDate?.toIso8601String(),
+    'importSourceType': importSourceType?.storageValue,
+    'importSourceUrl': importSourceUrl,
   };
 
   factory AudioItem.fromJson(Map<String, dynamic> json) => AudioItem(
@@ -132,6 +178,10 @@ class AudioItem {
     originalDate: json['originalDate'] == null
         ? null
         : DateTime.parse(json['originalDate'] as String),
+    importSourceType: AudioImportSourceType.fromStorageValue(
+      json['importSourceType'] as String?,
+    ),
+    importSourceUrl: json['importSourceUrl'] as String?,
   );
 
   AudioItem copyWith({
@@ -149,6 +199,8 @@ class AudioItem {
     Object? transcriptLanguage = _sentinel,
     Object? remoteAudioId = _sentinel,
     Object? originalDate = _sentinel,
+    Object? importSourceType = _sentinel,
+    Object? importSourceUrl = _sentinel,
   }) {
     return AudioItem(
       id: id ?? this.id,
@@ -177,6 +229,12 @@ class AudioItem {
       originalDate: originalDate == _sentinel
           ? this.originalDate
           : originalDate as DateTime?,
+      importSourceType: importSourceType == _sentinel
+          ? this.importSourceType
+          : importSourceType as AudioImportSourceType?,
+      importSourceUrl: importSourceUrl == _sentinel
+          ? this.importSourceUrl
+          : importSourceUrl as String?,
     );
   }
 }

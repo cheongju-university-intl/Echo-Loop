@@ -134,6 +134,7 @@
       }
     }
   },
+  "back": "Back",
   "ok": "OK",
   "addedOn": "Added: {date}",
   "@addedOn": {
@@ -1744,5 +1745,24 @@
   "subtitleEditsSaved": "Subtitle changes saved.",
   "discardSubtitleEditsTitle": "Discard changes?",
   "discardSubtitleEditsMessage": "Your subtitle changes have not been saved.",
-  "discard": "Discard"
+  "discard": "Discard",
+  "importAudio": "Import Audio",
+  "importAudioFromFile": "Import from File",
+  "importAudioFromFileDescription": "Select audio files from this device",
+  "importAudioFromUrl": "Import from Link",
+  "importAudioFromUrlDescription": "Paste a direct audio link and download it",
+  "audioUrlLabel": "Audio link",
+  "audioUrlHint": "https://example.com/audio.mp3",
+  "pasteAudioLink": "Paste Link",
+  "audioClipboardNoValidLink": "Clipboard does not contain a valid link",
+  "downloadAndImportAudio": "Download and Import",
+  "audioUrlInvalid": "Enter a valid audio link",
+  "audioUrlUnsupported": "This link is not a supported audio format",
+  "audioUrlNotDirectAudio": "This link is not a direct audio file",
+  "audioUrlDuplicate": "An audio item with this name already exists",
+  "audioDownloadFailed": "Failed to download audio",
+  "audioDownloadInProgress": "Downloading audio",
+  "audioImportComplete": "Import complete",
+  "audioImportCanceled": "Audio import canceled",
+  "cancelDownload": "Cancel Download"
 }

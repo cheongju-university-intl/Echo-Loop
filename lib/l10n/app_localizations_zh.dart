@@ -335,6 +335,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get back => '返回';
+
+  @override
   String get ok => '确定';
 
   @override
@@ -3411,4 +3414,61 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get discard => '放弃';
+
+  @override
+  String get importAudio => '导入音频';
+
+  @override
+  String get importAudioFromFile => '从本地文件导入';
+
+  @override
+  String get importAudioFromFileDescription => '选择设备上的音频文件';
+
+  @override
+  String get importAudioFromUrl => '从链接导入';
+
+  @override
+  String get importAudioFromUrlDescription => '粘贴音频直链，下载后加入资源库';
+
+  @override
+  String get audioUrlLabel => '音频链接';
+
+  @override
+  String get audioUrlHint => 'https://example.com/audio.mp3';
+
+  @override
+  String get pasteAudioLink => '粘贴链接';
+
+  @override
+  String get audioClipboardNoValidLink => '剪切板中没有可用链接';
+
+  @override
+  String get downloadAndImportAudio => '下载并导入';
+
+  @override
+  String get audioUrlInvalid => '请输入有效的音频链接';
+
+  @override
+  String get audioUrlUnsupported => '链接不是支持的音频格式';
+
+  @override
+  String get audioUrlNotDirectAudio => '该链接不是可直接下载的音频文件';
+
+  @override
+  String get audioUrlDuplicate => '已存在同名音频';
+
+  @override
+  String get audioDownloadFailed => '下载音频失败';
+
+  @override
+  String get audioDownloadInProgress => '正在下载音频';
+
+  @override
+  String get audioImportComplete => '导入完成';
+
+  @override
+  String get audioImportCanceled => '已取消音频导入';
+
+  @override
+  String get cancelDownload => '取消下载';
 }

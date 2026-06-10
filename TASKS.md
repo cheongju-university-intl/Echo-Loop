@@ -1,7 +1,7 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-09
-> 当前焦点：限制开发者时光机只能跳到未来
+> 最后更新：2026-06-10
+> 当前焦点：支持从链接导入音频
 
 ## 已完成：邮箱验证码错误后停留在验证码页
 
@@ -59,6 +59,49 @@
 - [x] `scripts/check.sh`：`flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2609 passed、11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，`asr_engine_test.dart` / `app_test.dart` 失败在本地 debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次通知调度修复无关
 
 **完成时间**: 2026-06-09 12:14 +0800
+
+## 已完成：支持从链接导入音频
+
+音频导入入口现在同时支持本地文件和音频直链。链接导入会先解析并校验 `http/https` 音频 URL，再下载到应用沙盒，随后与本地文件导入共用同一个沙盒音频注册流程，复用现有音频库、合集关联和字幕提示流程。下载实现收敛在独立 `AudioImportService` 中，未来 podcast RSS 解析只需把单集 enclosure 规整为直链来源，即可复用当前下载与入库流程。
+
+### 实现
+- [x] 新增模块化链接导入 feature：模型、下载服务、共享注册服务、Riverpod controller 和生成 provider
+- [x] 下载服务支持 URL 校验、HEAD 元数据探测、音频格式判断、沙盒 `.part` 临时文件、最终文件唯一命名、时长读取和 SHA256 指纹计算
+- [x] 本地导入和链接下载统一调用 `AudioRegistrationService` 创建 `AudioItem`、写入 `AudioLibrary.addAudioItem()` 并关联合集，避免两套数据库入库流程
+- [x] 新增 `import_source_type` / `import_source_url` 字段：本地导入记录 `local` 且不保存设备绝对路径；直链导入记录 `direct_url` 和原始 URL；预留 `cloud_drive`
+- [x] 新增统一导入入口底部弹窗，保留本地文件导入，并新增链接导入表单、下载进度、取消和内联错误状态
+- [x] 统一导入 UI/交互：本地文件、链接导入和导入完成页都在同一个底部 sheet 流程内切换；二级页面可返回导入方式选择，不再混用中间 dialog 和底部 sheet
+- [x] 音频库、音频空态、合集详情添加入口统一接入新导入弹窗
+- [x] 链接导入成功后复用现有字幕添加提示；合集入口同名音频会关联已有音频，避免重复下载
+- [x] 补充中英文文案和本地化生成文件
+- [x] 修复链接导入表单空闲态底部按钮与本地导入不一致：未下载时显示“返回”并回到导入方式选择页，下载中仍保留取消下载并停留在链接页
+- [x] 优化链接导入粘贴流程：进入页面不再自动弹出键盘，新增“粘贴链接”按钮，剪切板为空或不是 `http/https` 链接时显示内联提示，粘贴成功后仍由用户确认下载
+- [x] 优化“粘贴链接”视觉样式：从突兀的大号描边按钮改为输入框下方右侧轻量文本操作，降低表单噪音并保留图标提示
+- [x] 抽取通用 `SecondaryActionButton`：统一底部操作区弱化按钮样式，本地导入和链接导入复用同一组件
+
+### 验证
+- [x] `flutter analyze lib/features/audio_import lib/widgets/add_audio_dialog.dart lib/widgets/import_audio_sheet.dart test/features/audio_import/audio_import_service_test.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/features/audio_import/audio_import_service_test.dart test/widgets/import_audio_sheet_test.dart`：10 passed
+- [x] `flutter analyze lib/models/audio_item.dart lib/features/audio_import lib/widgets/add_audio_dialog.dart lib/widgets/import_audio_sheet.dart lib/database/app_database.dart lib/database/tables/audio_items.dart lib/providers/audio_library_provider.dart test/models/audio_item_test.dart test/features/audio_import/audio_import_service_test.dart test/database/v36_to_v37_migration_test.dart`：No issues found
+- [x] `flutter test test/models/audio_item_test.dart test/features/audio_import/audio_import_service_test.dart test/widgets/import_audio_sheet_test.dart test/database/v36_to_v37_migration_test.dart`：58 passed
+- [x] `flutter analyze lib/widgets/import_audio_sheet.dart lib/widgets/add_audio_dialog.dart lib/screens/library_screen.dart lib/screens/collection_detail_screen.dart lib/widgets/audio_list_view.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart test/features/audio_import/audio_import_service_test.dart test/models/audio_item_test.dart test/database/v36_to_v37_migration_test.dart`：59 passed
+- [x] `flutter test test/widgets/audio_list_view_sort_test.dart test/screens/collection_screen_test.dart test/widgets/import_audio_sheet_test.dart test/features/audio_import/audio_import_service_test.dart`：全部通过
+- [x] `dart format lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart`
+- [x] `flutter analyze lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：6 passed
+- [x] `dart format lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`
+- [x] `flutter analyze lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：8 passed
+- [x] `dart format lib/widgets/import_audio_sheet.dart`
+- [x] `flutter analyze lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：8 passed
+- [x] `dart format lib/widgets/common/secondary_action_button.dart lib/widgets/import_audio_sheet.dart lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart`
+- [x] `flutter analyze lib/widgets/common/secondary_action_button.dart lib/widgets/import_audio_sheet.dart lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：8 passed
+- [x] `scripts/check.sh`：`flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2623 passed、11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，`asr_engine_test.dart` / `app_test.dart` 失败在本地 debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次链接导入和导入 UI 改动无直接关联
+
+**完成时间**: 2026-06-10 09:37 +0800
 
 ## 已完成：修复 Android 首次学习完成后通知权限弹窗不出现
 

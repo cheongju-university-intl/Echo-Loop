@@ -70,6 +70,14 @@ class AudioItems extends Table {
   /// 用户自建音频保持 NULL。用于官方合集详情页「最早/最新发布」排序。
   DateTimeColumn get originalDate => dateTime().nullable()();
 
+  /// 用户导入来源类型：local / direct_url / cloud_drive。
+  ///
+  /// 官方/精选合集不使用该字段，继续由 remoteAudioId 和 collections.source 标识。
+  TextColumn get importSourceType => text().nullable()();
+
+  /// 用户导入来源 URL。直链导入记录原始 URL；本地文件导入保持 NULL。
+  TextColumn get importSourceUrl => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

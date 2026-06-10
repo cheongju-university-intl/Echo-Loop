@@ -734,6 +734,12 @@ abstract class AppLocalizations {
   /// **'An audio file named \"{name}\" already exists. Please delete the original audio first.'**
   String fileExistsMessage(String name);
 
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
   /// No description provided for @ok.
   ///
   /// In en, this message translates to:
@@ -6337,6 +6343,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Discard'**
   String get discard;
+
+  /// No description provided for @importAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Audio'**
+  String get importAudio;
+
+  /// No description provided for @importAudioFromFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from File'**
+  String get importAudioFromFile;
+
+  /// No description provided for @importAudioFromFileDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Select audio files from this device'**
+  String get importAudioFromFileDescription;
+
+  /// No description provided for @importAudioFromUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Link'**
+  String get importAudioFromUrl;
+
+  /// No description provided for @importAudioFromUrlDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a direct audio link and download it'**
+  String get importAudioFromUrlDescription;
+
+  /// No description provided for @audioUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio link'**
+  String get audioUrlLabel;
+
+  /// No description provided for @audioUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://example.com/audio.mp3'**
+  String get audioUrlHint;
+
+  /// No description provided for @pasteAudioLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste Link'**
+  String get pasteAudioLink;
+
+  /// No description provided for @audioClipboardNoValidLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard does not contain a valid link'**
+  String get audioClipboardNoValidLink;
+
+  /// No description provided for @downloadAndImportAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and Import'**
+  String get downloadAndImportAudio;
+
+  /// No description provided for @audioUrlInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid audio link'**
+  String get audioUrlInvalid;
+
+  /// No description provided for @audioUrlUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This link is not a supported audio format'**
+  String get audioUrlUnsupported;
+
+  /// No description provided for @audioUrlNotDirectAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'This link is not a direct audio file'**
+  String get audioUrlNotDirectAudio;
+
+  /// No description provided for @audioUrlDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'An audio item with this name already exists'**
+  String get audioUrlDuplicate;
+
+  /// No description provided for @audioDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to download audio'**
+  String get audioDownloadFailed;
+
+  /// No description provided for @audioDownloadInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading audio'**
+  String get audioDownloadInProgress;
+
+  /// No description provided for @audioImportComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Import complete'**
+  String get audioImportComplete;
+
+  /// No description provided for @audioImportCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio import canceled'**
+  String get audioImportCanceled;
+
+  /// No description provided for @cancelDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Download'**
+  String get cancelDownload;
 }
 
 class _AppLocalizationsDelegate

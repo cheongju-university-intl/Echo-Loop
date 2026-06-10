@@ -14,6 +14,8 @@ void main() {
       TranscriptSource? transcriptSource,
       String? audioSha256,
       String? transcriptLanguage,
+      AudioImportSourceType? importSourceType,
+      String? importSourceUrl,
     }) {
       return AudioItem(
         id: 'audio-1',
@@ -28,6 +30,8 @@ void main() {
         transcriptSource: transcriptSource,
         audioSha256: audioSha256,
         transcriptLanguage: transcriptLanguage,
+        importSourceType: importSourceType,
+        importSourceUrl: importSourceUrl,
       );
     }
 
@@ -46,6 +50,18 @@ void main() {
         expect(restored.sentenceCount, item.sentenceCount);
         expect(restored.wordCount, item.wordCount);
         expect(restored.isPinned, item.isPinned);
+      });
+
+      test('导入来源字段往返一致', () {
+        final item = createSample(
+          importSourceType: AudioImportSourceType.directUrl,
+          importSourceUrl: 'https://example.com/audio.mp3',
+        );
+        final json = item.toJson();
+        final restored = AudioItem.fromJson(json);
+
+        expect(restored.importSourceType, AudioImportSourceType.directUrl);
+        expect(restored.importSourceUrl, 'https://example.com/audio.mp3');
       });
 
       test('isPinned=true 往返一致', () {
@@ -97,6 +113,20 @@ void main() {
         // 未修改的字段保持不变
         expect(copied.id, item.id);
         expect(copied.name, item.name);
+      });
+
+      test('导入来源支持显式清空', () {
+        final item = createSample(
+          importSourceType: AudioImportSourceType.directUrl,
+          importSourceUrl: 'https://example.com/audio.mp3',
+        );
+        final copied = item.copyWith(
+          importSourceType: null,
+          importSourceUrl: null,
+        );
+
+        expect(copied.importSourceType, isNull);
+        expect(copied.importSourceUrl, isNull);
       });
 
       test('不传参数时保持原值', () {

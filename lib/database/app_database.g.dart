@@ -222,6 +222,28 @@ class $AudioItemsTable extends AudioItems
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _importSourceTypeMeta = const VerificationMeta(
+    'importSourceType',
+  );
+  @override
+  late final GeneratedColumn<String> importSourceType = GeneratedColumn<String>(
+    'import_source_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _importSourceUrlMeta = const VerificationMeta(
+    'importSourceUrl',
+  );
+  @override
+  late final GeneratedColumn<String> importSourceUrl = GeneratedColumn<String>(
+    'import_source_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -243,6 +265,8 @@ class $AudioItemsTable extends AudioItems
     syncStatus,
     remoteAudioId,
     originalDate,
+    importSourceType,
+    importSourceUrl,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -405,6 +429,24 @@ class $AudioItemsTable extends AudioItems
         ),
       );
     }
+    if (data.containsKey('import_source_type')) {
+      context.handle(
+        _importSourceTypeMeta,
+        importSourceType.isAcceptableOrUnknown(
+          data['import_source_type']!,
+          _importSourceTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('import_source_url')) {
+      context.handle(
+        _importSourceUrlMeta,
+        importSourceUrl.isAcceptableOrUnknown(
+          data['import_source_url']!,
+          _importSourceUrlMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -490,6 +532,14 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.dateTime,
         data['${effectivePrefix}original_date'],
       ),
+      importSourceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}import_source_type'],
+      ),
+      importSourceUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}import_source_url'],
+      ),
     );
   }
 
@@ -567,6 +617,14 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 原始发布/播出日期。官方合集音频从后端 catalog 同步（如 VOA 某期的播出日期）；
   /// 用户自建音频保持 NULL。用于官方合集详情页「最早/最新发布」排序。
   final DateTime? originalDate;
+
+  /// 用户导入来源类型：local / direct_url / cloud_drive。
+  ///
+  /// 官方/精选合集不使用该字段，继续由 remoteAudioId 和 collections.source 标识。
+  final String? importSourceType;
+
+  /// 用户导入来源 URL。直链导入记录原始 URL；本地文件导入保持 NULL。
+  final String? importSourceUrl;
   const AudioItem({
     required this.id,
     required this.name,
@@ -587,6 +645,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     required this.syncStatus,
     this.remoteAudioId,
     this.originalDate,
+    this.importSourceType,
+    this.importSourceUrl,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -629,6 +689,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     }
     if (!nullToAbsent || originalDate != null) {
       map['original_date'] = Variable<DateTime>(originalDate);
+    }
+    if (!nullToAbsent || importSourceType != null) {
+      map['import_source_type'] = Variable<String>(importSourceType);
+    }
+    if (!nullToAbsent || importSourceUrl != null) {
+      map['import_source_url'] = Variable<String>(importSourceUrl);
     }
     return map;
   }
@@ -674,6 +740,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       originalDate: originalDate == null && nullToAbsent
           ? const Value.absent()
           : Value(originalDate),
+      importSourceType: importSourceType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(importSourceType),
+      importSourceUrl: importSourceUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(importSourceUrl),
     );
   }
 
@@ -706,6 +778,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
       remoteAudioId: serializer.fromJson<String?>(json['remoteAudioId']),
       originalDate: serializer.fromJson<DateTime?>(json['originalDate']),
+      importSourceType: serializer.fromJson<String?>(json['importSourceType']),
+      importSourceUrl: serializer.fromJson<String?>(json['importSourceUrl']),
     );
   }
   @override
@@ -731,6 +805,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'syncStatus': serializer.toJson<int>(syncStatus),
       'remoteAudioId': serializer.toJson<String?>(remoteAudioId),
       'originalDate': serializer.toJson<DateTime?>(originalDate),
+      'importSourceType': serializer.toJson<String?>(importSourceType),
+      'importSourceUrl': serializer.toJson<String?>(importSourceUrl),
     };
   }
 
@@ -754,6 +830,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     int? syncStatus,
     Value<String?> remoteAudioId = const Value.absent(),
     Value<DateTime?> originalDate = const Value.absent(),
+    Value<String?> importSourceType = const Value.absent(),
+    Value<String?> importSourceUrl = const Value.absent(),
   }) => AudioItem(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -786,6 +864,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
         ? remoteAudioId.value
         : this.remoteAudioId,
     originalDate: originalDate.present ? originalDate.value : this.originalDate,
+    importSourceType: importSourceType.present
+        ? importSourceType.value
+        : this.importSourceType,
+    importSourceUrl: importSourceUrl.present
+        ? importSourceUrl.value
+        : this.importSourceUrl,
   );
   AudioItem copyWithCompanion(AudioItemsCompanion data) {
     return AudioItem(
@@ -830,6 +914,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       originalDate: data.originalDate.present
           ? data.originalDate.value
           : this.originalDate,
+      importSourceType: data.importSourceType.present
+          ? data.importSourceType.value
+          : this.importSourceType,
+      importSourceUrl: data.importSourceUrl.present
+          ? data.importSourceUrl.value
+          : this.importSourceUrl,
     );
   }
 
@@ -854,13 +944,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('transcriptSrt: $transcriptSrt, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('remoteAudioId: $remoteAudioId, ')
-          ..write('originalDate: $originalDate')
+          ..write('originalDate: $originalDate, ')
+          ..write('importSourceType: $importSourceType, ')
+          ..write('importSourceUrl: $importSourceUrl')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     name,
     audioPath,
@@ -880,7 +972,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     syncStatus,
     remoteAudioId,
     originalDate,
-  );
+    importSourceType,
+    importSourceUrl,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -903,7 +997,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.transcriptSrt == this.transcriptSrt &&
           other.syncStatus == this.syncStatus &&
           other.remoteAudioId == this.remoteAudioId &&
-          other.originalDate == this.originalDate);
+          other.originalDate == this.originalDate &&
+          other.importSourceType == this.importSourceType &&
+          other.importSourceUrl == this.importSourceUrl);
 }
 
 class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
@@ -926,6 +1022,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<int> syncStatus;
   final Value<String?> remoteAudioId;
   final Value<DateTime?> originalDate;
+  final Value<String?> importSourceType;
+  final Value<String?> importSourceUrl;
   final Value<int> rowid;
   const AudioItemsCompanion({
     this.id = const Value.absent(),
@@ -947,6 +1045,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.syncStatus = const Value.absent(),
     this.remoteAudioId = const Value.absent(),
     this.originalDate = const Value.absent(),
+    this.importSourceType = const Value.absent(),
+    this.importSourceUrl = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AudioItemsCompanion.insert({
@@ -969,6 +1069,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.syncStatus = const Value.absent(),
     this.remoteAudioId = const Value.absent(),
     this.originalDate = const Value.absent(),
+    this.importSourceType = const Value.absent(),
+    this.importSourceUrl = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -994,6 +1096,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<int>? syncStatus,
     Expression<String>? remoteAudioId,
     Expression<DateTime>? originalDate,
+    Expression<String>? importSourceType,
+    Expression<String>? importSourceUrl,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1017,6 +1121,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (syncStatus != null) 'sync_status': syncStatus,
       if (remoteAudioId != null) 'remote_audio_id': remoteAudioId,
       if (originalDate != null) 'original_date': originalDate,
+      if (importSourceType != null) 'import_source_type': importSourceType,
+      if (importSourceUrl != null) 'import_source_url': importSourceUrl,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1041,6 +1147,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<int>? syncStatus,
     Value<String?>? remoteAudioId,
     Value<DateTime?>? originalDate,
+    Value<String?>? importSourceType,
+    Value<String?>? importSourceUrl,
     Value<int>? rowid,
   }) {
     return AudioItemsCompanion(
@@ -1063,6 +1171,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       syncStatus: syncStatus ?? this.syncStatus,
       remoteAudioId: remoteAudioId ?? this.remoteAudioId,
       originalDate: originalDate ?? this.originalDate,
+      importSourceType: importSourceType ?? this.importSourceType,
+      importSourceUrl: importSourceUrl ?? this.importSourceUrl,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1127,6 +1237,12 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     if (originalDate.present) {
       map['original_date'] = Variable<DateTime>(originalDate.value);
     }
+    if (importSourceType.present) {
+      map['import_source_type'] = Variable<String>(importSourceType.value);
+    }
+    if (importSourceUrl.present) {
+      map['import_source_url'] = Variable<String>(importSourceUrl.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1155,6 +1271,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('syncStatus: $syncStatus, ')
           ..write('remoteAudioId: $remoteAudioId, ')
           ..write('originalDate: $originalDate, ')
+          ..write('importSourceType: $importSourceType, ')
+          ..write('importSourceUrl: $importSourceUrl, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10230,6 +10348,8 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<int> syncStatus,
       Value<String?> remoteAudioId,
       Value<DateTime?> originalDate,
+      Value<String?> importSourceType,
+      Value<String?> importSourceUrl,
       Value<int> rowid,
     });
 typedef $$AudioItemsTableUpdateCompanionBuilder =
@@ -10253,6 +10373,8 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<int> syncStatus,
       Value<String?> remoteAudioId,
       Value<DateTime?> originalDate,
+      Value<String?> importSourceType,
+      Value<String?> importSourceUrl,
       Value<int> rowid,
     });
 
@@ -10544,6 +10666,16 @@ class $$AudioItemsTableFilterComposer
 
   ColumnFilters<DateTime> get originalDate => $composableBuilder(
     column: $table.originalDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get importSourceType => $composableBuilder(
+    column: $table.importSourceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get importSourceUrl => $composableBuilder(
+    column: $table.importSourceUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10851,6 +10983,16 @@ class $$AudioItemsTableOrderingComposer
     column: $table.originalDate,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get importSourceType => $composableBuilder(
+    column: $table.importSourceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get importSourceUrl => $composableBuilder(
+    column: $table.importSourceUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AudioItemsTableAnnotationComposer
@@ -10938,6 +11080,16 @@ class $$AudioItemsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get originalDate => $composableBuilder(
     column: $table.originalDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get importSourceType => $composableBuilder(
+    column: $table.importSourceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get importSourceUrl => $composableBuilder(
+    column: $table.importSourceUrl,
     builder: (column) => column,
   );
 
@@ -11200,6 +11352,8 @@ class $$AudioItemsTableTableManager
                 Value<int> syncStatus = const Value.absent(),
                 Value<String?> remoteAudioId = const Value.absent(),
                 Value<DateTime?> originalDate = const Value.absent(),
+                Value<String?> importSourceType = const Value.absent(),
+                Value<String?> importSourceUrl = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AudioItemsCompanion(
                 id: id,
@@ -11221,6 +11375,8 @@ class $$AudioItemsTableTableManager
                 syncStatus: syncStatus,
                 remoteAudioId: remoteAudioId,
                 originalDate: originalDate,
+                importSourceType: importSourceType,
+                importSourceUrl: importSourceUrl,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11244,6 +11400,8 @@ class $$AudioItemsTableTableManager
                 Value<int> syncStatus = const Value.absent(),
                 Value<String?> remoteAudioId = const Value.absent(),
                 Value<DateTime?> originalDate = const Value.absent(),
+                Value<String?> importSourceType = const Value.absent(),
+                Value<String?> importSourceUrl = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AudioItemsCompanion.insert(
                 id: id,
@@ -11265,6 +11423,8 @@ class $$AudioItemsTableTableManager
                 syncStatus: syncStatus,
                 remoteAudioId: remoteAudioId,
                 originalDate: originalDate,
+                importSourceType: importSourceType,
+                importSourceUrl: importSourceUrl,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

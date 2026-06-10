@@ -5,17 +5,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/audio_item.dart';
-import '../models/collection.dart';
 import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/new_user_guide_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
-import '../widgets/add_audio_dialog.dart';
 import '../providers/audio_list_settings_provider.dart';
 import '../widgets/audio_list_view.dart';
 import '../widgets/guide_flow.dart';
-import '../widgets/manage_subtitles_sheet.dart';
+import '../widgets/import_audio_sheet.dart';
 
 /// 合集详情页面 - 展示合集中的音频，支持上传音频
 class CollectionDetailScreen extends ConsumerStatefulWidget {
@@ -103,7 +101,10 @@ class _CollectionDetailScreenState
                 step: stepUpload,
                 child: IconButton(
                   icon: const Icon(Icons.add),
-                  onPressed: () => _showAddAudioDialog(context, collection),
+                  onPressed: () => showImportAudioSheet(
+                    context,
+                    collectionId: collection.id,
+                  ),
                 ),
               ),
           ],
@@ -127,66 +128,15 @@ class _CollectionDetailScreenState
                 )
               : _CollectionEmptyState(
                   l10n: l10n,
-                  onAdd: () => _showAddAudioDialog(context, collection),
+                  onAdd: () => showImportAudioSheet(
+                    context,
+                    collectionId: collection.id,
+                  ),
                 ),
         ),
       ),
     );
   }
-
-  /// 显示添加音频对话框，添加成功后弹字幕确认
-  void _showAddAudioDialog(BuildContext context, Collection collection) async {
-    final results = await showDialog<List<AudioItem>>(
-      context: context,
-      builder: (context) => AddAudioDialog(collectionId: collection.id),
-    );
-    if (results == null || results.isEmpty || !context.mounted) return;
-
-    if (results.length == 1) {
-      // 单文件：保持字幕提示流程
-      final l10n = AppLocalizations.of(context)!;
-      final wantSubtitle = await _showSubtitlePrompt(context, l10n);
-      if (wantSubtitle && context.mounted) {
-        showModalBottomSheet(
-          context: context,
-          builder: (_) => ManageSubtitlesSheet(audioItem: results.first),
-        );
-      }
-    } else {
-      // 多文件：显示成功提示
-      if (context.mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.multipleAudioAdded(results.length))),
-        );
-      }
-    }
-  }
-}
-
-/// 添加音频后弹出字幕确认对话框
-Future<bool> _showSubtitlePrompt(
-  BuildContext context,
-  AppLocalizations l10n,
-) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(l10n.addSubtitlePromptTitle),
-      content: Text(l10n.addSubtitlePromptMessage),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(l10n.addSubtitle),
-        ),
-      ],
-    ),
-  );
-  return result ?? false;
 }
 
 /// 合集空状态视图

@@ -85,7 +85,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 36;
+  static const currentSchemaVersion = 37;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -511,6 +511,19 @@ class AppDatabase extends _$AppDatabase {
         // 仅加列，不做文件 IO；旧行内容由启动时全量 backfill 从文件读入。
         if (from < 36) {
           await _addColumnIfNotExists('audio_items', 'transcript_srt', 'TEXT');
+        }
+        // v36→v37：audio_items 新增用户导入来源字段。
+        if (from < 37) {
+          await _addColumnIfNotExists(
+            'audio_items',
+            'import_source_type',
+            'TEXT',
+          );
+          await _addColumnIfNotExists(
+            'audio_items',
+            'import_source_url',
+            'TEXT',
+          );
         }
       },
     );

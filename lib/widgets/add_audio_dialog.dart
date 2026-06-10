@@ -16,12 +16,12 @@ import 'package:universal_io/io.dart';
 import '../utils/app_data_dir.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
-import 'package:uuid/uuid.dart';
+import '../features/audio_import/audio_registration_service.dart';
 import '../models/audio_item.dart';
 import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
-import '../utils/audio_duration.dart';
+import 'common/secondary_action_button.dart';
 
 /// 已选中的音频文件信息
 typedef _PickedAudio = ({
@@ -49,8 +49,17 @@ class _InlineError {
 class AddAudioDialog extends ConsumerStatefulWidget {
   /// 合集 ID（为 null 时显示合集下拉框）
   final String? collectionId;
+  final bool embedded;
+  final VoidCallback? onBack;
+  final ValueChanged<List<AudioItem>>? onComplete;
 
-  const AddAudioDialog({super.key, this.collectionId});
+  const AddAudioDialog({
+    super.key,
+    this.collectionId,
+    this.embedded = false,
+    this.onBack,
+    this.onComplete,
+  });
 
   @override
   ConsumerState<AddAudioDialog> createState() => _AddAudioDialogState();
@@ -97,6 +106,10 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
+    if (widget.embedded) {
+      return _buildEmbeddedPanel(l10n, colorScheme);
+    }
+
     // 自适应宽度：默认 AlertDialog 在窄屏（如 360dp 手机）会被 insetPadding 挤到
     // 极窄，文件名只能显示省略号；这里把侧边 inset 收紧到 16dp，并按屏幕宽度的
     // 90% 取宽（封顶 560dp，符合 Material 3 dialog 上限）。
@@ -110,104 +123,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       ),
       content: SizedBox(
         width: dialogWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _pickAudioFiles,
-                icon: const Icon(Icons.audiotrack),
-                label: Text(l10n.selectAudioFile),
-              ),
-            ),
-            // 内联错误提示（淡入 + 上滑，6 秒自动消失）
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, anim) => FadeTransition(
-                  opacity: anim,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, -0.08),
-                      end: Offset.zero,
-                    ).animate(anim),
-                    child: child,
-                  ),
-                ),
-                child: _error == null
-                    ? const SizedBox(
-                        key: ValueKey('no-err'),
-                        width: double.infinity,
-                      )
-                    : Padding(
-                        key: ValueKey(_error!.message),
-                        padding: const EdgeInsets.only(top: 12),
-                        child: _buildInlineErrorCard(
-                          Theme.of(context),
-                          l10n,
-                          _error!,
-                        ),
-                      ),
-              ),
-            ),
-            // 已选文件列表
-            if (_pickedFiles.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              // 多文件时显示文件数量 + 总大小
-              if (_pickedFiles.length > 1)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    '${l10n.filesSelected(_pickedFiles.length)}'
-                    '  ·  ${_formatFileSize(_pickedFiles.fold<int>(0, (sum, f) => sum + f.fileSize))}',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 240),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: _pickedFiles.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 2),
-                    itemBuilder: (context, index) {
-                      final file = _pickedFiles[index];
-                      return _buildFileRow(file, index, colorScheme);
-                    },
-                  ),
-                ),
-              ),
-            ],
-            // 加载进度
-            if (_isLoading && _pickedFiles.length > 1) ...[
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: _processedCount / _pickedFiles.length,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                AppLocalizations.of(
-                  context,
-                )!.processingFileOf(_processedCount + 1, _pickedFiles.length),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            // 无 collectionId 时显示合集下拉框
-            if (widget.collectionId == null) ...[
-              const SizedBox(height: 16),
-              _buildCollectionDropdown(l10n),
-            ],
-          ],
-        ),
+        child: _buildContent(l10n, colorScheme),
       ),
       actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       actions: [
@@ -236,6 +152,147 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildEmbeddedPanel(AppLocalizations l10n, ColorScheme colorScheme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildContent(l10n, colorScheme, maxFileListHeight: 220),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: SecondaryActionButton(
+                onPressed: _isLoading
+                    ? null
+                    : (widget.onBack ?? () => Navigator.pop(context)),
+                label: l10n.back,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton(
+                onPressed: _pickedFiles.isEmpty || _isLoading
+                    ? null
+                    : _addAudio,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.add),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(
+    AppLocalizations l10n,
+    ColorScheme colorScheme, {
+    double maxFileListHeight = 240,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: ElevatedButton.icon(
+            onPressed: _isLoading ? null : _pickAudioFiles,
+            icon: const Icon(Icons.audiotrack),
+            label: Text(l10n.selectAudioFile),
+          ),
+        ),
+        // 内联错误提示（淡入 + 上滑，6 秒自动消失）
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, -0.08),
+                  end: Offset.zero,
+                ).animate(anim),
+                child: child,
+              ),
+            ),
+            child: _error == null
+                ? const SizedBox(
+                    key: ValueKey('no-err'),
+                    width: double.infinity,
+                  )
+                : Padding(
+                    key: ValueKey(_error!.message),
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _buildInlineErrorCard(
+                      Theme.of(context),
+                      l10n,
+                      _error!,
+                    ),
+                  ),
+          ),
+        ),
+        // 已选文件列表
+        if (_pickedFiles.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          // 多文件时显示文件数量 + 总大小
+          if (_pickedFiles.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${l10n.filesSelected(_pickedFiles.length)}'
+                '  ·  ${_formatFileSize(_pickedFiles.fold<int>(0, (sum, f) => sum + f.fileSize))}',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxFileListHeight),
+            child: Material(
+              type: MaterialType.transparency,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _pickedFiles.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 2),
+                itemBuilder: (context, index) {
+                  final file = _pickedFiles[index];
+                  return _buildFileRow(file, index, colorScheme);
+                },
+              ),
+            ),
+          ),
+        ],
+        // 加载进度
+        if (_isLoading && _pickedFiles.length > 1) ...[
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: _processedCount / _pickedFiles.length),
+          const SizedBox(height: 4),
+          Text(
+            AppLocalizations.of(
+              context,
+            )!.processingFileOf(_processedCount + 1, _pickedFiles.length),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        // 无 collectionId 时显示合集下拉框
+        if (widget.collectionId == null) ...[
+          const SizedBox(height: 16),
+          _buildCollectionDropdown(l10n),
+        ],
       ],
     );
   }
@@ -349,8 +406,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
                     width: 28,
                     height: 28,
                   ),
-                  tooltip:
-                      MaterialLocalizations.of(context).closeButtonTooltip,
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 ),
               ],
             ),
@@ -458,10 +514,12 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         if (rejectedExts.isNotEmpty) {
           final l10n = AppLocalizations.of(context)!;
           final extList = rejectedExts.toSet().map((e) => '.$e').join(', ');
-          _showInlineError(_InlineError(
-            _AudioErrorKind.unsupportedFormat,
-            l10n.audioUnsupportedFormat(extList),
-          ));
+          _showInlineError(
+            _InlineError(
+              _AudioErrorKind.unsupportedFormat,
+              l10n.audioUnsupportedFormat(extList),
+            ),
+          );
         }
         if (picked.isNotEmpty) {
           setState(() => _pickedFiles = picked);
@@ -470,10 +528,12 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        _showInlineError(_InlineError(
-          _AudioErrorKind.generic,
-          '${l10n.pickAudioFileFailed}: $e',
-        ));
+        _showInlineError(
+          _InlineError(
+            _AudioErrorKind.generic,
+            '${l10n.pickAudioFileFailed}: $e',
+          ),
+        );
       }
     }
   }
@@ -534,6 +594,8 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     final library = ref.read(audioLibraryProvider.notifier);
     final libraryState = ref.read(audioLibraryProvider);
     final collectionState = ref.read(collectionListProvider);
+    final collectionList = ref.read(collectionListProvider.notifier);
+    final registrationService = AudioRegistrationService();
 
     setState(() {
       _isLoading = true;
@@ -542,72 +604,30 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
 
     final List<AudioItem> results = [];
     final List<String> skippedDuplicates = [];
-    const uuid = Uuid();
 
     for (var i = 0; i < _pickedFiles.length; i++) {
       final file = _pickedFiles[i];
 
-      // 检查合集中是否已存在同名音频
-      if (collectionId != null) {
-        final collection = collectionState.rawCollections
-            .where((c) => c.id == collectionId)
-            .firstOrNull;
-        if (collection != null) {
-          final existingAudioIds = collectionState.getAudioIds(collectionId);
-          final isDupInCollection = existingAudioIds.any((id) {
-            final item = library.getItemById(id);
-            return item != null && item.name == file.name;
-          });
-          if (isDupInCollection) {
-            skippedDuplicates.add(file.name);
-            setState(() => _processedCount = i + 1);
-            continue;
-          }
-        }
-      }
-
-      // 检查音频库中是否已存在同名音频
-      final existingItem = libraryState.audioItems
-          .where((item) => item.name == file.name)
-          .firstOrNull;
-
-      String audioId;
-      AudioItem resultItem;
-
-      if (existingItem != null) {
-        if (collectionId != null) {
-          // 有合集：音频已存在于库中，直接关联
-          audioId = existingItem.id;
-          resultItem = existingItem;
-        } else {
-          // 无合集：跳过重复
-          skippedDuplicates.add(file.name);
-          setState(() => _processedCount = i + 1);
-          continue;
-        }
-      } else {
-        // 新音频，添加到音频库
-        final duration = await getAudioDurationSeconds(file.path);
-        final audioItem = AudioItem(
-          id: uuid.v4(),
+      final result = await registrationService.registerSandboxedAudio(
+        input: SandboxedAudioRegistrationInput(
           name: file.name,
-          audioPath: file.path,
-          addedDate: DateTime.now(),
-          totalDuration: duration,
-        );
-        await library.addAudioItem(audioItem);
-        audioId = audioItem.id;
-        resultItem = audioItem;
+          relativePath: file.path,
+          importSourceType: AudioImportSourceType.local,
+        ),
+        audioLibrary: library,
+        audioLibraryState: libraryState,
+        collectionList: collectionList,
+        collectionState: collectionState,
+        collectionId: collectionId,
+      );
+
+      switch (result) {
+        case AudioRegistrationAdded(:final item):
+          results.add(item);
+        case AudioRegistrationDuplicate(:final name):
+          skippedDuplicates.add(name);
       }
 
-      // 关联到合集
-      if (collectionId != null && mounted) {
-        await ref
-            .read(collectionListProvider.notifier)
-            .addAudioToCollection(collectionId, audioId);
-      }
-
-      results.add(resultItem);
       setState(() => _processedCount = i + 1);
     }
 
@@ -636,6 +656,11 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           ],
         ),
       );
+    }
+
+    if (mounted && widget.embedded) {
+      widget.onComplete?.call(results);
+      return;
     }
 
     if (mounted) {

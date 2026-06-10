@@ -12,12 +12,12 @@ import '../providers/audio_list_settings_provider.dart';
 import '../providers/new_user_guide_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
-import '../widgets/add_audio_dialog.dart';
 import 'audio_list_tile.dart';
 import 'dialogs/confirm_dialog.dart';
 import 'edit_collection_membership_sheet.dart';
 import 'edit_tag_membership_sheet.dart';
 import 'guide_flow.dart';
+import 'import_audio_sheet.dart';
 
 /// 按排序类型排序音频列表（置顶项固定在前，不参与排序）。
 ///
@@ -256,10 +256,7 @@ class _DefaultEmptyState extends StatelessWidget {
           const SizedBox(height: AppSpacing.l),
           FilledButton.icon(
             onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => const AddAudioDialog(),
-              );
+              showImportAudioSheet(context);
             },
             icon: const Icon(Icons.add),
             label: Text(l10n.addAudio),

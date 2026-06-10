@@ -339,6 +339,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get back => 'Back';
+
+  @override
   String get ok => 'OK';
 
   @override
@@ -3552,4 +3555,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get discard => 'Discard';
+
+  @override
+  String get importAudio => 'Import Audio';
+
+  @override
+  String get importAudioFromFile => 'Import from File';
+
+  @override
+  String get importAudioFromFileDescription =>
+      'Select audio files from this device';
+
+  @override
+  String get importAudioFromUrl => 'Import from Link';
+
+  @override
+  String get importAudioFromUrlDescription =>
+      'Paste a direct audio link and download it';
+
+  @override
+  String get audioUrlLabel => 'Audio link';
+
+  @override
+  String get audioUrlHint => 'https://example.com/audio.mp3';
+
+  @override
+  String get pasteAudioLink => 'Paste Link';
+
+  @override
+  String get audioClipboardNoValidLink =>
+      'Clipboard does not contain a valid link';
+
+  @override
+  String get downloadAndImportAudio => 'Download and Import';
+
+  @override
+  String get audioUrlInvalid => 'Enter a valid audio link';
+
+  @override
+  String get audioUrlUnsupported => 'This link is not a supported audio format';
+
+  @override
+  String get audioUrlNotDirectAudio => 'This link is not a direct audio file';
+
+  @override
+  String get audioUrlDuplicate => 'An audio item with this name already exists';
+
+  @override
+  String get audioDownloadFailed => 'Failed to download audio';
+
+  @override
+  String get audioDownloadInProgress => 'Downloading audio';
+
+  @override
+  String get audioImportComplete => 'Import complete';
+
+  @override
+  String get audioImportCanceled => 'Audio import canceled';
+
+  @override
+  String get cancelDownload => 'Cancel Download';
 }

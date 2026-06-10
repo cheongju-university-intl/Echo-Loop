@@ -5,14 +5,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/official_collections/widgets/discover_entry_banner.dart';
-import '../models/audio_item.dart';
 import '../providers/new_user_guide_provider.dart';
 import '../providers/collection_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/audio_list_view.dart';
-import '../widgets/add_audio_dialog.dart';
 import '../widgets/guide_flow.dart';
-import '../widgets/manage_subtitles_sheet.dart';
+import '../widgets/import_audio_sheet.dart';
 import 'collection_screen.dart';
 
 // AudioSortButton 已提取到 audio_list_view.dart 中作为公开组件
@@ -139,63 +137,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         // 音频排序
         const AudioSortButton(),
         // 添加音频
-        IconButton(icon: const Icon(Icons.add), onPressed: _handleAddAudio),
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => showImportAudioSheet(context),
+        ),
       ];
     }
   }
-
-  Future<void> _handleAddAudio() async {
-    final results = await showDialog<List<AudioItem>>(
-      context: context,
-      builder: (dialogContext) => const AddAudioDialog(),
-    );
-    if (results == null || results.isEmpty || !mounted) return;
-
-    if (results.length == 1) {
-      // 单文件：保持字幕提示流程
-      final l10n = AppLocalizations.of(context)!;
-      final wantSubtitle = await _showSubtitlePrompt(context, l10n);
-      if (!mounted || !wantSubtitle) return;
-
-      showModalBottomSheet(
-        context: context,
-        builder: (_) => ManageSubtitlesSheet(audioItem: results.first),
-      );
-    } else {
-      // 多文件：显示成功提示
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.multipleAudioAdded(results.length))),
-        );
-      }
-    }
-  }
-}
-
-/// 添加音频后弹出字幕确认对话框
-Future<bool> _showSubtitlePrompt(
-  BuildContext context,
-  AppLocalizations l10n,
-) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(l10n.addSubtitlePromptTitle),
-      content: Text(l10n.addSubtitlePromptMessage),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(l10n.addSubtitle),
-        ),
-      ],
-    ),
-  );
-  return result ?? false;
 }
 
 /// 合集列表视图体（不含 Scaffold/AppBar）
