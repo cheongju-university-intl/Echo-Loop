@@ -339,6 +339,55 @@ void main() {
       ).called(1);
     });
 
+    test('signInWithPassword 通过统一仓库登录并同步 analytics 身份属性', () async {
+      final user = User(
+        id: 'reviewer-1',
+        email: 'reviewer@example.com',
+        appMetadata: const {},
+        userMetadata: const {},
+        aud: 'authenticated',
+        createdAt: '2026-06-10T00:00:00.000Z',
+      );
+      final response = AuthResponse(session: null, user: user);
+
+      when(
+        () => repository.signInWithPassword(
+          email: 'reviewer@example.com',
+          password: 'secret123',
+        ),
+      ).thenAnswer((_) async => response);
+      when(() => analytics.setUserId('reviewer-1')).thenAnswer((_) async {});
+      when(
+        () => analytics.registerSuperProperties({
+          'supabase_user_id': 'reviewer-1',
+        }),
+      ).thenAnswer((_) async {});
+      when(
+        () => analytics.setUserProperty('email', 'reviewer@example.com'),
+      ).thenAnswer((_) async {});
+      when(
+        () => analytics.setUserProperty('app_anonymous_id', 'anon-123'),
+      ).thenAnswer((_) async {});
+
+      await container
+          .read(authControllerProvider)
+          .signInWithPassword(
+            email: 'reviewer@example.com',
+            password: 'secret123',
+          );
+
+      verify(
+        () => repository.signInWithPassword(
+          email: 'reviewer@example.com',
+          password: 'secret123',
+        ),
+      ).called(1);
+      verify(() => analytics.setUserId('reviewer-1')).called(1);
+      verify(
+        () => analytics.setUserProperty('email', 'reviewer@example.com'),
+      ).called(1);
+    });
+
     test('signOut 通过统一仓库退出并清理 analytics userId', () async {
       when(() => repository.signOut()).thenAnswer((_) async {});
       when(() => analytics.setUserId(null)).thenAnswer((_) async {});
@@ -410,6 +459,66 @@ void main() {
           idToken: any(named: 'idToken'),
           accessToken: any(named: 'accessToken'),
         ),
+      );
+    });
+  });
+
+  group('SupabaseAuthRepository 密码登录', () {
+    late _MockGoTrueClient auth;
+    late User user;
+
+    setUp(() {
+      auth = _MockGoTrueClient();
+      user = User(
+        id: 'reviewer-1',
+        email: 'reviewer@example.com',
+        appMetadata: const {},
+        userMetadata: const {},
+        aud: 'authenticated',
+        createdAt: '2026-06-10T00:00:00.000Z',
+      );
+    });
+
+    test('透传邮箱密码到 GoTrueClient.signInWithPassword', () async {
+      final repository = SupabaseAuthRepository(auth);
+
+      when(
+        () => auth.signInWithPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => AuthResponse(session: null, user: user));
+
+      final response = await repository.signInWithPassword(
+        email: 'reviewer@example.com',
+        password: 'secret123',
+      );
+
+      expect(response.user?.id, 'reviewer-1');
+      verify(
+        () => auth.signInWithPassword(
+          email: 'reviewer@example.com',
+          password: 'secret123',
+        ),
+      ).called(1);
+    });
+
+    test('凭据错误时向上抛出 AuthException', () async {
+      final repository = SupabaseAuthRepository(auth);
+
+      when(
+        () => auth.signInWithPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(const AuthException('Invalid login credentials'));
+
+      expect(
+        repository.signInWithPassword(
+          email: 'reviewer@example.com',
+          password: 'wrong',
+        ),
+        throwsA(isA<AuthException>()),
       );
     });
   });
