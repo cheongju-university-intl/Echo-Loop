@@ -9,29 +9,43 @@ import 'package:echo_loop/utils/audio_content_check.dart';
 void main() {
   group('isWaveformSilent', () {
     test('全零样本判为静音', () {
-      final samples = List<int>.filled(100, 0);
+      final samples = List<int>.filled(1000, 0);
       expect(isWaveformSilent(samples, bits: 16), isTrue);
     });
 
-    test('含接近满量程峰值的样本判为非静音', () {
-      final samples = List<int>.filled(100, 0)..[50] = 30000; // 接近 32768
+    test('大量接近满量程的样本判为非静音', () {
+      final samples = List<int>.filled(1000, 20000); // 远超响亮门限
       expect(isWaveformSilent(samples, bits: 16), isFalse);
     });
 
-    test('峰值低于阈值（满量程 3%）判为静音', () {
-      // 16bit 满量程 32768，3% ≈ 983；取 500 < 阈值
-      final samples = List<int>.filled(100, 0)..[10] = 500;
+    test('整段低幅（< -40dBFS）判为静音', () {
+      // 16bit 满量程 32768，响亮门限 1% ≈ 328；全部 ≈ 4（约 -78dBFS）
+      final samples = List<int>.filled(1000, 4);
       expect(isWaveformSilent(samples, bits: 16), isTrue);
     });
 
-    test('峰值刚好高于阈值判为非静音', () {
-      // 32768 * 0.03 = 983.04，取 1000 > 阈值
-      final samples = List<int>.filled(100, 0)..[10] = 1000;
+    test('极少数离群响亮样本不影响静音判定（回归：just_waveform 16bit 头部污染）', () {
+      // 模拟 just_waveform 解析缺陷：data 头部混入几个头部字段值（如 2205），
+      // 其余为真实静音样本。占比法应忽略这几个离群点，仍判静音。
+      final samples = List<int>.filled(72000, 4);
+      samples[0] = 2205; // samplesPerPixel
+      samples[1] = 1;
+      samples[3] = 17500; // length 字段碎片
+      samples[4] = 0;
+      expect(isWaveformSilent(samples, bits: 16), isTrue);
+    });
+
+    test('响亮样本占比超过 0.5% 判为非静音', () {
+      // 1000 个样本中 10 个（1%）超过门限 → 非静音
+      final samples = List<int>.filled(1000, 0);
+      for (var i = 0; i < 10; i++) {
+        samples[i] = 20000;
+      }
       expect(isWaveformSilent(samples, bits: 16), isFalse);
     });
 
-    test('负向峰值取绝对值同样生效', () {
-      final samples = List<int>.filled(100, 0)..[10] = -30000;
+    test('负向大振幅取绝对值同样计入响亮样本', () {
+      final samples = List<int>.filled(1000, -20000);
       expect(isWaveformSilent(samples, bits: 16), isFalse);
     });
 
@@ -40,18 +54,25 @@ void main() {
     });
 
     test('8bit 满量程按 128 计算', () {
-      // 8bit 满量程 128，3% ≈ 3.84；峰值 2 < 阈值 → 静音
-      expect(isWaveformSilent([0, 2, -1], bits: 8), isTrue);
-      // 峰值 100 > 阈值 → 非静音
-      expect(isWaveformSilent([0, 100], bits: 8), isFalse);
+      // 8bit 响亮门限 1% ≈ 1.28；整段 1 < 门限 → 静音
+      expect(isWaveformSilent(List<int>.filled(1000, 1), bits: 8), isTrue);
+      // 整段 100 > 门限 → 非静音
+      expect(isWaveformSilent(List<int>.filled(1000, 100), bits: 8), isFalse);
     });
 
-    test('自定义阈值生效', () {
-      final samples = List<int>.filled(10, 0)..[0] = 5000; // 约 15% 满量程
-      // 默认 3% → 非静音
+    test('自定义占比门限生效', () {
+      // 1000 中 8 个响亮（0.8%）
+      final samples = List<int>.filled(1000, 0);
+      for (var i = 0; i < 8; i++) {
+        samples[i] = 20000;
+      }
+      // 默认 0.5% → 0.8% > 0.5% → 非静音
       expect(isWaveformSilent(samples, bits: 16), isFalse);
-      // 阈值提到 20% → 判为静音
-      expect(isWaveformSilent(samples, bits: 16, threshold: 0.2), isTrue);
+      // 门限提到 1% → 0.8% < 1% → 静音
+      expect(
+        isWaveformSilent(samples, bits: 16, minLoudFraction: 0.01),
+        isTrue,
+      );
     });
   });
 }

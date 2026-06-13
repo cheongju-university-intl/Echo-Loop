@@ -15,29 +15,38 @@ import '../models/audio_item.dart';
 import 'app_data_dir.dart';
 import 'audio_duration.dart';
 
-/// 静音判定阈值：峰值绝对振幅 < 满量程 × 该比例 即视为静音。
+/// 「响亮样本」振幅门限：绝对振幅 > 满量程 × 该比例 视为有声内容。
 ///
-/// 正常人声/音乐峰值接近满量程，取保守的 3% 可极大降低误判。
-const double _silenceThresholdRatio = 0.03;
+/// 约 1% 满量程 ≈ -40 dBFS；低于此的样本视为静音背景噪声。
+const double _loudAmplitudeRatio = 0.01;
+
+/// 静音判定：响亮样本占比 < 该比例 即视为整体静音。
+///
+/// 用占比而非全局峰值，对少量离群样本健壮——`just_waveform` 16-bit 解析存在
+/// 已知偏移缺陷（数据视图比真实数据早 10 字节，导致 [Waveform.data] 头部混入
+/// 几个头部字段值，如 samplesPerPixel）。全局峰值会被这几个垃圾值污染而漏判，
+/// 占比法可忽略这种极少数离群点。
+const double _minLoudFraction = 0.005;
 
 /// 纯函数：判断波形样本是否整体静音。
 ///
 /// [samples] 为 just_waveform 的 min/max 交错样本（[Waveform.data]）。
 /// [bits] 为采样位宽（16 或 8），决定满量程 `1 << (bits-1)`。
+/// 统计「响亮样本占比」：占比低于 [minLoudFraction] 判为静音。
 /// 空样本无法判定，返回 false（不过度标记）。
 bool isWaveformSilent(
   List<int> samples, {
   required int bits,
-  double threshold = _silenceThresholdRatio,
+  double loudRatio = _loudAmplitudeRatio,
+  double minLoudFraction = _minLoudFraction,
 }) {
   if (samples.isEmpty) return false;
-  final fullScale = 1 << (bits - 1);
-  var peak = 0;
+  final loudThreshold = (1 << (bits - 1)) * loudRatio;
+  var loudCount = 0;
   for (final sample in samples) {
-    final magnitude = sample.abs();
-    if (magnitude > peak) peak = magnitude;
+    if (sample.abs() > loudThreshold) loudCount++;
   }
-  return peak < fullScale * threshold;
+  return loudCount / samples.length < minLoudFraction;
 }
 
 /// 评估音频文件内容状态。

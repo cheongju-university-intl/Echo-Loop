@@ -754,6 +754,8 @@ class AudioListTile extends ConsumerWidget {
           } else if (value == 'rename') {
             _showRenameDialog(context, ref);
           } else if (value == 'manageSubtitles') {
+            // 进字幕管理（AI 转录入口）前懒检测一次，让转录前拦截能拿到状态。
+            _maybeCheckContent(ref, audioItem);
             _showManageSubtitlesSheet(context);
           } else if (value == 'editSubtitles') {
             context.push(
@@ -819,8 +821,21 @@ class AudioListTile extends ConsumerWidget {
       );
       return;
     }
+    // 懒检测内容状态：用户实际打开音频时才检（仅未检测过的），避免启动全库扫描。
+    _maybeCheckContent(ref, currentItem);
     if (!context.mounted) return;
     _pushPlan(context);
+  }
+
+  /// 懒检测音频内容有效性：仅对已就绪、尚未检测（contentStatus==null）的音频后台触发一次。
+  ///
+  /// 用户接触音频（打开学习 / 管理字幕）时才检测，把开销分摊到实际使用，
+  /// 避免启动时对全库逐个解码波形。检测完成后 provider 状态更新，列表项自动显示徽章。
+  void _maybeCheckContent(WidgetRef ref, AudioItem item) {
+    if (!item.isAudioReady || item.contentStatus != null) return;
+    unawaited(
+      ref.read(audioLibraryProvider.notifier).checkAudioContent(item.id),
+    );
   }
 
   /// 跳转 plan 页（合集上下文 vs 独立音频上下文）
