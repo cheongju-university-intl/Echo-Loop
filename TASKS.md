@@ -1,7 +1,18 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-12
+> 最后更新：2026-06-13
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：禁止重复订阅同一播客
+
+**完成时间**: 2026-06-13
+
+同一播客可被重复订阅、生成多个相同合集。改为以解析后的 `podcastFeedUrl` 为判重键：
+
+- [x] `podcast_repository.dart` 新增 `PodcastAlreadySubscribedException`；`createAndFetch` 在 resolve 拿到 feedUrl 后、抓取 Feed 前判重，命中则抛异常携带已有合集名
+- [x] `collection_screen.dart` `_formatPodcastError` 优先处理该异常，内联提示「已订阅该播客，合集名为「XXX」」
+- [x] i18n：`app_zh.arb` / `app_en.arb` 新增 `podcastAlreadySubscribed`
+- [x] 测试：`test/features/podcast/podcast_service_test.dart` 新增判重命中/不命中两例（用 `_SeededCollectionList` override 免 DB）
 
 ## 已完成：修复 Podcast 合集三类 Bug（下载孤儿/进度条、信息不全、退订残留）
 

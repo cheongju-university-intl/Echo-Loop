@@ -25,6 +25,14 @@ part 'podcast_repository.g.dart';
 /// 10 分钟节流阈值
 const _refreshThrottleMinutes = 10;
 
+/// 重复订阅同一播客时抛出，携带已有合集名供 UI 提示。
+class PodcastAlreadySubscribedException implements Exception {
+  final String collectionName;
+  const PodcastAlreadySubscribedException(this.collectionName);
+  @override
+  String toString() => 'PodcastAlreadySubscribedException: $collectionName';
+}
+
 @riverpod
 PodcastRepository podcastRepository(Ref ref) {
   return PodcastRepository(ref);
@@ -51,6 +59,17 @@ class PodcastRepository {
   /// 成功后合集和音频条目（占位，未下载）已入库。
   Future<Collection> createAndFetch(String inputUrl) async {
     final feedUrl = await _urlResolver.resolve(inputUrl);
+
+    // 判重：同一 Feed 已订阅则拒绝创建，提示已有合集名
+    final existing = _ref
+        .read(collectionListProvider)
+        .rawCollections
+        .where((c) => c.isPodcast && c.podcastFeedUrl == feedUrl)
+        .firstOrNull;
+    if (existing != null) {
+      throw PodcastAlreadySubscribedException(existing.name);
+    }
+
     final feedContent = await _fetchFeedContent(feedUrl);
     final result = _feedParser.parse(feedContent, feedUrl: feedUrl);
 

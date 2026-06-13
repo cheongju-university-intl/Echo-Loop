@@ -336,6 +336,9 @@ class _CreateCollectionFlowSheetState
   }
 
   String _formatPodcastError(AppLocalizations l10n, Object error) {
+    if (error is PodcastAlreadySubscribedException) {
+      return l10n.podcastAlreadySubscribed(error.collectionName);
+    }
     final raw = error.toString();
     final message = raw
         .replaceFirst('PodcastResolveException: ', '')

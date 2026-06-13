@@ -1,7 +1,19 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:echo_loop/features/podcast/podcast_repository.dart';
 import 'package:echo_loop/features/podcast/podcast_url_resolver.dart';
 import 'package:echo_loop/features/podcast/podcast_feed_parser.dart';
 import 'package:echo_loop/features/podcast/podcast_models.dart';
+import 'package:echo_loop/models/collection.dart';
+import 'package:echo_loop/providers/collection_provider.dart';
+
+/// 用预置状态的 CollectionList override，避免依赖数据库。
+class _SeededCollectionList extends CollectionList {
+  _SeededCollectionList(this._seed);
+  final CollectionState _seed;
+  @override
+  CollectionState build() => _seed;
+}
 
 void main() {
   group('PodcastUrlResolver._extractApplePodcastId', () {
@@ -238,6 +250,66 @@ void main() {
       expect(restored.author, meta.author);
       expect(restored.description, meta.description);
       expect(restored.imageUrl, meta.imageUrl);
+    });
+  });
+
+  group('PodcastRepository.createAndFetch — 重复订阅判重', () {
+    const feedUrl = 'https://feeds.example.com/voa/rss';
+
+    ProviderContainer makeContainer(List<Collection> collections) {
+      return ProviderContainer(
+        overrides: [
+          collectionListProvider.overrideWith(
+            () => _SeededCollectionList(
+              CollectionState(rawCollections: collections),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Collection podcast({required String name, required String feedUrl}) {
+      return Collection(
+        id: name,
+        name: name,
+        createdDate: DateTime(2026, 6, 13),
+        source: CollectionSource.podcast,
+        podcastFeedUrl: feedUrl,
+      );
+    }
+
+    test('已存在相同 feedUrl 的播客合集时抛 PodcastAlreadySubscribedException', () async {
+      final container = makeContainer([
+        podcast(name: 'VOA Learning English', feedUrl: feedUrl),
+      ]);
+      addTearDown(container.dispose);
+      final repo = container.read(podcastRepositoryProvider);
+
+      await expectLater(
+        repo.createAndFetch(feedUrl),
+        throwsA(
+          isA<PodcastAlreadySubscribedException>().having(
+            (e) => e.collectionName,
+            'collectionName',
+            'VOA Learning English',
+          ),
+        ),
+      );
+    });
+
+    test('不同 feedUrl 不触发判重（不抛 AlreadySubscribed）', () async {
+      final container = makeContainer([
+        podcast(name: '其他播客', feedUrl: 'https://feeds.example.com/other/rss'),
+      ]);
+      addTearDown(container.dispose);
+      final repo = container.read(podcastRepositoryProvider);
+
+      // 不同 feed 会越过判重继续拉取（最终因网络/解析失败抛别的异常），
+      // 只需确认不是重复订阅异常。
+      await expectLater(
+        repo.createAndFetch(feedUrl),
+        throwsA(isNot(isA<PodcastAlreadySubscribedException>())),
+      );
     });
   });
 }
