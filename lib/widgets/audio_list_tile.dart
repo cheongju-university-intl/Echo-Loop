@@ -317,9 +317,12 @@ class AudioListTile extends ConsumerWidget {
     final metaStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
+    final isSuspectEmpty =
+        audioItem.contentStatus == AudioContentStatus.suspectEmpty;
     final hasBadgeRow =
         audioItem.hasTranscript ||
         isTranscribing ||
+        isSuspectEmpty ||
         (progress?.isStarted ?? false) ||
         collectionNames.isNotEmpty ||
         tagData.isNotEmpty ||
@@ -341,6 +344,9 @@ class AudioListTile extends ConsumerWidget {
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              // 内容异常警告（解码失败 / 全程静音）
+              if (isSuspectEmpty)
+                _buildContentWarningBadge(theme, l10n.audioContentEmptyWarning),
               if (audioItem.hasTranscript && !isTranscribing)
                 _buildTranscriptBadge(theme, l10n.transcript),
               // 后台转录进度指示（带 spinner，需独立显示）
@@ -497,6 +503,36 @@ class AudioListTile extends ConsumerWidget {
   }
 
   /// 构建高辨识度的字幕状态标签。
+  /// 内容异常警告徽章（疑似空音频：解码失败或全程静音）。
+  Widget _buildContentWarningBadge(ThemeData theme, String label) {
+    final color = theme.colorScheme.error;
+    return Container(
+      key: const Key('audio_list_tile_content_warning_badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        border: Border.all(color: color.withValues(alpha: 0.55)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 12, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTranscriptBadge(ThemeData theme, String label) {
     final color = theme.colorScheme.primary;
     return Container(

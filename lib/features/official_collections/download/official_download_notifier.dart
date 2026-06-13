@@ -316,7 +316,12 @@ class OfficialDownload extends _$OfficialDownload {
       await ref.read(audioLibraryProvider.notifier).loadLibrary();
       if (sid != _sessionId) return false;
 
-      // 6) 成功不提示，避免遮挡「开始学习」按钮；状态切回 idle 即可
+      // 6) 后台检测内容有效性（不阻塞返回；官方时长来自 catalog，让检测器自行探测文件）
+      unawaited(
+        ref.read(audioLibraryProvider.notifier).checkAudioContent(audioItem.id),
+      );
+
+      // 7) 成功不提示，避免遮挡「开始学习」按钮；状态切回 idle 即可
       state = const DownloadIdle();
       return true;
     } catch (e, st) {

@@ -185,6 +185,89 @@ void main() {
     });
   });
 
+  group('AudioListTile 内容异常警告', () {
+    Widget buildTile(AudioItem item) {
+      return createTestApp(
+        Center(
+          child: SizedBox(width: 360, child: AudioListTile(audioItem: item)),
+        ),
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
+          ),
+        ],
+      );
+    }
+
+    testWidgets('suspectEmpty 时显示警告徽章', (tester) async {
+      final item = createTestAudioItem(
+        name: 'Empty Audio',
+        transcriptPath: null,
+        transcriptSource: null,
+      ).copyWith(contentStatus: AudioContentStatus.suspectEmpty);
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('audio_list_tile_content_warning_badge')),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      expect(find.text('Possibly empty'), findsOneWidget);
+    });
+
+    testWidgets('suspectEmpty 且 totalDuration=0 时不渲染时长行', (tester) async {
+      final item = createTestAudioItem(
+        name: 'Empty Audio',
+        totalDuration: 0,
+        transcriptPath: null,
+        transcriptSource: null,
+      ).copyWith(contentStatus: AudioContentStatus.suspectEmpty);
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Duration:'), findsNothing);
+      expect(
+        find.byKey(const Key('audio_list_tile_content_warning_badge')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('contentStatus=ok 时不显示警告徽章', (tester) async {
+      final item = createTestAudioItem(
+        name: 'Normal Audio',
+        transcriptPath: null,
+        transcriptSource: null,
+      ).copyWith(contentStatus: AudioContentStatus.ok);
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('audio_list_tile_content_warning_badge')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('contentStatus=null（未检测）时不显示警告徽章', (tester) async {
+      final item = createTestAudioItem(
+        name: 'Unchecked Audio',
+        transcriptPath: null,
+        transcriptSource: null,
+      );
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('audio_list_tile_content_warning_badge')),
+        findsNothing,
+      );
+    });
+  });
+
   group('AudioListTile 日期元信息', () {
     Widget buildTile(AudioItem item) {
       return createTestApp(

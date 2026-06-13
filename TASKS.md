@@ -3,6 +3,29 @@
 > 最后更新：2026-06-13
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：空/静音音频检测与标记
+
+**完成时间**: 2026-06-13
+
+新下载/导入的音频若「解码失败（损坏/空）」或「能播但全程静音」，列表项显示警告徽章、转录前确认拦截，避免反复无意义转录；解码失败不再回退 RSS 假时长。
+
+### 实现
+- [x] `utils/audio_content_check.dart` —— 纯函数 `isWaveformSilent` + 编排 `evaluateAudioContent`（解码时长<=0 直接判 suspectEmpty，否则 just_waveform 取峰值判静音；阈值 3% 满量程）
+- [x] `models/audio_item.dart` —— 新增 `AudioContentStatus{ok,suspectEmpty}` 枚举 + `contentStatus` 字段（toJson/fromJson/copyWith）
+- [x] DB：`audio_items` 加 `audio_content_status` 列；`app_database` schemaVersion 38→39 + 迁移；build_runner 重新生成
+- [x] `audio_library_provider.dart` —— row↔model 读写映射 + `checkAudioContent`（防竞态校验后写回）
+- [x] 三处下载完成点 fire-and-forget 调用检测：`audio_import_provider`（podcast 懒下载 + 直链导入）、`official_download_notifier`（官方合集）
+- [x] `audio_import_provider` 去掉 podcast 解码失败的 RSS 时长回退（解不出即 0，列表项时长行自然省略）
+- [x] `audio_list_tile.dart` —— suspectEmpty 显示红色 `warning_amber` 警告徽章
+- [x] `manage_subtitles_sheet.dart` —— `_handleAiTranscription` suspectEmpty 时弹确认框（用确认非硬拦截，规避误判）
+- [x] i18n：`app_en/zh.arb` 新增 `audioContentEmptyWarning` / `transcriptionSilentConfirm*`
+
+### 验证
+- [x] `flutter analyze`（变更文件）：No issues found
+- [x] 新增/更新测试：`test/utils/audio_content_check_test.dart`（峰值阈值/位宽/空样本）、`test/models/audio_item_test.dart`（枚举 + contentStatus 序列化/copyWith）、`test/widgets/audio_list_tile_test.dart`（徽章显示/隐藏 + 时长行省略）
+- [x] 相关测试全过；全量 `flutter test` 仅 2 例**既有失败**（`manage_subtitles_sheet_test` / `learning_plan_screen_test` 的「AI 转录音频过长」用例：测试用 16 分钟却期望触发 30 分钟上限，clean HEAD 同样失败，与本次改动无关）
+- [ ] `flutter test integration_test -d macos`：未跑（真机解码路径，单元/Widget 已覆盖逻辑）
+
 ## 已完成：禁止重复订阅同一播客
 
 **完成时间**: 2026-06-13

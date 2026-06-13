@@ -144,6 +144,16 @@ class $AudioItemsTable extends AudioItems
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _audioContentStatusMeta =
+      const VerificationMeta('audioContentStatus');
+  @override
+  late final GeneratedColumn<int> audioContentStatus = GeneratedColumn<int>(
+    'audio_content_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -324,6 +334,7 @@ class $AudioItemsTable extends AudioItems
     transcriptSource,
     audioSha256,
     transcriptLanguage,
+    audioContentStatus,
     updatedAt,
     deletedAt,
     wordTimestampsJson,
@@ -442,6 +453,15 @@ class $AudioItemsTable extends AudioItems
         transcriptLanguage.isAcceptableOrUnknown(
           data['transcript_language']!,
           _transcriptLanguageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_content_status')) {
+      context.handle(
+        _audioContentStatusMeta,
+        audioContentStatus.isAcceptableOrUnknown(
+          data['audio_content_status']!,
+          _audioContentStatusMeta,
         ),
       );
     }
@@ -630,6 +650,10 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.string,
         data['${effectivePrefix}transcript_language'],
       ),
+      audioContentStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}audio_content_status'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -741,6 +765,10 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// AI 转录使用的语言（'en' / 'multi'）
   final String? transcriptLanguage;
 
+  /// 音频内容有效性状态：0=ok, 1=suspectEmpty, null=未检测。
+  /// 新下载时检测一次（解码失败或全程静音判 suspectEmpty）。
+  final int? audioContentStatus;
+
   /// 最后修改时间
   final DateTime updatedAt;
 
@@ -780,7 +808,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 无 guid 的 episode 不导入。
   final String? podcastEpisodeGuid;
 
-  /// Episode 音频文件的 enclosure URL（RSS <enclosure url="...">）
+  /// Episode 音频文件的 enclosure URL（RSS `<enclosure url="...">`）
   final String? podcastEnclosureUrl;
 
   /// Enclosure MIME type，如 audio/mpeg
@@ -807,6 +835,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     this.transcriptSource,
     this.audioSha256,
     this.transcriptLanguage,
+    this.audioContentStatus,
     required this.updatedAt,
     this.deletedAt,
     this.wordTimestampsJson,
@@ -847,6 +876,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     }
     if (!nullToAbsent || transcriptLanguage != null) {
       map['transcript_language'] = Variable<String>(transcriptLanguage);
+    }
+    if (!nullToAbsent || audioContentStatus != null) {
+      map['audio_content_status'] = Variable<int>(audioContentStatus);
     }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -916,6 +948,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       transcriptLanguage: transcriptLanguage == null && nullToAbsent
           ? const Value.absent()
           : Value(transcriptLanguage),
+      audioContentStatus: audioContentStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioContentStatus),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -980,6 +1015,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       transcriptLanguage: serializer.fromJson<String?>(
         json['transcriptLanguage'],
       ),
+      audioContentStatus: serializer.fromJson<int?>(json['audioContentStatus']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       wordTimestampsJson: serializer.fromJson<String?>(
@@ -1023,6 +1059,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'transcriptSource': serializer.toJson<int?>(transcriptSource),
       'audioSha256': serializer.toJson<String?>(audioSha256),
       'transcriptLanguage': serializer.toJson<String?>(transcriptLanguage),
+      'audioContentStatus': serializer.toJson<int?>(audioContentStatus),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'wordTimestampsJson': serializer.toJson<String?>(wordTimestampsJson),
@@ -1054,6 +1091,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     Value<int?> transcriptSource = const Value.absent(),
     Value<String?> audioSha256 = const Value.absent(),
     Value<String?> transcriptLanguage = const Value.absent(),
+    Value<int?> audioContentStatus = const Value.absent(),
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     Value<String?> wordTimestampsJson = const Value.absent(),
@@ -1088,6 +1126,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     transcriptLanguage: transcriptLanguage.present
         ? transcriptLanguage.value
         : this.transcriptLanguage,
+    audioContentStatus: audioContentStatus.present
+        ? audioContentStatus.value
+        : this.audioContentStatus,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     wordTimestampsJson: wordTimestampsJson.present
@@ -1150,6 +1191,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       transcriptLanguage: data.transcriptLanguage.present
           ? data.transcriptLanguage.value
           : this.transcriptLanguage,
+      audioContentStatus: data.audioContentStatus.present
+          ? data.audioContentStatus.value
+          : this.audioContentStatus,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       wordTimestampsJson: data.wordTimestampsJson.present
@@ -1209,6 +1253,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('transcriptSource: $transcriptSource, ')
           ..write('audioSha256: $audioSha256, ')
           ..write('transcriptLanguage: $transcriptLanguage, ')
+          ..write('audioContentStatus: $audioContentStatus, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('wordTimestampsJson: $wordTimestampsJson, ')
@@ -1242,6 +1287,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     transcriptSource,
     audioSha256,
     transcriptLanguage,
+    audioContentStatus,
     updatedAt,
     deletedAt,
     wordTimestampsJson,
@@ -1274,6 +1320,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.transcriptSource == this.transcriptSource &&
           other.audioSha256 == this.audioSha256 &&
           other.transcriptLanguage == this.transcriptLanguage &&
+          other.audioContentStatus == this.audioContentStatus &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.wordTimestampsJson == this.wordTimestampsJson &&
@@ -1304,6 +1351,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<int?> transcriptSource;
   final Value<String?> audioSha256;
   final Value<String?> transcriptLanguage;
+  final Value<int?> audioContentStatus;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<String?> wordTimestampsJson;
@@ -1333,6 +1381,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.transcriptSource = const Value.absent(),
     this.audioSha256 = const Value.absent(),
     this.transcriptLanguage = const Value.absent(),
+    this.audioContentStatus = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.wordTimestampsJson = const Value.absent(),
@@ -1363,6 +1412,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.transcriptSource = const Value.absent(),
     this.audioSha256 = const Value.absent(),
     this.transcriptLanguage = const Value.absent(),
+    this.audioContentStatus = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.wordTimestampsJson = const Value.absent(),
@@ -1396,6 +1446,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<int>? transcriptSource,
     Expression<String>? audioSha256,
     Expression<String>? transcriptLanguage,
+    Expression<int>? audioContentStatus,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<String>? wordTimestampsJson,
@@ -1426,6 +1477,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (transcriptSource != null) 'transcript_source': transcriptSource,
       if (audioSha256 != null) 'audio_sha256': audioSha256,
       if (transcriptLanguage != null) 'transcript_language': transcriptLanguage,
+      if (audioContentStatus != null)
+        'audio_content_status': audioContentStatus,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (wordTimestampsJson != null)
@@ -1462,6 +1515,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<int?>? transcriptSource,
     Value<String?>? audioSha256,
     Value<String?>? transcriptLanguage,
+    Value<int?>? audioContentStatus,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<String?>? wordTimestampsJson,
@@ -1492,6 +1546,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       transcriptSource: transcriptSource ?? this.transcriptSource,
       audioSha256: audioSha256 ?? this.audioSha256,
       transcriptLanguage: transcriptLanguage ?? this.transcriptLanguage,
+      audioContentStatus: audioContentStatus ?? this.audioContentStatus,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       wordTimestampsJson: wordTimestampsJson ?? this.wordTimestampsJson,
@@ -1549,6 +1604,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     }
     if (transcriptLanguage.present) {
       map['transcript_language'] = Variable<String>(transcriptLanguage.value);
+    }
+    if (audioContentStatus.present) {
+      map['audio_content_status'] = Variable<int>(audioContentStatus.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -1620,6 +1678,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('transcriptSource: $transcriptSource, ')
           ..write('audioSha256: $audioSha256, ')
           ..write('transcriptLanguage: $transcriptLanguage, ')
+          ..write('audioContentStatus: $audioContentStatus, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('wordTimestampsJson: $wordTimestampsJson, ')
@@ -10945,6 +11004,7 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<int?> transcriptSource,
       Value<String?> audioSha256,
       Value<String?> transcriptLanguage,
+      Value<int?> audioContentStatus,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<String?> wordTimestampsJson,
@@ -10976,6 +11036,7 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<int?> transcriptSource,
       Value<String?> audioSha256,
       Value<String?> transcriptLanguage,
+      Value<int?> audioContentStatus,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<String?> wordTimestampsJson,
@@ -11247,6 +11308,11 @@ class $$AudioItemsTableFilterComposer
 
   ColumnFilters<String> get transcriptLanguage => $composableBuilder(
     column: $table.transcriptLanguage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get audioContentStatus => $composableBuilder(
+    column: $table.audioContentStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11595,6 +11661,11 @@ class $$AudioItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get audioContentStatus => $composableBuilder(
+    column: $table.audioContentStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -11725,6 +11796,11 @@ class $$AudioItemsTableAnnotationComposer
 
   GeneratedColumn<String> get transcriptLanguage => $composableBuilder(
     column: $table.transcriptLanguage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get audioContentStatus => $composableBuilder(
+    column: $table.audioContentStatus,
     builder: (column) => column,
   );
 
@@ -12051,6 +12127,7 @@ class $$AudioItemsTableTableManager
                 Value<int?> transcriptSource = const Value.absent(),
                 Value<String?> audioSha256 = const Value.absent(),
                 Value<String?> transcriptLanguage = const Value.absent(),
+                Value<int?> audioContentStatus = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<String?> wordTimestampsJson = const Value.absent(),
@@ -12080,6 +12157,7 @@ class $$AudioItemsTableTableManager
                 transcriptSource: transcriptSource,
                 audioSha256: audioSha256,
                 transcriptLanguage: transcriptLanguage,
+                audioContentStatus: audioContentStatus,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 wordTimestampsJson: wordTimestampsJson,
@@ -12111,6 +12189,7 @@ class $$AudioItemsTableTableManager
                 Value<int?> transcriptSource = const Value.absent(),
                 Value<String?> audioSha256 = const Value.absent(),
                 Value<String?> transcriptLanguage = const Value.absent(),
+                Value<int?> audioContentStatus = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<String?> wordTimestampsJson = const Value.absent(),
@@ -12140,6 +12219,7 @@ class $$AudioItemsTableTableManager
                 transcriptSource: transcriptSource,
                 audioSha256: audioSha256,
                 transcriptLanguage: transcriptLanguage,
+                audioContentStatus: audioContentStatus,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 wordTimestampsJson: wordTimestampsJson,

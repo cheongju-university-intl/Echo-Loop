@@ -1656,6 +1656,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get overwrite => 'Overwrite';
 
   @override
+  String get audioContentEmptyWarning => 'Possibly empty';
+
+  @override
+  String get transcriptionSilentConfirmTitle => 'Audio may be empty';
+
+  @override
+  String get transcriptionSilentConfirmMessage =>
+      'This audio appears to be silent with no speech. Transcribe anyway?';
+
+  @override
+  String get transcriptionSilentConfirmProceed => 'Transcribe anyway';
+
+  @override
   String get currentSubtitleExists => 'Current: Has Subtitle';
 
   @override

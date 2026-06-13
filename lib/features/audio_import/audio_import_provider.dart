@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -65,6 +67,10 @@ class AudioImportController extends _$AudioImportController {
           );
       if (sid != _sessionId) return null;
       state = AudioImportCompleted(item);
+      // 后台检测内容有效性（不阻塞返回）。
+      unawaited(
+        ref.read(audioLibraryProvider.notifier).checkAudioContent(item.id),
+      );
       return item;
     } on AudioImportException catch (e) {
       if (sid != _sessionId) return null;
@@ -126,18 +132,27 @@ class AudioImportController extends _$AudioImportController {
           );
       if (sid != _sessionId) return false;
 
+      // 解码失败（durationSeconds==0）不再回退 RSS 时长：宁可不显示，也不展示
+      // 假时长掩盖空音频。内容检测会据此判 suspectEmpty。
       await ref
           .read(audioLibraryProvider.notifier)
           .updateAudioItem(
             item.copyWith(
               audioPath: result.relativePath,
-              totalDuration: result.durationSeconds > 0
-                  ? result.durationSeconds
-                  : item.totalDuration,
+              totalDuration: result.durationSeconds,
               audioSha256: result.audioSha256,
             ),
           );
       state = const AudioImportIdle();
+      // 后台检测内容有效性（复用已算出的解码时长，不阻塞返回）。
+      unawaited(
+        ref
+            .read(audioLibraryProvider.notifier)
+            .checkAudioContent(
+              item.id,
+              decodedDurationSeconds: result.durationSeconds,
+            ),
+      );
       return true;
     } on AudioImportException catch (e) {
       if (sid != _sessionId) return false;

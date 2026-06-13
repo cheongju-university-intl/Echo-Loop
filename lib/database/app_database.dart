@@ -85,7 +85,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 38;
+  static const currentSchemaVersion = 39;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -104,6 +104,14 @@ class AppDatabase extends _$AppDatabase {
         await _ensurePodcastColumns();
       },
       onUpgrade: (Migrator m, int from, int to) async {
+        // v38→v39：audio_items 加 audio_content_status（音频内容有效性，新下载时检测）
+        if (from < 39) {
+          await _addColumnIfNotExists(
+            'audio_items',
+            'audio_content_status',
+            'INTEGER',
+          );
+        }
         if (from < 2) {
           await m.createTable(learningProgresses);
         }

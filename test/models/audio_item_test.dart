@@ -471,6 +471,84 @@ void main() {
       });
     });
 
+    group('AudioContentStatus 枚举', () {
+      test('fromIndex 正确映射', () {
+        expect(AudioContentStatus.fromIndex(0), AudioContentStatus.ok);
+        expect(
+          AudioContentStatus.fromIndex(1),
+          AudioContentStatus.suspectEmpty,
+        );
+        expect(AudioContentStatus.fromIndex(null), isNull);
+        expect(AudioContentStatus.fromIndex(99), isNull);
+        expect(AudioContentStatus.fromIndex(-1), isNull);
+      });
+
+      test('index 属性正确', () {
+        expect(AudioContentStatus.ok.index, 0);
+        expect(AudioContentStatus.suspectEmpty.index, 1);
+      });
+    });
+
+    group('contentStatus 字段', () {
+      test('默认 null（未检测）', () {
+        expect(createSample().contentStatus, isNull);
+      });
+
+      test('toJson / fromJson 往返一致 — suspectEmpty', () {
+        final item = createSample().copyWith(
+          contentStatus: AudioContentStatus.suspectEmpty,
+        );
+        final json = item.toJson();
+        expect(json['contentStatus'], 1);
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.contentStatus, AudioContentStatus.suspectEmpty);
+      });
+
+      test('toJson / fromJson 往返一致 — null', () {
+        final item = createSample();
+        final json = item.toJson();
+        expect(json['contentStatus'], isNull);
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.contentStatus, isNull);
+      });
+
+      test('fromJson 缺失字段默认 null', () {
+        final json = {
+          'id': 'a1',
+          'name': 'n',
+          'audioPath': 'audios/test.mp3',
+          'transcriptPath': null,
+          'addedDate': now.toIso8601String(),
+          'totalDuration': 60,
+        };
+        expect(AudioItem.fromJson(json).contentStatus, isNull);
+      });
+
+      test('copyWith 覆盖为 ok', () {
+        final item = createSample().copyWith(
+          contentStatus: AudioContentStatus.suspectEmpty,
+        );
+        final copied = item.copyWith(contentStatus: AudioContentStatus.ok);
+        expect(copied.contentStatus, AudioContentStatus.ok);
+      });
+
+      test('copyWith 不传参保持原值', () {
+        final item = createSample().copyWith(
+          contentStatus: AudioContentStatus.suspectEmpty,
+        );
+        expect(item.copyWith().contentStatus, AudioContentStatus.suspectEmpty);
+      });
+
+      test('copyWith 显式传 null', () {
+        final item = createSample().copyWith(
+          contentStatus: AudioContentStatus.suspectEmpty,
+        );
+        expect(item.copyWith(contentStatus: null).contentStatus, isNull);
+      });
+    });
+
     group('originalDate', () {
       test('默认 null（用户自建音频）', () {
         expect(createSample().originalDate, isNull);

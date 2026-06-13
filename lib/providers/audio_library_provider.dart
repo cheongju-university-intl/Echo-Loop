@@ -10,6 +10,7 @@ import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/audio_item.dart';
 import '../services/app_logger.dart';
+import '../utils/audio_content_check.dart';
 import '../utils/audio_duration.dart';
 import '../utils/transcript_stats.dart';
 import 'collection_provider.dart';
@@ -67,6 +68,9 @@ class AudioLibrary extends _$AudioLibrary {
               ),
               audioSha256: row.audioSha256,
               transcriptLanguage: row.transcriptLanguage,
+              contentStatus: AudioContentStatus.fromIndex(
+                row.audioContentStatus,
+              ),
               remoteAudioId: row.remoteAudioId,
               originalDate: row.originalDate,
               importSourceType: AudioImportSourceType.fromStorageValue(
@@ -292,6 +296,33 @@ class AudioLibrary extends _$AudioLibrary {
     }
   }
 
+  /// 检测音频内容有效性并持久化（新下载/导入完成后调用）。
+  ///
+  /// 解码失败或全程静音 → [AudioContentStatus.suspectEmpty]。
+  /// [decodedDurationSeconds] 调用方已算出解码时长时传入，避免重复解码。
+  /// 后台执行，失败仅记录日志，不影响主流程。写回前校验条目仍存在且 audioPath
+  /// 未变（防竞态）。
+  Future<void> checkAudioContent(
+    String audioId, {
+    int? decodedDurationSeconds,
+  }) async {
+    final item = getItemById(audioId);
+    if (item == null || !item.isAudioReady) return;
+    final audioPath = item.audioPath!;
+    try {
+      final status = await evaluateAudioContent(
+        audioPath,
+        decodedDurationSeconds: decodedDurationSeconds,
+      );
+      // 写回前重新校验：条目仍在且路径未变，避免污染已被替换/删除的状态。
+      final latest = getItemById(audioId);
+      if (latest == null || latest.audioPath != audioPath) return;
+      await updateAudioItem(latest.copyWith(contentStatus: status));
+    } catch (e) {
+      AppLogger.log('AudioContentCheck', '音频内容检测失败: $e');
+    }
+  }
+
   /// 补填缺失时长 — 对已就绪且 totalDuration == 0 的音频逐个提取并持久化
   Future<void> backfillDurations() async {
     final missing = state.audioItems
@@ -379,6 +410,7 @@ class AudioLibrary extends _$AudioLibrary {
         transcriptSource: Value(item.transcriptSource?.index),
         audioSha256: Value(item.audioSha256),
         transcriptLanguage: Value(item.transcriptLanguage),
+        audioContentStatus: Value(item.contentStatus?.index),
         remoteAudioId: Value(item.remoteAudioId),
         originalDate: Value(item.originalDate),
         importSourceType: Value(item.importSourceType?.storageValue),

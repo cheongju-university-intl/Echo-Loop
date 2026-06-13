@@ -20,6 +20,25 @@ enum TranscriptSource {
   }
 }
 
+/// 音频内容有效性状态。
+///
+/// 仅在新下载/导入完成时检测一次：解码失败（解不出时长）或全程静音都判为
+/// [suspectEmpty]。null 表示尚未检测（旧数据或检测前），不展示警告。
+enum AudioContentStatus {
+  /// 内容正常（能解码且有有效音量）。
+  ok,
+
+  /// 疑似为空：文件损坏/解码失败，或全程静音、无人声。
+  suspectEmpty;
+
+  /// 从整数值创建（数据库存储用）。
+  static AudioContentStatus? fromIndex(int? index) {
+    if (index == null) return null;
+    if (index >= 0 && index < values.length) return values[index];
+    return null;
+  }
+}
+
 /// 用户导入音频的来源类型。
 ///
 /// 精选/官方合集不使用该字段，继续由 `remoteAudioId` 与合集 `source=official`
@@ -79,6 +98,12 @@ class AudioItem {
   /// AI 转录使用的语言（'en' / 'multi'）
   final String? transcriptLanguage;
 
+  /// 音频内容有效性状态（新下载时检测一次）。
+  ///
+  /// null 表示未检测（旧数据或检测前）；[AudioContentStatus.suspectEmpty]
+  /// 表示解码失败或全程静音，列表项展示警告、转录前拦截。
+  final AudioContentStatus? contentStatus;
+
   /// 官方合集中该音频在后端的 UUID；用户自建音频为 null。
   /// 同步时按此反查本地行（复用 id）。
   final String? remoteAudioId;
@@ -130,6 +155,7 @@ class AudioItem {
     this.transcriptSource,
     this.audioSha256,
     this.transcriptLanguage,
+    this.contentStatus,
     this.remoteAudioId,
     this.originalDate,
     this.importSourceType,
@@ -181,6 +207,7 @@ class AudioItem {
     'transcriptSource': transcriptSource?.index,
     'audioSha256': audioSha256,
     'transcriptLanguage': transcriptLanguage,
+    'contentStatus': contentStatus?.index,
     'remoteAudioId': remoteAudioId,
     'originalDate': originalDate?.toIso8601String(),
     'importSourceType': importSourceType?.storageValue,
@@ -206,6 +233,7 @@ class AudioItem {
     transcriptSource: TranscriptSource.fromIndex(json['transcriptSource']),
     audioSha256: json['audioSha256'],
     transcriptLanguage: json['transcriptLanguage'],
+    contentStatus: AudioContentStatus.fromIndex(json['contentStatus']),
     remoteAudioId: json['remoteAudioId'],
     originalDate: json['originalDate'] == null
         ? null
@@ -235,6 +263,7 @@ class AudioItem {
     Object? transcriptSource = _sentinel,
     Object? audioSha256 = _sentinel,
     Object? transcriptLanguage = _sentinel,
+    Object? contentStatus = _sentinel,
     Object? remoteAudioId = _sentinel,
     Object? originalDate = _sentinel,
     Object? importSourceType = _sentinel,
@@ -267,6 +296,9 @@ class AudioItem {
       transcriptLanguage: transcriptLanguage == _sentinel
           ? this.transcriptLanguage
           : transcriptLanguage as String?,
+      contentStatus: contentStatus == _sentinel
+          ? this.contentStatus
+          : contentStatus as AudioContentStatus?,
       remoteAudioId: remoteAudioId == _sentinel
           ? this.remoteAudioId
           : remoteAudioId as String?,

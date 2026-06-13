@@ -1598,6 +1598,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get overwrite => '覆盖';
 
   @override
+  String get audioContentEmptyWarning => '疑似空音频';
+
+  @override
+  String get transcriptionSilentConfirmTitle => '音频疑似为空';
+
+  @override
+  String get transcriptionSilentConfirmMessage => '该音频疑似全程静音、无人声，仍要转录吗？';
+
+  @override
+  String get transcriptionSilentConfirmProceed => '仍要转录';
+
+  @override
   String get currentSubtitleExists => '当前：已有字幕';
 
   @override

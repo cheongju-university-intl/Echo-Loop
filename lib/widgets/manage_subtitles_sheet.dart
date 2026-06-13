@@ -1010,6 +1010,29 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       return;
     }
 
+    // 疑似空音频（解码失败 / 全程静音）拦截：用确认而非硬拦截，规避检测误判
+    if (audioItem.contentStatus == AudioContentStatus.suspectEmpty) {
+      if (!context.mounted) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.transcriptionSilentConfirmTitle),
+          content: Text(l10n.transcriptionSilentConfirmMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.transcriptionSilentConfirmProceed),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
     // 已有字幕时弹出覆盖确认
     if (audioItem.hasTranscript) {
       if (!context.mounted) return;

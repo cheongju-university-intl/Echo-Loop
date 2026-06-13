@@ -2978,6 +2978,30 @@ abstract class AppLocalizations {
   /// **'Overwrite'**
   String get overwrite;
 
+  /// No description provided for @audioContentEmptyWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Possibly empty'**
+  String get audioContentEmptyWarning;
+
+  /// No description provided for @transcriptionSilentConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio may be empty'**
+  String get transcriptionSilentConfirmTitle;
+
+  /// No description provided for @transcriptionSilentConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This audio appears to be silent with no speech. Transcribe anyway?'**
+  String get transcriptionSilentConfirmMessage;
+
+  /// No description provided for @transcriptionSilentConfirmProceed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe anyway'**
+  String get transcriptionSilentConfirmProceed;
+
   /// No description provided for @currentSubtitleExists.
   ///
   /// In en, this message translates to:
