@@ -9,6 +9,7 @@ import '../providers/tag_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../theme/tag_colors.dart';
+import 'common/form_input_style.dart';
 
 /// 标签归属编辑 BottomSheet
 ///
@@ -190,7 +191,9 @@ class EditTagMembershipSheet extends ConsumerWidget {
                 TextField(
                   controller: controller,
                   autofocus: true,
-                  decoration: InputDecoration(
+                  style: compactFormTextStyle(context),
+                  decoration: compactFormInputDecoration(
+                    context,
                     labelText: l10n.tagName,
                     hintText: l10n.enterTagName,
                   ),

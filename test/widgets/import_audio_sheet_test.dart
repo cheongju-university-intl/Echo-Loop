@@ -167,6 +167,36 @@ void main() {
     expect(button.onPressed, isNull);
   });
 
+  testWidgets('链接导入表单弱化输入提示样式', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.tap(find.text('Open Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import from Link'));
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    final fieldContext = tester.element(find.byType(TextField));
+    final theme = Theme.of(fieldContext);
+
+    expect(field.style?.fontSize, theme.textTheme.bodyMedium?.fontSize);
+    expect(
+      field.decoration?.hintStyle?.fontSize,
+      theme.textTheme.bodyMedium?.fontSize,
+    );
+    expect(
+      field.decoration?.hintStyle?.color,
+      theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.52),
+    );
+    expect(
+      field.decoration?.labelStyle?.fontSize,
+      theme.textTheme.bodySmall?.fontSize,
+    );
+    expect(
+      field.decoration?.floatingLabelStyle?.color,
+      theme.colorScheme.primary.withValues(alpha: 0.78),
+    );
+  });
+
   testWidgets('本地文件入口使用全宽次级按钮', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.tap(find.text('Open Import'));

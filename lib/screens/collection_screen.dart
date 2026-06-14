@@ -17,6 +17,7 @@ import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../services/app_network_image_cache.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common/form_input_style.dart';
 import '../widgets/common/secondary_action_button.dart';
 import '../widgets/dialogs/confirm_dialog.dart';
 import '../widgets/dialogs/text_input_dialog.dart';
@@ -538,8 +539,10 @@ class _LocalCollectionPanelState extends State<_LocalCollectionPanel> {
         TextField(
           controller: widget.controller,
           autofocus: true,
+          style: compactFormTextStyle(context),
           textInputAction: TextInputAction.done,
-          decoration: InputDecoration(
+          decoration: compactFormInputDecoration(
+            context,
             labelText: l10n.collectionName,
             hintText: l10n.enterCollectionName,
             errorText: widget.errorText,
@@ -611,9 +614,11 @@ class _PodcastSubscriptionPanelState extends State<_PodcastSubscriptionPanel> {
           controller: widget.controller,
           enabled: !widget.isSubmitting,
           autofocus: false,
+          style: compactFormTextStyle(context),
           keyboardType: TextInputType.url,
           textInputAction: TextInputAction.done,
-          decoration: InputDecoration(
+          decoration: compactFormInputDecoration(
+            context,
             labelText: l10n.podcastUrlLabel,
             hintText: l10n.podcastUrlHint,
             suffixIcon: widget.controller.text.isEmpty || widget.isSubmitting

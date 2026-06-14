@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart';
 import '../theme/app_theme.dart';
 import 'add_audio_dialog.dart';
+import 'common/form_input_style.dart';
 import 'common/secondary_action_button.dart';
 import 'manage_subtitles_sheet.dart';
 
@@ -395,9 +396,11 @@ class _DirectUrlPanelState extends State<_DirectUrlPanel> {
           controller: widget.controller,
           enabled: !busy,
           autofocus: false,
+          style: compactFormTextStyle(context),
           keyboardType: TextInputType.url,
           textInputAction: TextInputAction.done,
-          decoration: InputDecoration(
+          decoration: compactFormInputDecoration(
+            context,
             labelText: l10n.audioUrlLabel,
             hintText: l10n.audioUrlHint,
             suffixIcon: widget.controller.text.isEmpty || busy

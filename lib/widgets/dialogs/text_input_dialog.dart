@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../common/form_input_style.dart';
+
 /// 显示文本输入对话框
 ///
 /// 返回用户输入的文本（已 trim），取消时返回 `null`。
@@ -107,7 +109,9 @@ class _TextInputDialogState extends State<_TextInputDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
-        decoration: InputDecoration(
+        style: compactFormTextStyle(context),
+        decoration: compactFormInputDecoration(
+          context,
           labelText: widget.labelText,
           hintText: widget.hintText,
           errorText: _errorText,

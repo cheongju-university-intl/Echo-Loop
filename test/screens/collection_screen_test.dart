@@ -183,6 +183,73 @@ void main() {
         expect(find.text('Collection Name'), findsOneWidget);
       });
 
+      testWidgets('创建合集和订阅 Podcast 表单弱化输入提示样式', (tester) async {
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.add).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('collection-option-local')));
+        await tester.pumpAndSettle();
+
+        final localField = tester.widget<TextField>(find.byType(TextField));
+        final localContext = tester.element(find.byType(TextField));
+        final localTheme = Theme.of(localContext);
+
+        expect(
+          localField.style?.fontSize,
+          localTheme.textTheme.bodyMedium?.fontSize,
+        );
+        expect(
+          localField.decoration?.hintStyle?.fontSize,
+          localTheme.textTheme.bodyMedium?.fontSize,
+        );
+        expect(
+          localField.decoration?.hintStyle?.color,
+          localTheme.colorScheme.onSurfaceVariant.withValues(alpha: 0.52),
+        );
+        expect(
+          localField.decoration?.labelStyle?.fontSize,
+          localTheme.textTheme.bodySmall?.fontSize,
+        );
+        expect(
+          localField.decoration?.floatingLabelStyle?.color,
+          localTheme.colorScheme.primary.withValues(alpha: 0.78),
+        );
+        expect(
+          localField.decoration?.contentPadding,
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        );
+
+        await tester.tap(find.byIcon(Icons.arrow_back));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('collection-option-podcast')),
+        );
+        await tester.pumpAndSettle();
+
+        final podcastField = tester.widget<TextField>(find.byType(TextField));
+        final podcastContext = tester.element(find.byType(TextField));
+        final podcastTheme = Theme.of(podcastContext);
+
+        expect(
+          podcastField.style?.fontSize,
+          podcastTheme.textTheme.bodyMedium?.fontSize,
+        );
+        expect(
+          podcastField.decoration?.hintStyle?.fontSize,
+          podcastTheme.textTheme.bodyMedium?.fontSize,
+        );
+        expect(
+          podcastField.decoration?.hintStyle?.color,
+          podcastTheme.colorScheme.onSurfaceVariant.withValues(alpha: 0.52),
+        );
+        expect(
+          podcastField.decoration?.floatingLabelStyle?.color,
+          podcastTheme.colorScheme.primary.withValues(alpha: 0.78),
+        );
+      });
+
       testWidgets('创建合集时空名称时 Add 按钮禁用', (tester) async {
         await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();

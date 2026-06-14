@@ -16,6 +16,12 @@
 - [x] `flutter test test/screens/collection_screen_test.dart`：14 passed
 - [ ] `scripts/check.sh`：未跑；本次为合集页底部弹窗局部文案调整，按规范仅运行直接相关检查
 
+### 后续修复
+- [x] （2026-06-14 22:30 +0800）继续压低普通表单输入权重：抽取 `compactFormInputDecoration` / `compactFormTextStyle`，让创建合集、订阅 Podcast、链接导入、通用文本输入弹窗和创建标签输入框统一使用更小字号、更低透明度的 label/hint
+- [x] `flutter analyze lib/widgets/common/form_input_style.dart lib/screens/collection_screen.dart lib/widgets/import_audio_sheet.dart lib/widgets/dialogs/text_input_dialog.dart lib/widgets/edit_tag_membership_sheet.dart test/screens/collection_screen_test.dart test/widgets/import_audio_sheet_test.dart test/widgets/edit_tag_membership_sheet_test.dart test/widgets/text_input_dialog_test.dart`：No issues found
+- [x] `flutter test test/screens/collection_screen_test.dart test/widgets/import_audio_sheet_test.dart test/widgets/edit_tag_membership_sheet_test.dart test/widgets/text_input_dialog_test.dart`：35 passed
+- [ ] `scripts/check.sh`：未跑；本次为普通表单输入 placeholder 局部视觉统一，按规范仅运行直接相关检查
+
 ## 已完成：学习社群入口视觉对齐发现入口
 
 **完成时间**: 2026-06-14 22:09 +0800
