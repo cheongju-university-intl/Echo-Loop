@@ -43,10 +43,30 @@ CatalogCollection makeCatalogCollection({
   );
 }
 
+/// 构造 [CatalogPodcast] 便于注入。
+CatalogPodcast makeCatalogPodcast({
+  String id = 'podcast-1',
+  String title = '6 Minute English',
+  String? description = 'Short BBC lessons',
+  String? imageUrl = 'https://cdn/podcast.jpg',
+  String applePodcastUrl = 'https://podcasts.apple.com/us/podcast/id262026947',
+  String rssUrl = 'https://podcasts.files.bbci.co.uk/p02pc9tn.rss',
+}) {
+  return CatalogPodcast(
+    id: id,
+    title: title,
+    description: description,
+    imageUrl: imageUrl,
+    applePodcastUrl: applePodcastUrl,
+    rssUrl: rssUrl,
+  );
+}
+
 /// 构造完整 [CatalogSnapshot]。`contentHash` 默认基于 collections 内容生成，
 /// 与 service 的 sha256 对比逻辑兼容。
 CatalogSnapshot makeSnapshot({
   required List<CatalogCollection> collections,
+  List<CatalogPodcast> podcastCatalogs = const [],
   String? contentHash,
   DateTime? fetchedAt,
 }) {
@@ -80,12 +100,25 @@ CatalogSnapshot makeSnapshot({
                       },
                     )
                     .toList(),
+                'podcastCatalogs': podcastCatalogs
+                    .map(
+                      (p) => {
+                        'id': p.id,
+                        'applePodcastUrl': p.applePodcastUrl,
+                        'rssUrl': p.rssUrl,
+                        'imageUrl': p.imageUrl,
+                        'title': p.title,
+                        'description': p.description,
+                      },
+                    )
+                    .toList(),
               }),
             ),
           )
           .toString();
   return CatalogSnapshot(
     collections: collections,
+    podcastCatalogs: podcastCatalogs,
     contentHash: hash,
     fetchedAt: fetchedAt ?? DateTime(2026, 4, 19),
   );
@@ -114,6 +147,18 @@ String snapshotToBody(CatalogSnapshot s) {
                   },
                 )
                 .toList(),
+          },
+        )
+        .toList(),
+    'podcastCatalogs': s.podcastCatalogs
+        .map(
+          (p) => {
+            'id': p.id,
+            'applePodcastUrl': p.applePodcastUrl,
+            'rssUrl': p.rssUrl,
+            'imageUrl': p.imageUrl,
+            'title': p.title,
+            'description': p.description,
           },
         )
         .toList(),

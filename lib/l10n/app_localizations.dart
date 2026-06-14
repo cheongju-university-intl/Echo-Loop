@@ -5132,6 +5132,78 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get discoverRetry;
 
+  /// No description provided for @discoverPodcastEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Curated Podcasts'**
+  String get discoverPodcastEntryTitle;
+
+  /// No description provided for @discoverPodcastEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} podcasts. Subscribe to keep new episodes in your library.'**
+  String discoverPodcastEntrySubtitle(int count);
+
+  /// No description provided for @discoverPodcastTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Curated Podcasts'**
+  String get discoverPodcastTitle;
+
+  /// No description provided for @discoverPodcastEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No curated podcasts yet'**
+  String get discoverPodcastEmpty;
+
+  /// No description provided for @podcastCatalogSignInRequiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to add curated podcasts to My Collections and keep learning future episodes.'**
+  String get podcastCatalogSignInRequiredMessage;
+
+  /// No description provided for @podcastCatalogSubscribeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add. Some RSS feeds or Apple Podcasts may be unavailable on the current network. Try again later or switch networks.'**
+  String get podcastCatalogSubscribeFailed;
+
+  /// No description provided for @podcastEnrollNeededTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Podcast First'**
+  String get podcastEnrollNeededTitle;
+
+  /// No description provided for @podcastEnrollNeededMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this podcast to My Collections, then you can download and learn this episode.'**
+  String get podcastEnrollNeededMessage;
+
+  /// No description provided for @podcastPreviewNetworkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not fetch podcast content. Apple Podcasts or some RSS feeds may be unavailable on the current network. Try again later or switch networks.'**
+  String get podcastPreviewNetworkFailed;
+
+  /// No description provided for @podcastPreviewAppleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not resolve the Apple Podcasts link. The current network may not reach Apple\'s podcast lookup service. Try again later or switch networks.'**
+  String get podcastPreviewAppleFailed;
+
+  /// No description provided for @podcastPreviewParseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This podcast feed format is not supported, so the episode list could not be read.'**
+  String get podcastPreviewParseFailed;
+
+  /// No description provided for @podcastPreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No episodes were found yet.'**
+  String get podcastPreviewEmpty;
+
   /// No description provided for @officialBadge.
   ///
   /// In en, this message translates to:

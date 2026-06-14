@@ -72,6 +72,39 @@ class CatalogCollection {
   }
 }
 
+/// catalog 内单个精选 Podcast。
+///
+/// 后端 `podcastCatalogs` 当前返回扁平列表；客户端只把它作为发现页
+/// 预览入口。真正订阅后仍使用本地 `CollectionSource.podcast`。
+class CatalogPodcast {
+  final String id;
+  final String applePodcastUrl;
+  final String rssUrl;
+  final String? imageUrl;
+  final String title;
+  final String? description;
+
+  const CatalogPodcast({
+    required this.id,
+    required this.applePodcastUrl,
+    required this.rssUrl,
+    required this.imageUrl,
+    required this.title,
+    required this.description,
+  });
+
+  factory CatalogPodcast.fromJson(Map<String, dynamic> json) {
+    return CatalogPodcast(
+      id: json['id'] as String,
+      applePodcastUrl: json['applePodcastUrl'] as String? ?? '',
+      rssUrl: json['rssUrl'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String?,
+    );
+  }
+}
+
 /// catalog 的本地内存快照。
 ///
 /// `contentHash` 用于 `OfficialCatalogService.refresh` 的 sha256 比对：
@@ -79,11 +112,13 @@ class CatalogCollection {
 /// `fetchedAt` 用于 10 分钟节流判断。
 class CatalogSnapshot {
   final List<CatalogCollection> collections;
+  final List<CatalogPodcast> podcastCatalogs;
   final String contentHash;
   final DateTime fetchedAt;
 
   const CatalogSnapshot({
     required this.collections,
+    this.podcastCatalogs = const [],
     required this.contentHash,
     required this.fetchedAt,
   });

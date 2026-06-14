@@ -1131,6 +1131,23 @@
   "discoverEmpty": "暂无精选合集",
   "discoverLoadFailed": "加载失败，点击重试",
   "discoverRetry": "重试",
+  "discoverPodcastEntryTitle": "精选播客",
+  "discoverPodcastEntrySubtitle": "共 {count} 个播客，订阅后可自动获取最新单集",
+  "@discoverPodcastEntrySubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "discoverPodcastTitle": "精选播客",
+  "discoverPodcastEmpty": "暂无精选播客",
+  "podcastCatalogSignInRequiredMessage": "登录后可以将精选播客添加到我的合集，并继续学习后续单集。",
+  "podcastCatalogSubscribeFailed": "添加失败。部分 RSS 或 Apple Podcasts 在当前网络环境下可能不可访问，请稍后重试或切换网络。",
+  "podcastEnrollNeededTitle": "需要先添加播客",
+  "podcastEnrollNeededMessage": "添加到我的合集后，就可以下载并学习这期节目。",
+  "podcastPreviewNetworkFailed": "无法获取播客内容。Apple Podcasts 或部分 RSS 源在当前网络下可能不可访问，请稍后重试或切换网络。",
+  "podcastPreviewAppleFailed": "无法解析 Apple Podcasts 链接。当前网络可能无法访问 Apple 播客查询服务，请稍后重试或切换网络。",
+  "podcastPreviewParseFailed": "播客源格式暂不支持，无法读取单集列表。",
+  "podcastPreviewEmpty": "暂未获取到单集。",
   "officialBadge": "精选",
   "officialDeprecatedBadge": "已下架",
   "addToMyCollections": "添加到我的合集",

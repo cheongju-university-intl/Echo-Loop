@@ -132,9 +132,13 @@ class OfficialCatalogService {
       final collections = (json['collections'] as List? ?? const [])
           .map((e) => CatalogCollection.fromJson(e as Map<String, dynamic>))
           .toList(growable: false);
+      final podcastCatalogs = (json['podcastCatalogs'] as List? ?? const [])
+          .map((e) => CatalogPodcast.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false);
 
       final snapshot = CatalogSnapshot(
         collections: collections,
+        podcastCatalogs: podcastCatalogs,
         contentHash: metaJson['contentHash'] as String? ?? '',
         fetchedAt: DateTime.parse(metaJson['lastFetchedAt'] as String),
       );
@@ -142,7 +146,8 @@ class OfficialCatalogService {
       _hasInitialized = true;
       AppLogger.log(
         _logTag,
-        'loadCachedCatalog ok: collections=${collections.length} fetchedAt=${snapshot.fetchedAt}',
+        'loadCachedCatalog ok: collections=${collections.length} '
+        'podcasts=${podcastCatalogs.length} fetchedAt=${snapshot.fetchedAt}',
       );
       return snapshot;
     } catch (e) {
@@ -215,6 +220,7 @@ class OfficialCatalogService {
       }
       _cached = CatalogSnapshot(
         collections: _cached?.collections ?? const [],
+        podcastCatalogs: _cached?.podcastCatalogs ?? const [],
         contentHash: newHash,
         fetchedAt: now,
       );
@@ -228,6 +234,9 @@ class OfficialCatalogService {
       final collections = (json['collections'] as List? ?? const [])
           .map((e) => CatalogCollection.fromJson(e as Map<String, dynamic>))
           .toList(growable: false);
+      final podcastCatalogs = (json['podcastCatalogs'] as List? ?? const [])
+          .map((e) => CatalogPodcast.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false);
 
       await (await _catalogFile()).writeAsString(body);
       await _writeMeta(
@@ -238,6 +247,7 @@ class OfficialCatalogService {
 
       final snapshot = CatalogSnapshot(
         collections: collections,
+        podcastCatalogs: podcastCatalogs,
         contentHash: newHash,
         fetchedAt: now,
       );
@@ -245,7 +255,8 @@ class OfficialCatalogService {
       _hasInitialized = true;
       AppLogger.log(
         _logTag,
-        'refresh updated: collections=${collections.length}',
+        'refresh updated: collections=${collections.length} '
+        'podcasts=${podcastCatalogs.length}',
       );
       return CatalogUpdated(snapshot);
     } catch (e) {

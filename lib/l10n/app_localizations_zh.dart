@@ -2794,6 +2794,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverRetry => '重试';
 
   @override
+  String get discoverPodcastEntryTitle => '精选播客';
+
+  @override
+  String discoverPodcastEntrySubtitle(int count) {
+    return '共 $count 个播客，订阅后可自动获取最新单集';
+  }
+
+  @override
+  String get discoverPodcastTitle => '精选播客';
+
+  @override
+  String get discoverPodcastEmpty => '暂无精选播客';
+
+  @override
+  String get podcastCatalogSignInRequiredMessage =>
+      '登录后可以将精选播客添加到我的合集，并继续学习后续单集。';
+
+  @override
+  String get podcastCatalogSubscribeFailed =>
+      '添加失败。部分 RSS 或 Apple Podcasts 在当前网络环境下可能不可访问，请稍后重试或切换网络。';
+
+  @override
+  String get podcastEnrollNeededTitle => '需要先添加播客';
+
+  @override
+  String get podcastEnrollNeededMessage => '添加到我的合集后，就可以下载并学习这期节目。';
+
+  @override
+  String get podcastPreviewNetworkFailed =>
+      '无法获取播客内容。Apple Podcasts 或部分 RSS 源在当前网络下可能不可访问，请稍后重试或切换网络。';
+
+  @override
+  String get podcastPreviewAppleFailed =>
+      '无法解析 Apple Podcasts 链接。当前网络可能无法访问 Apple 播客查询服务，请稍后重试或切换网络。';
+
+  @override
+  String get podcastPreviewParseFailed => '播客源格式暂不支持，无法读取单集列表。';
+
+  @override
+  String get podcastPreviewEmpty => '暂未获取到单集。';
+
+  @override
   String get officialBadge => '精选';
 
   @override

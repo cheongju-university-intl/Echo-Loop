@@ -139,6 +139,52 @@ void main() {
     expect(hashAfter, isNot(hashBefore), reason: 'body 不同 → hash 不同');
   });
 
+  test('远端 catalog 解析并缓存 podcastCatalogs', () async {
+    final body = snapshotToBody(
+      makeSnapshot(
+        collections: [makeCatalogCollection()],
+        podcastCatalogs: [
+          makeCatalogPodcast(id: 'podcast-1', title: '6 Minute English'),
+        ],
+      ),
+    );
+    final dio = _MockDio(bodyProvider: () => body);
+    final svc = OfficialCatalogService.withDio(
+      dio: dio,
+      resolveDir: () async => tempDir,
+    );
+
+    final outcome = await svc.refresh();
+    expect(outcome, isA<CatalogUpdated>());
+    expect(svc.cached?.podcastCatalogs, hasLength(1));
+    expect(svc.cached?.podcastCatalogs.single.title, '6 Minute English');
+
+    final reloaded = OfficialCatalogService.withDio(
+      dio: dio,
+      resolveDir: () async => tempDir,
+    );
+    final cached = await reloaded.loadCachedCatalog();
+    expect(cached?.podcastCatalogs.single.rssUrl, contains('p02pc9tn.rss'));
+  });
+
+  test('旧 catalog body 缺少 podcastCatalogs 时按空列表兼容', () async {
+    const body = '''
+{
+  "serverTime":"2026-04-19T00:00:00.000Z",
+  "collections":[]
+}
+''';
+    final dio = _MockDio(bodyProvider: () => body);
+    final svc = OfficialCatalogService.withDio(
+      dio: dio,
+      resolveDir: () async => tempDir,
+    );
+
+    final outcome = await svc.refresh();
+    expect(outcome, isA<CatalogUpdated>());
+    expect(svc.cached?.podcastCatalogs, isEmpty);
+  });
+
   test('远端抛错 → outcome=failed，本地文件保留', () async {
     final body = snapshotToBody(
       makeSnapshot(collections: [makeCatalogCollection()]),
@@ -169,12 +215,6 @@ void main() {
     final completer = Completer<String>();
     final body = snapshotToBody(
       makeSnapshot(collections: [makeCatalogCollection()]),
-    );
-    final dio = _MockDio(
-      bodyProvider: () {
-        // 等 completer 才返回，确保多次 refresh 同时挂起
-        return body;
-      },
     );
     // 改写 get 让首次挂起
     final waitDio = _SlowDio(body: body, gate: completer.future);

@@ -2901,6 +2901,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get discoverRetry => 'Retry';
 
   @override
+  String get discoverPodcastEntryTitle => 'Curated Podcasts';
+
+  @override
+  String discoverPodcastEntrySubtitle(int count) {
+    return '$count podcasts. Subscribe to keep new episodes in your library.';
+  }
+
+  @override
+  String get discoverPodcastTitle => 'Curated Podcasts';
+
+  @override
+  String get discoverPodcastEmpty => 'No curated podcasts yet';
+
+  @override
+  String get podcastCatalogSignInRequiredMessage =>
+      'Sign in to add curated podcasts to My Collections and keep learning future episodes.';
+
+  @override
+  String get podcastCatalogSubscribeFailed =>
+      'Failed to add. Some RSS feeds or Apple Podcasts may be unavailable on the current network. Try again later or switch networks.';
+
+  @override
+  String get podcastEnrollNeededTitle => 'Add Podcast First';
+
+  @override
+  String get podcastEnrollNeededMessage =>
+      'Add this podcast to My Collections, then you can download and learn this episode.';
+
+  @override
+  String get podcastPreviewNetworkFailed =>
+      'Could not fetch podcast content. Apple Podcasts or some RSS feeds may be unavailable on the current network. Try again later or switch networks.';
+
+  @override
+  String get podcastPreviewAppleFailed =>
+      'Could not resolve the Apple Podcasts link. The current network may not reach Apple\'s podcast lookup service. Try again later or switch networks.';
+
+  @override
+  String get podcastPreviewParseFailed =>
+      'This podcast feed format is not supported, so the episode list could not be read.';
+
+  @override
+  String get podcastPreviewEmpty => 'No episodes were found yet.';
+
+  @override
   String get officialBadge => 'Curated';
 
   @override
