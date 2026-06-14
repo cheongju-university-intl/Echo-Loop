@@ -3,14 +3,18 @@ import 'dart:convert';
 import 'package:echo_loop/features/podcast/podcast_models.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/models/collection.dart';
+import 'package:echo_loop/features/podcast/podcast_repository.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
 import 'package:echo_loop/screens/collection_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
+
+class _MockPodcastRepository extends Mock implements PodcastRepository {}
 
 void main() {
   testWidgets('podcast 合集详情头部紧凑展示 feed 元信息', (tester) async {
@@ -48,6 +52,10 @@ void main() {
       podcastEnclosureUrl: 'https://example.com/episode-1.mp3',
       podcastEnclosureType: 'audio/mpeg',
     );
+    final podcastRepo = _MockPodcastRepository();
+    when(
+      () => podcastRepo.refresh('podcast-1', force: any(named: 'force')),
+    ).thenAnswer((_) async {});
 
     await tester.pumpWidget(
       createTestScreen(
@@ -66,6 +74,7 @@ void main() {
               ),
             ),
           ),
+          podcastRepositoryProvider.overrideWithValue(podcastRepo),
         ],
       ),
     );
@@ -79,9 +88,10 @@ void main() {
     // 头部保持紧凑，不展示上次刷新时间
     expect(find.text('Last refreshed: 2026-06-12 08:30'), findsNothing);
     expect(find.byIcon(Icons.podcasts_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.refresh), findsOneWidget);
+    expect(find.byIcon(Icons.refresh), findsNothing);
     expect(find.byIcon(Icons.info_outline), findsNothing);
     expect(find.text('More'), findsOneWidget);
+    verify(() => podcastRepo.refresh('podcast-1', force: false)).called(1);
 
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
@@ -100,5 +110,65 @@ void main() {
 
     expect(find.text('RSS URL'), findsOneWidget);
     expect(find.text('https://example.com/feed.xml'), findsOneWidget);
+  });
+
+  testWidgets('podcast 合集详情下拉刷新强制刷新 feed', (tester) async {
+    final collection = Collection(
+      id: 'podcast-1',
+      name: 'Learning Podcast',
+      createdDate: DateTime(2026, 6, 12),
+      source: CollectionSource.podcast,
+      podcastFeedUrl: 'https://example.com/feed.xml',
+      podcastMetaJson: jsonEncode(
+        const PodcastFeedMeta(
+          title: 'Learning Podcast',
+          feedUrl: 'https://example.com/feed.xml',
+        ).toJson(),
+      ),
+      podcastLastRefreshedAt: DateTime(2026, 6, 12, 8, 30),
+    );
+    final item = AudioItem(
+      id: 'episode-1',
+      name: 'Episode One',
+      audioPath: null,
+      addedDate: DateTime(2026, 6, 12),
+      podcastEpisodeGuid: 'guid-1',
+      podcastEnclosureUrl: 'https://example.com/episode-1.mp3',
+      podcastEnclosureType: 'audio/mpeg',
+    );
+    final podcastRepo = _MockPodcastRepository();
+    when(
+      () => podcastRepo.refresh('podcast-1', force: any(named: 'force')),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      createTestScreen(
+        const CollectionDetailScreen(collectionId: 'podcast-1'),
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
+          ),
+          collectionListProvider.overrideWith(
+            () => TestCollectionList(
+              CollectionState(
+                rawCollections: [collection],
+                audioIdsMap: const {
+                  'podcast-1': ['episode-1'],
+                },
+              ),
+            ),
+          ),
+          podcastRepositoryProvider.overrideWithValue(podcastRepo),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    clearInteractions(podcastRepo);
+    await tester.drag(find.text('Episode One'), const Offset(0, 500));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    verify(() => podcastRepo.refresh('podcast-1', force: true)).called(1);
   });
 }

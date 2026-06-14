@@ -32,9 +32,12 @@ class _FakeCatalogService extends OfficialCatalogService {
 
 class _FakeDio extends Fake implements Dio {
   Object? error;
-  String body;
+  String Function() bodyProvider;
+  int callCount = 0;
 
-  _FakeDio({required this.body, this.error});
+  _FakeDio({required String body, this.error}) : bodyProvider = (() => body);
+
+  _FakeDio.withBodyProvider({required this.bodyProvider});
 
   @override
   Future<Response<T>> get<T>(
@@ -45,10 +48,11 @@ class _FakeDio extends Fake implements Dio {
     CancelToken? cancelToken,
     ProgressCallback? onReceiveProgress,
   }) async {
+    callCount++;
     final e = error;
     if (e != null) throw e;
     return Response<T>(
-      data: body as T,
+      data: bodyProvider() as T,
       statusCode: 200,
       requestOptions: RequestOptions(path: path),
     );
@@ -86,6 +90,45 @@ void main() {
     expect(data.episodes, hasLength(1));
     expect(data.episodes.single.title, 'Episode One');
     expect(data.episodes.single.durationSeconds, 360);
+  });
+
+  test('PodcastPreviewService 10 分钟内复用 RSS 预览缓存', () async {
+    var now = DateTime(2026, 6, 14, 12);
+    final dio = _FakeDio(body: rss);
+    final service = PodcastPreviewService(
+      dio: dio,
+      resolver: PodcastUrlResolver(dio: dio),
+      parser: PodcastFeedParser(),
+      now: () => now,
+    );
+
+    final first = await service.fetch(makeCatalogPodcast());
+    now = now.add(const Duration(minutes: 3));
+    final second = await service.fetch(makeCatalogPodcast());
+
+    expect(first.episodes.single.title, 'Episode One');
+    expect(second.episodes.single.title, 'Episode One');
+    expect(dio.callCount, 1);
+  });
+
+  test('PodcastPreviewService force=true 绕过缓存重新拉 RSS', () async {
+    var version = 1;
+    final dio = _FakeDio.withBodyProvider(
+      bodyProvider: () => rss.replaceFirst('Episode One', 'Episode $version'),
+    );
+    final service = PodcastPreviewService(
+      dio: dio,
+      resolver: PodcastUrlResolver(dio: dio),
+      parser: PodcastFeedParser(),
+    );
+
+    final first = await service.fetch(makeCatalogPodcast());
+    version = 2;
+    final second = await service.fetch(makeCatalogPodcast(), force: true);
+
+    expect(first.episodes.single.title, 'Episode 1');
+    expect(second.episodes.single.title, 'Episode 2');
+    expect(dio.callCount, 2);
   });
 
   test('PodcastPreviewService 将网络错误映射为 preview exception', () async {

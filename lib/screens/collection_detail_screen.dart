@@ -2,6 +2,7 @@
 //
 // 展示合集中的音频列表，复用 AudioListView 和 AudioSortButton。
 // 支持上传音频到合集。
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -37,9 +38,6 @@ class _CollectionDetailScreenState
     extends ConsumerState<CollectionDetailScreen> {
   final _keyUpload = GlobalKey();
 
-  /// podcast feed 刷新中标志：刷新期间按钮显示加载态并禁用，防止二次点击。
-  bool _isRefreshingPodcast = false;
-
   /// 官方合集的排序状态，页面内独立持有（不走全局 audioListSettingsProvider，
   /// 避免污染资源库 / 用户自建合集的排序偏好）。首次打开默认「官方编排顺序」。
   AudioSortType _officialSort = AudioSortType.custom;
@@ -52,6 +50,14 @@ class _CollectionDetailScreenState
     AudioSortType.originalDateAsc,
     AudioSortType.originalDateDesc,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_refreshPodcastFeed(force: false));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,23 +101,6 @@ class _CollectionDetailScreenState
         appBar: AppBar(
           title: Text(collection.name),
           actions: [
-            // podcast 合集：刷新按钮保留在详情页，信息展示收敛到页面头部和合集菜单。
-            if (collection.isPodcast) ...[
-              IconButton(
-                icon: _isRefreshingPodcast
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-                tooltip: l10n.podcastRefreshFeed,
-                // 刷新中禁用按钮，避免重复触发请求
-                onPressed: _isRefreshingPodcast
-                    ? null
-                    : () => _refreshPodcastFeed(context, collection.id),
-              ),
-            ],
             // 官方合集：独立 sort state + 5 项菜单（默认 / 名称×2 / 原始发布×2）
             // 用户合集：保持现状 —— 4 项默认菜单 + 全局 provider
             if (collection.isOfficial)
@@ -142,6 +131,7 @@ class _CollectionDetailScreenState
                 audioItems: audioItems,
                 guideFirstAudioMenu: hasAudioItems,
                 guideLeadingItems: hasAudioItems,
+                onRefresh: () => _refreshPodcastFeed(force: true),
               )
             : AudioListView(
                 items: audioItems,
@@ -172,27 +162,21 @@ class _CollectionDetailScreenState
     );
   }
 
-  /// 刷新 podcast feed（force）。
+  /// 刷新 podcast feed。
   ///
-  /// 刷新期间通过 [_isRefreshingPodcast] 让顶部刷新按钮进入加载态并禁用，
-  /// 不再展示「正在获取」snackbar；仅在失败时弹出 snackbar 提示。
-  Future<void> _refreshPodcastFeed(
-    BuildContext context,
-    String collectionId,
-  ) async {
-    final l10n = AppLocalizations.of(context)!;
-    setState(() => _isRefreshingPodcast = true);
+  /// 进入页面时走普通刷新，交给 repository 的通用刷新策略节流；
+  /// 下拉时传 force=true 强制拉取 RSS。
+  Future<void> _refreshPodcastFeed({required bool force}) async {
     try {
       await ref
           .read(podcastRepositoryProvider)
-          .refresh(collectionId, force: true);
+          .refresh(widget.collectionId, force: force);
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted || !force) return;
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.podcastSubscribeFailed(e.toString()))),
       );
-    } finally {
-      if (mounted) setState(() => _isRefreshingPodcast = false);
     }
   }
 }
@@ -203,12 +187,14 @@ class _PodcastCollectionBody extends StatelessWidget {
   final List<AudioItem> audioItems;
   final bool guideFirstAudioMenu;
   final bool guideLeadingItems;
+  final Future<void> Function() onRefresh;
 
   const _PodcastCollectionBody({
     required this.collection,
     required this.audioItems,
     required this.guideFirstAudioMenu,
     required this.guideLeadingItems,
+    required this.onRefresh,
   });
 
   @override
@@ -218,19 +204,29 @@ class _PodcastCollectionBody extends StatelessWidget {
       children: [
         _PodcastFeedHeader(collection: collection),
         Expanded(
-          child: audioItems.isEmpty
-              ? Center(
-                  child: Text(
-                    l10n.officialCollectionEmpty,
-                    textAlign: TextAlign.center,
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            child: AudioListView(
+              items: audioItems,
+              collectionId: collection.id,
+              guideFirstAudioMenu: guideFirstAudioMenu,
+              guideLeadingItems: guideLeadingItems,
+              emptyState: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    child: Center(
+                      child: Text(
+                        l10n.officialCollectionEmpty,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
-                )
-              : AudioListView(
-                  items: audioItems,
-                  collectionId: collection.id,
-                  guideFirstAudioMenu: guideFirstAudioMenu,
-                  guideLeadingItems: guideLeadingItems,
-                ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );

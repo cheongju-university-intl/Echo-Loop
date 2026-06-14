@@ -21,6 +21,21 @@
 - [x] `flutter test test/features/official_collections/widgets/discover_entry_banner_test.dart`：4 passed
 - [ ] `scripts/check.sh`：未跑；本次为发现页入口文案与视觉局部调整，按规范仅运行直接相关检查
 
+## 已完成：统一刷新策略与 Podcast 下拉刷新
+
+**完成时间**: 2026-06-14 20:02 +0800
+
+抽取通用刷新调度器，统一处理 10 分钟节流、force 强刷、按 key 的 inflight 合并和异常后清理；catalog、精选合集详情、精选 Podcast 预览、已订阅 Podcast 合集刷新链路复用该策略。已订阅 Podcast 合集详情页移除顶部独立刷新按钮，改为下拉强制刷新。
+
+- [x] `refresh_coordinator.dart`：新增通用 `RefreshCoordinator` / `RefreshRun`，只负责刷新调度，不耦合 Riverpod、Dio、DB 或业务 outcome
+- [x] `official_catalog_service.dart` / `podcast_repository.dart` / `podcast_preview_provider.dart`：接入通用调度器，保留各自业务写入和错误语义
+- [x] `discover_collections_screen.dart` / `official_collection_detail_screen.dart`：进入页面触发普通同步，下拉仍为强制同步
+- [x] `collection_detail_screen.dart` / `official_podcast_preview_screen.dart`：Podcast 预览和已订阅合集统一为进页普通刷新、下拉强制刷新；已订阅合集移除 AppBar 刷新按钮
+- [x] 测试：新增通用调度器单元测试，补充 preview 缓存/强刷、repository 节流/强刷、Podcast 合集下拉刷新与官方页面回归测试
+- [x] `flutter analyze`（本次相关文件）：No issues found
+- [x] `flutter test test/services/refresh_coordinator_test.dart test/features/official_collections/official_catalog_service_test.dart test/features/official_collections/podcast_preview_provider_test.dart test/features/podcast/podcast_service_test.dart test/screens/collection_detail_screen_podcast_test.dart test/features/official_collections/discover_collections_screen_test.dart test/features/official_collections/official_collection_detail_screen_test.dart`：51 passed
+- [ ] `scripts/check.sh`：未跑；本次为 Podcast/官方合集刷新策略局部重构，按规范仅运行直接相关检查
+
 ## 已完成：Android 使用平台默认字体链
 
 **完成时间**: 2026-06-14 14:17 +0800

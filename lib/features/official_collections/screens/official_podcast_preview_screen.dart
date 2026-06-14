@@ -51,16 +51,7 @@ class _OfficialPodcastPreviewScreenState
               children: [
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: () async {
-                      ref.invalidate(podcastPreviewProvider(widget.podcastId));
-                      try {
-                        await ref.read(
-                          podcastPreviewProvider(widget.podcastId).future,
-                        );
-                      } catch (_) {
-                        // 错误由 AsyncValue 渲染为页面内错误卡；刷新手势本身不抛出。
-                      }
-                    },
+                    onRefresh: () => _refreshPreview(podcast),
                     child: _buildContent(
                       podcast,
                       preview,
@@ -131,6 +122,20 @@ class _OfficialPodcastPreviewScreenState
         },
       ),
     );
+  }
+
+  Future<void> _refreshPreview(CatalogPodcast podcast) async {
+    try {
+      await ref.read(podcastPreviewServiceProvider).fetch(podcast, force: true);
+    } catch (_) {
+      // 错误由 AsyncValue 渲染为页面内错误卡；刷新手势本身不抛出。
+    }
+    ref.invalidate(podcastPreviewProvider(widget.podcastId));
+    try {
+      await ref.read(podcastPreviewProvider(widget.podcastId).future);
+    } catch (_) {
+      // provider 的错误态由 build 渲染。
+    }
   }
 
   Widget _buildCta(

@@ -51,16 +51,10 @@ class _DiscoverCollectionsScreenState
   @override
   void initState() {
     super.initState();
-    // 首次安装 / 文件损坏 / 上次冷启动失败时的兜底：本地无缓存就立即拉。
+    // 进入发现页走普通同步：是否真正发请求由通用刷新策略节流决定。
     // inflight 防重入保证不会和 main.dart 启动时那次重复发请求。
-    final svc = ref.read(officialCatalogServiceProvider);
-    if (!svc.hasInitialized) {
-      AppLogger.log(
-        _logTag,
-        'initState: catalog not initialized, triggering syncAll',
-      );
-      unawaited(_syncCatalog());
-    }
+    AppLogger.log(_logTag, 'initState: triggering syncAll(force=false)');
+    unawaited(_syncCatalog());
   }
 
   /// 触发全局唯一同步；helper 内部处理 outcome=updated 后的

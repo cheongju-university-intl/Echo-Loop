@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../analytics/geo_interceptor.dart';
 import '../../../config/api_config.dart';
 import '../../../services/app_logger.dart';
+import '../../../services/refresh_coordinator.dart';
 import '../models/catalog.dart';
 
 part 'official_catalog_service.g.dart';
@@ -81,7 +82,7 @@ class OfficialCatalogService {
   bool get hasInitialized => _hasInitialized;
 
   /// 防重入：并发 refresh 复用同一个 future。
-  Future<CatalogRefreshOutcome>? _inflight;
+  late final RefreshCoordinator<String, CatalogRefreshOutcome> _refresh;
 
   OfficialCatalogService({required String baseUrl})
     : _dio = Dio(
@@ -92,6 +93,7 @@ class OfficialCatalogService {
         ),
       ),
       _resolveDir = _defaultDir {
+    _refresh = RefreshCoordinator<String, CatalogRefreshOutcome>();
     SharedPreferences.getInstance().then(
       (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
     );
@@ -101,8 +103,13 @@ class OfficialCatalogService {
   OfficialCatalogService.withDio({
     required Dio dio,
     required Future<Directory> Function() resolveDir,
+    RefreshCoordinator<String, CatalogRefreshOutcome>? refreshCoordinator,
   }) : _dio = dio,
-       _resolveDir = resolveDir;
+       _resolveDir = resolveDir {
+    _refresh =
+        refreshCoordinator ??
+        RefreshCoordinator<String, CatalogRefreshOutcome>();
+  }
 
   static Future<Directory> _defaultDir() async {
     final base = await getApplicationSupportDirectory();
@@ -168,24 +175,24 @@ class OfficialCatalogService {
   /// - body hash 与上次一致 → unchanged，仅刷新 lastFetchedAt
   /// - body hash 变化 → updated，写文件 + 更新 _cached + _hasInitialized
   Future<CatalogRefreshOutcome> refresh({bool force = false}) {
-    final existing = _inflight;
-    if (existing != null) {
-      AppLogger.log(_logTag, 'refresh: reusing inflight (force=$force)');
-      return existing;
-    }
-    final future = _doRefresh(force: force);
-    _inflight = future;
-    return future.whenComplete(() => _inflight = null);
+    return _refresh
+        .run(
+          key: 'catalog',
+          force: force,
+          lastRefreshedAt: _cached?.fetchedAt,
+          throttleWindow: _kThrottleWindow,
+          refresh: _doRefresh,
+        )
+        .then((result) {
+          return switch (result) {
+            RefreshThrottled<CatalogRefreshOutcome>() =>
+              const CatalogThrottled(),
+            RefreshCompleted<CatalogRefreshOutcome>(:final result) => result,
+          };
+        });
   }
 
-  Future<CatalogRefreshOutcome> _doRefresh({required bool force}) async {
-    if (!force) {
-      final last = _cached?.fetchedAt;
-      if (last != null && DateTime.now().difference(last) < _kThrottleWindow) {
-        return const CatalogThrottled();
-      }
-    }
-
+  Future<CatalogRefreshOutcome> _doRefresh() async {
     final Response<String> response;
     try {
       response = await _dio.get<String>(

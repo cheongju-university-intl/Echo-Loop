@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/features/podcast/podcast_repository.dart';
@@ -6,6 +7,33 @@ import 'package:echo_loop/features/podcast/podcast_feed_parser.dart';
 import 'package:echo_loop/features/podcast/podcast_models.dart';
 import 'package:echo_loop/models/collection.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _CountingDio extends Fake implements Dio {
+  int callCount = 0;
+  final String body;
+
+  _CountingDio({required this.body});
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    callCount++;
+    return Response<T>(
+      data: body as T,
+      statusCode: 200,
+      requestOptions: RequestOptions(path: path),
+    );
+  }
+}
+
+class _MockRef extends Mock implements Ref {}
 
 /// 用预置状态的 CollectionList override，避免依赖数据库。
 class _SeededCollectionList extends CollectionList {
@@ -337,6 +365,56 @@ void main() {
         repo.createAndFetch(feedUrl),
         throwsA(isNot(isA<PodcastAlreadySubscribedException>())),
       );
+    });
+  });
+
+  group('PodcastRepository.refresh — 刷新策略', () {
+    const feedUrl = 'https://feeds.example.com/voa/rss';
+
+    Collection podcast({required DateTime lastRefreshedAt}) {
+      return Collection(
+        id: 'podcast-1',
+        name: 'VOA Learning English',
+        createdDate: DateTime(2026, 6, 13),
+        source: CollectionSource.podcast,
+        podcastFeedUrl: feedUrl,
+        podcastLastRefreshedAt: lastRefreshedAt,
+      );
+    }
+
+    Ref makeRef(Collection collection) {
+      final ref = _MockRef();
+      when(
+        () => ref.read(collectionListProvider),
+      ).thenReturn(CollectionState(rawCollections: [collection]));
+      return ref;
+    }
+
+    test('普通刷新 10 分钟内节流，不访问 RSS', () async {
+      final dio = _CountingDio(body: '<rss></rss>');
+      final repo = PodcastRepository(
+        makeRef(podcast(lastRefreshedAt: DateTime.now())),
+        dio: dio,
+      );
+
+      await repo.refresh('podcast-1');
+
+      expect(dio.callCount, 0);
+    });
+
+    test('force=true 绕过节流并访问 RSS', () async {
+      final dio = _CountingDio(body: '<rss></rss>');
+      final repo = PodcastRepository(
+        makeRef(podcast(lastRefreshedAt: DateTime.now())),
+        dio: dio,
+      );
+
+      await expectLater(
+        repo.refresh('podcast-1', force: true),
+        throwsA(isA<PodcastParseException>()),
+      );
+
+      expect(dio.callCount, 1);
     });
   });
 }

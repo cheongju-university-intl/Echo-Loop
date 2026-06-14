@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../podcast/podcast_feed_parser.dart';
 import '../../podcast/podcast_models.dart';
 import '../../podcast/podcast_url_resolver.dart';
+import '../../../services/refresh_coordinator.dart';
 import '../models/catalog.dart';
 import 'discover_podcasts_provider.dart';
 
@@ -39,6 +40,16 @@ class PodcastPreviewData {
   const PodcastPreviewData({required this.meta, required this.episodes});
 }
 
+class _PodcastPreviewCacheEntry {
+  final PodcastPreviewData data;
+  final DateTime fetchedAt;
+
+  const _PodcastPreviewCacheEntry({
+    required this.data,
+    required this.fetchedAt,
+  });
+}
+
 @Riverpod(keepAlive: true)
 Dio podcastPreviewDio(Ref ref) {
   return Dio(
@@ -58,22 +69,61 @@ PodcastPreviewService podcastPreviewService(Ref ref) {
   );
 }
 
+const _kPreviewRefreshWindow = Duration(minutes: 10);
+
 /// 只读预览服务：拉取 RSS 并解析 episode，不写入本地库。
 class PodcastPreviewService {
   final Dio _dio;
   final PodcastUrlResolver _resolver;
   final PodcastFeedParser _parser;
+  final RefreshCoordinator<String, PodcastPreviewData> _refresh;
+  final DateTime Function() _now;
+  final Map<String, _PodcastPreviewCacheEntry> _cacheByFeedUrl = {};
 
   PodcastPreviewService({
     required Dio dio,
     required PodcastUrlResolver resolver,
     required PodcastFeedParser parser,
+    RefreshCoordinator<String, PodcastPreviewData>? refreshCoordinator,
+    DateTime Function()? now,
   }) : _dio = dio,
        _resolver = resolver,
-       _parser = parser;
+       _parser = parser,
+       _refresh =
+           refreshCoordinator ??
+           RefreshCoordinator<String, PodcastPreviewData>(
+             now: now ?? DateTime.now,
+           ),
+       _now = now ?? DateTime.now;
 
-  Future<PodcastPreviewData> fetch(CatalogPodcast podcast) async {
+  Future<PodcastPreviewData> fetch(
+    CatalogPodcast podcast, {
+    bool force = false,
+  }) async {
     final feedUrl = await _resolveFeedUrl(podcast);
+    final cached = _cacheByFeedUrl[feedUrl];
+    final result = await _refresh.run(
+      key: feedUrl,
+      force: force,
+      lastRefreshedAt: cached?.fetchedAt,
+      throttleWindow: _kPreviewRefreshWindow,
+      refresh: () async {
+        final data = await _fetchAndParse(feedUrl);
+        _cacheByFeedUrl[feedUrl] = _PodcastPreviewCacheEntry(
+          data: data,
+          fetchedAt: _now(),
+        );
+        return data;
+      },
+    );
+    return switch (result) {
+      RefreshThrottled<PodcastPreviewData>() =>
+        _cacheByFeedUrl[feedUrl]?.data ?? await _fetchAndParse(feedUrl),
+      RefreshCompleted<PodcastPreviewData>(:final result) => result,
+    };
+  }
+
+  Future<PodcastPreviewData> _fetchAndParse(String feedUrl) async {
     final feedContent = await _fetchFeedContent(feedUrl);
     try {
       final result = _parser.parse(feedContent, feedUrl: feedUrl);

@@ -53,11 +53,9 @@ class _OfficialCollectionDetailScreenState
   @override
   void initState() {
     super.initState();
-    final svc = ref.read(officialCatalogServiceProvider);
-    if (!svc.hasInitialized) {
-      AppLogger.log(_logTag, 'initState: catalog not initialized → syncAll');
-      unawaited(_syncCatalog());
-    }
+    // 进入精选合集详情走普通同步：是否真正发请求由通用刷新策略节流决定。
+    AppLogger.log(_logTag, 'initState: triggering syncAll(force=false)');
+    unawaited(_syncCatalog());
     // 延迟埋点，确保 detail 数据可用
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _trackDetailView();

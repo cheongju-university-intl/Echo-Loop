@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:echo_loop/database/app_database.dart' as db;
 import 'package:echo_loop/features/auth/providers/auth_providers.dart';
 import 'package:echo_loop/features/official_collections/data/official_catalog_service.dart';
+import 'package:echo_loop/features/official_collections/data/official_sync_service.dart';
 import 'package:echo_loop/features/official_collections/models/catalog.dart';
 import 'package:echo_loop/features/official_collections/screens/official_collection_detail_screen.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
@@ -15,6 +17,7 @@ import 'package:echo_loop/providers/listening_practice/listening_practice_provid
 import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/tag_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/mock_providers.dart';
@@ -32,6 +35,24 @@ class _FakeCatalogService extends OfficialCatalogService {
 
   @override
   bool get hasInitialized => true;
+}
+
+class _FakeAppDatabase extends Fake implements db.AppDatabase {}
+
+class _NoopOfficialSyncService extends OfficialSyncService {
+  _NoopOfficialSyncService(OfficialCatalogService catalog)
+    : super(database: _FakeAppDatabase(), catalog: catalog);
+
+  @override
+  Future<OfficialSyncStats> syncAll({bool force = false}) async {
+    return OfficialSyncStats.noop(const CatalogThrottled());
+  }
+}
+
+Override _noopSyncOverride() {
+  return officialSyncServiceProvider.overrideWith(
+    (ref) => _NoopOfficialSyncService(ref.read(officialCatalogServiceProvider)),
+  );
 }
 
 void main() {
@@ -66,6 +87,7 @@ void main() {
           ),
           learningSessionProvider.overrideWith(() => TestLearningSession()),
           blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
+          _noopSyncOverride(),
         ],
       ),
     );
@@ -98,6 +120,7 @@ void main() {
             _FakeCatalogService(snapshot),
           ),
           isAuthenticatedProvider.overrideWithValue(false),
+          _noopSyncOverride(),
         ],
       ),
     );
@@ -133,6 +156,7 @@ void main() {
             _FakeCatalogService(snapshot),
           ),
           isAuthenticatedProvider.overrideWithValue(false),
+          _noopSyncOverride(),
         ],
       ),
     );

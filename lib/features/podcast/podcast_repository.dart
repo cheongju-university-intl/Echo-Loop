@@ -16,6 +16,7 @@ import '../../models/audio_item.dart';
 import '../../models/collection.dart';
 import '../../providers/audio_library_provider.dart';
 import '../../providers/collection_provider.dart';
+import '../../services/refresh_coordinator.dart';
 import 'podcast_feed_parser.dart';
 import 'podcast_models.dart';
 import 'podcast_url_resolver.dart';
@@ -44,13 +45,18 @@ class PodcastRepository {
   final PodcastUrlResolver _urlResolver;
   final PodcastFeedParser _feedParser;
 
-  /// 进行中的刷新任务（collectionId → Future）；用于 inflight 合并
-  final Map<String, Future<void>> _inflightRefresh = {};
+  final RefreshCoordinator<String, void> _refresh;
 
-  PodcastRepository(this._ref)
-    : _dio = Dio(),
-      _urlResolver = PodcastUrlResolver(),
-      _feedParser = PodcastFeedParser();
+  PodcastRepository(
+    this._ref, {
+    Dio? dio,
+    PodcastUrlResolver? urlResolver,
+    PodcastFeedParser? feedParser,
+    RefreshCoordinator<String, void>? refreshCoordinator,
+  }) : _dio = dio ?? Dio(),
+       _urlResolver = urlResolver ?? PodcastUrlResolver(dio: dio),
+       _feedParser = feedParser ?? PodcastFeedParser(),
+       _refresh = refreshCoordinator ?? RefreshCoordinator<String, void>();
 
   // ── 创建 Podcast 合集 ─────────────────────────────────────────────────
 
@@ -104,31 +110,24 @@ class PodcastRepository {
   /// [force] = true 跳过 10 分钟节流。
   /// 同一合集若已有进行中的刷新，直接返回同一个 Future（inflight 合并）。
   Future<void> refresh(String collectionId, {bool force = false}) {
-    final existing = _inflightRefresh[collectionId];
-    if (existing != null) return existing;
-
-    final future = _doRefresh(collectionId, force: force).whenComplete(() {
-      _inflightRefresh.remove(collectionId);
-    });
-    _inflightRefresh[collectionId] = future;
-    return future;
-  }
-
-  Future<void> _doRefresh(String collectionId, {required bool force}) async {
     final collections = _ref.read(collectionListProvider).rawCollections;
     final collection = collections
         .where((c) => c.id == collectionId)
         .firstOrNull;
-    if (collection == null || !collection.isPodcast) return;
+    if (collection == null || !collection.isPodcast) return Future.value();
 
-    if (!force) {
-      final last = collection.podcastLastRefreshedAt;
-      if (last != null &&
-          DateTime.now().difference(last).inMinutes < _refreshThrottleMinutes) {
-        return; // 节流：距上次刷新不足 10 分钟
-      }
-    }
+    return _refresh
+        .run(
+          key: collectionId,
+          force: force,
+          lastRefreshedAt: collection.podcastLastRefreshedAt,
+          throttleWindow: const Duration(minutes: _refreshThrottleMinutes),
+          refresh: () => _doRefresh(collection),
+        )
+        .then((_) {});
+  }
 
+  Future<void> _doRefresh(Collection collection) async {
     final feedUrl = collection.podcastFeedUrl;
     if (feedUrl == null) return;
 
@@ -145,7 +144,7 @@ class PodcastRepository {
         .read(collectionListProvider.notifier)
         .updatePodcastCollection(updated);
 
-    await _importEpisodes(result.episodes, collectionId: collectionId);
+    await _importEpisodes(result.episodes, collectionId: collection.id);
   }
 
   // ── 内部辅助 ─────────────────────────────────────────────────────────
