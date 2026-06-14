@@ -429,10 +429,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get discoverEntryTitleA => 'Discover Curated Collections';
+  String get discoverEntryTitleA => 'Discover Curated Resources';
 
   @override
-  String get discoverEntrySubtitleA => 'TOEFL · IELTS · TEM · VOA…';
+  String get discoverEntrySubtitleA =>
+      'Podcasts · TOEFL · IELTS · TEM, textbooks...';
 
   @override
   String get officialCollectionEmpty => 'This collection has no audios yet';

@@ -425,10 +425,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get discoverEntryTitleA => '发现精选合集';
+  String get discoverEntryTitleA => '发现精选资源';
 
   @override
-  String get discoverEntrySubtitleA => '托福 · 雅思 · 专四专八 · VOA…';
+  String get discoverEntrySubtitleA => '播客 · 托福 · 雅思 · 专四专八，教材...';
 
   @override
   String get officialCollectionEmpty => '该合集暂无音频';

@@ -152,8 +152,8 @@
       "date": {"type": "String"}
     }
   },
-  "discoverEntryTitleA": "发现精选合集",
-  "discoverEntrySubtitleA": "托福 · 雅思 · 专四专八 · VOA…",
+  "discoverEntryTitleA": "发现精选资源",
+  "discoverEntrySubtitleA": "播客 · 托福 · 雅思 · 专四专八，教材...",
   "officialCollectionEmpty": "该合集暂无音频",
   "sortCollections": "排序",
   "gridView": "文件夹视图",

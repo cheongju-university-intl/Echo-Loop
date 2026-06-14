@@ -899,13 +899,13 @@ abstract class AppLocalizations {
   /// No description provided for @discoverEntryTitleA.
   ///
   /// In en, this message translates to:
-  /// **'Discover Curated Collections'**
+  /// **'Discover Curated Resources'**
   String get discoverEntryTitleA;
 
   /// No description provided for @discoverEntrySubtitleA.
   ///
   /// In en, this message translates to:
-  /// **'TOEFL · IELTS · TEM · VOA…'**
+  /// **'Podcasts · TOEFL · IELTS · TEM, textbooks...'**
   String get discoverEntrySubtitleA;
 
   /// No description provided for @officialCollectionEmpty.

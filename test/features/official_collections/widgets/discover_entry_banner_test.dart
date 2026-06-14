@@ -42,12 +42,12 @@ Widget _host({required List<Collection> collections, VoidCallback? onTap}) {
 }
 
 void main() {
-  testWidgets('入口卡片：固定显示「发现精选合集 / 托福·雅思·…」', (tester) async {
+  testWidgets('入口卡片：固定显示「发现精选资源 / 播客·托福·…」', (tester) async {
     await tester.pumpWidget(_host(collections: const []));
     await tester.pumpAndSettle();
 
-    expect(find.text('发现精选合集'), findsOneWidget);
-    expect(find.text('托福 · 雅思 · 专四专八 · VOA…'), findsOneWidget);
+    expect(find.text('发现精选资源'), findsOneWidget);
+    expect(find.text('播客 · 托福 · 雅思 · 专四专八，教材...'), findsOneWidget);
     // 旧 B 态文案不应再出现
     expect(find.text('看看新上架'), findsNothing);
   });
@@ -65,8 +65,35 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('发现精选合集'), findsOneWidget);
+    expect(find.text('发现精选资源'), findsOneWidget);
     expect(find.text('看看新上架'), findsNothing);
+  });
+
+  testWidgets('入口卡片：使用青蓝高亮渐变视觉', (tester) async {
+    await tester.pumpWidget(_host(collections: const []));
+    await tester.pumpAndSettle();
+
+    final gradientDecoration = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((box) => box.decoration)
+        .whereType<BoxDecoration>()
+        .firstWhere((decoration) => decoration.gradient != null);
+
+    final gradient = gradientDecoration.gradient;
+    expect(gradient, isA<LinearGradient>());
+    expect((gradient! as LinearGradient).colors, const [
+      Color(0xFFEAF8FA),
+      Color(0xFFDDEFFA),
+    ]);
+    expect(
+      (gradientDecoration.border! as Border).top.color,
+      const Color(0xFFA9D5DF),
+    );
+    expect(gradientDecoration.borderRadius, BorderRadius.circular(12));
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.auto_awesome_rounded)).size,
+      25,
+    );
   });
 
   testWidgets('点击整卡触发 onTap', (tester) async {

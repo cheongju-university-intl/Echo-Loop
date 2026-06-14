@@ -3,6 +3,24 @@
 > 最后更新：2026-06-14
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：发现页入口文案与视觉优化
+
+**完成时间**: 2026-06-14 20:13 +0800
+
+发现页顶部入口从“发现精选合集”调整为“发现精选资源”，副标题改为“播客 · 托福 · 雅思 · 专四专八，教材...”，避免精选播客接入后入口语义过窄。入口视觉从低饱和蓝色容器改为清透青蓝渐变、深海蓝图标色块和浅青边线，提升发现入口辨识度，同时避免黄色高亮带来的廉价感和内容压迫感。
+
+- [x] `discover_entry_banner.dart`：更新入口注释语义，新增亮/暗色视觉 palette 与渐变卡片样式
+- [x] `app_zh.arb` / `app_en.arb` / generated l10n：更新中英文入口文案
+- [x] `discover_entry_banner_test.dart`：更新中文文案回归断言，并补充青蓝高亮渐变视觉回归测试
+- [x] 后续修复（2026-06-14 20:56 +0800）：根据截图反馈移除偏黄暖奶油色调，统一为更克制的青蓝高亮 palette
+- [x] 后续修复（2026-06-14 20:59 +0800）：去掉入口图标外圈描边并降低图标底色对比，避免圆形图标过于扎眼
+- [x] 后续修复（2026-06-14 21:02 +0800）：彻底移除入口图标圆形背景，改为无外包圆的资源图标
+- [x] 后续修复（2026-06-14 21:04 +0800）：入口图标改为更直观的书册资源图标，卡片圆角从 20 降到 12
+- [x] 后续修复（2026-06-14 21:07 +0800）：按反馈将入口图标替换为 Sparkles 风格的 `auto_awesome_rounded`
+- [x] `flutter analyze lib/features/official_collections/widgets/discover_entry_banner.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart test/features/official_collections/widgets/discover_entry_banner_test.dart`：No issues found
+- [x] `flutter test test/features/official_collections/widgets/discover_entry_banner_test.dart`：4 passed
+- [ ] `scripts/check.sh`：未跑；本次为发现页入口文案与视觉局部调整，按规范仅运行直接相关检查
+
 ## 已完成：Android 使用平台默认字体链
 
 **完成时间**: 2026-06-14 14:17 +0800

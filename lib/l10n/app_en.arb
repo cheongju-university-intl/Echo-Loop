@@ -187,8 +187,8 @@
       "date": {"type": "String"}
     }
   },
-  "discoverEntryTitleA": "Discover Curated Collections",
-  "discoverEntrySubtitleA": "TOEFL · IELTS · TEM · VOA…",
+  "discoverEntryTitleA": "Discover Curated Resources",
+  "discoverEntrySubtitleA": "Podcasts · TOEFL · IELTS · TEM, textbooks...",
   "officialCollectionEmpty": "This collection has no audios yet",
   "sortCollections": "Sort",
   "gridView": "Grid View",
