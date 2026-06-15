@@ -10,7 +10,7 @@ import '../../providers/audio_library_provider.dart';
 import '../../providers/collection_provider.dart';
 import '../../utils/app_data_dir.dart';
 import '../../utils/audio_duration.dart';
-import '../../utils/audio_fingerprint.dart';
+import 'audio_finalization_service.dart';
 import 'audio_import_models.dart';
 import 'audio_registration_service.dart';
 import 'audio_transcode_service.dart';
@@ -34,20 +34,21 @@ class AudioImportService {
   }) : _dio = dio ?? Dio(),
        _uuid = uuid ?? const Uuid(),
        _resolveDataDir = resolveDataDir ?? getAppDataDirectory,
-       _computeSha256 = computeSha256 ?? computeAudioSha256,
        _readDurationSeconds = readDurationSeconds ?? getAudioDurationSeconds,
        _registrationService =
            registrationService ?? AudioRegistrationService(uuid: uuid),
-       _transcodeService =
-           transcodeService ?? AudioTranscodeService(uuid: uuid);
+       _finalizationService = AudioFinalizationService(
+         transcodeService:
+             transcodeService ?? AudioTranscodeService(uuid: uuid),
+         computeSha256: computeSha256,
+       );
 
   final Dio _dio;
   final Uuid _uuid;
   final Future<Directory> Function() _resolveDataDir;
-  final Future<String> Function(String absolutePath) _computeSha256;
   final Future<int> Function(String relativePath) _readDurationSeconds;
   final AudioRegistrationService _registrationService;
-  final AudioTranscodeService _transcodeService;
+  final AudioFinalizationService _finalizationService;
 
   static const supportedExtensions = {'mp3', 'wav', 'm4a', 'aac', 'flac'};
 
@@ -314,76 +315,15 @@ class AudioImportService {
     }
   }
 
-  Future<_FinalizedDownloadedAudio> _finalizeDownloadedAudio({
+  Future<FinalizedAudio> _finalizeDownloadedAudio({
     required Directory dataDir,
     required String tempRelativePath,
-  }) async {
-    final audioDir = Directory(p.join(dataDir.path, 'audios', 'imported'));
-    await audioDir.create(recursive: true);
-
-    final originalFile = File(p.join(dataDir.path, tempRelativePath));
-    final originalSha256 = await _computeFinalAudioSha256(originalFile);
-    final transcodeResult = await _transcodeService.transcodeToM4a(
+  }) {
+    return _finalizationService.finalize(
       dataDir: dataDir,
-      relativePath: tempRelativePath,
+      tempRelativePath: tempRelativePath,
+      targetSubdir: p.join('audios', 'imported'),
     );
-    final sourceRelativePath = transcodeResult.relativePath;
-    final sourceFile = File(p.join(dataDir.path, sourceRelativePath));
-    final sha256 = await _computeFinalAudioSha256(sourceFile);
-    final ext = p.extension(sourceFile.path);
-    final finalName = '$sha256$ext';
-    final finalFile = File(p.join(audioDir.path, finalName));
-
-    final created = !await finalFile.exists();
-    if (created) {
-      await _moveAudioToFinal(sourceFile: sourceFile, finalFile: finalFile);
-    } else {
-      await _deleteIfExists(sourceFile);
-    }
-    await _deleteTempAudioSibling(dataDir, tempRelativePath);
-    return _FinalizedDownloadedAudio(
-      relativePath: p.join('audios', 'imported', finalName),
-      sha256: sha256,
-      originalSha256: originalSha256,
-      created: created,
-    );
-  }
-
-  /// 对转码/回退后的最终候选音频计算指纹，用作程序内部稳定文件名。
-  Future<String> _computeFinalAudioSha256(File sourceFile) async {
-    try {
-      return await _computeSha256(sourceFile.path);
-    } catch (e) {
-      throw AudioImportException(
-        AudioImportFailureCode.storage,
-        'Failed to fingerprint audio',
-        e,
-      );
-    }
-  }
-
-  /// 将临时音频移动到正式目录；跨卷 rename 失败时回退 copy，并清理半成品。
-  Future<void> _moveAudioToFinal({
-    required File sourceFile,
-    required File finalFile,
-  }) async {
-    try {
-      await sourceFile.rename(finalFile.path);
-      return;
-    } on FileSystemException {
-      try {
-        await sourceFile.copy(finalFile.path);
-        await _deleteIfExists(sourceFile);
-        return;
-      } on FileSystemException catch (e) {
-        await _deleteIfExists(finalFile);
-        throw AudioImportException(
-          AudioImportFailureCode.storage,
-          'Failed to save audio',
-          e,
-        );
-      }
-    }
   }
 
   Future<int> _tryReadDuration(String relativePath) async {
@@ -430,32 +370,10 @@ class AudioImportService {
     return replaced.length > 80 ? replaced.substring(0, 80).trim() : replaced;
   }
 
-  Future<void> _deleteTempAudioSibling(
-    Directory dataDir,
-    String tempRelativePath,
-  ) async {
-    final tempFile = File(p.join(dataDir.path, tempRelativePath));
-    await _deleteIfExists(tempFile);
-  }
-
   Future<void> _deleteIfExists(File file) async {
     if (!await file.exists()) return;
     try {
       await file.delete();
     } catch (_) {}
   }
-}
-
-class _FinalizedDownloadedAudio {
-  const _FinalizedDownloadedAudio({
-    required this.relativePath,
-    required this.sha256,
-    required this.originalSha256,
-    required this.created,
-  });
-
-  final String relativePath;
-  final String sha256;
-  final String originalSha256;
-  final bool created;
 }

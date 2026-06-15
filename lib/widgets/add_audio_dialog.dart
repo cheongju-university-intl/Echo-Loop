@@ -14,11 +14,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_io/io.dart';
 import '../utils/app_data_dir.dart';
-import '../utils/audio_fingerprint.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
+import '../features/audio_import/audio_finalization_service.dart';
 import '../features/audio_import/audio_registration_service.dart';
-import '../features/audio_import/audio_transcode_service.dart';
 import '../models/audio_item.dart';
 import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
@@ -643,9 +642,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     String subdir,
   ) async {
     final dataDir = await getAppDataDirectory();
-    final finalDir = Directory(path.join(dataDir.path, subdir));
     final tmpDir = Directory(path.join(dataDir.path, 'tmp', 'audio_import'));
-    await finalDir.create(recursive: true);
     await tmpDir.create(recursive: true);
 
     final sourcePath = file.path;
@@ -659,7 +656,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         '${DateTime.now().microsecondsSinceEpoch}-${path.basename(baseName)}';
     final tmpPath = path.join(tmpDir.path, tmpName);
 
-    // 先复制到临时目录，转码/回退决策完成后再移动到正式音频目录。
+    // 先复制到临时目录，转码/落盘交给与链接导入共用的 finalize 流程。
     final bytes = file.bytes;
     final readStream = file.readStream;
     if (sourcePath != null) {
@@ -674,56 +671,19 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       throw Exception('Unable to access picked file');
     }
 
-    final tmpRelativePath = path.join('tmp', 'audio_import', tmpName);
-    final originalSha256 = await computeAudioSha256(tmpPath);
-    final transcodeResult = await AudioTranscodeService().transcodeToM4a(
+    final finalized = await AudioFinalizationService().finalize(
       dataDir: dataDir,
-      relativePath: tmpRelativePath,
+      tempRelativePath: path.join('tmp', 'audio_import', tmpName),
+      targetSubdir: subdir,
     );
-    final sourceRelativePath = transcodeResult.relativePath;
-    final sourceFile = File(path.join(dataDir.path, sourceRelativePath));
-    final sha256 = await computeAudioSha256(sourceFile.path);
-    final finalName = '$sha256${path.extension(sourceFile.path)}';
-    final finalFile = File(path.join(finalDir.path, finalName));
-
-    final created = !await finalFile.exists();
-    if (created) {
-      await _movePickedAudioToFinal(
-        sourceFile: sourceFile,
-        finalFile: finalFile,
-      );
-    } else {
-      await _deleteIfExists(sourceFile);
-    }
-    await _deleteIfExists(File(tmpPath));
 
     return (
-      path: path.join(subdir, finalName),
-      fileName: finalName,
-      audioSha256: sha256,
-      originalAudioSha256: originalSha256,
-      created: created,
+      path: finalized.relativePath,
+      fileName: path.basename(finalized.relativePath),
+      audioSha256: finalized.sha256,
+      originalAudioSha256: finalized.originalSha256,
+      created: finalized.created,
     );
-  }
-
-  /// 将本地导入的临时音频移动到正式目录；失败时清理可能写出的半文件。
-  Future<void> _movePickedAudioToFinal({
-    required File sourceFile,
-    required File finalFile,
-  }) async {
-    try {
-      await sourceFile.rename(finalFile.path);
-      return;
-    } on FileSystemException {
-      try {
-        await sourceFile.copy(finalFile.path);
-        await _deleteIfExists(sourceFile);
-        return;
-      } on FileSystemException catch (e) {
-        await _deleteIfExists(finalFile);
-        throw Exception('Failed to save picked audio: ${e.message}');
-      }
-    }
   }
 
   Future<void> _deleteIfExists(File file) async {
