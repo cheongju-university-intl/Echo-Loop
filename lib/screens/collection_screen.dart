@@ -340,6 +340,9 @@ class _CreateCollectionFlowSheetState
     if (error is PodcastAlreadySubscribedException) {
       return l10n.podcastAlreadySubscribed(error.collectionName);
     }
+    if (error is PodcastFeedBlockedException) {
+      return l10n.podcastFeedBlocked;
+    }
     final raw = error.toString();
     final message = raw
         .replaceFirst('PodcastResolveException: ', '')

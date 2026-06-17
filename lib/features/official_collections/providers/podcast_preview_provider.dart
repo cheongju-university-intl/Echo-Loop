@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../podcast/anti_bot_detector.dart';
 import '../../podcast/podcast_feed_parser.dart';
 import '../../podcast/podcast_models.dart';
 import '../../podcast/podcast_url_resolver.dart';
@@ -19,6 +20,9 @@ enum PodcastPreviewErrorKind {
   rssUnavailable,
   parseFailed,
   emptyFeed,
+
+  /// 源站返回了反爬/人机验证挑战页，Dio 无法通过。
+  blockedByAntiBot,
 }
 
 /// Podcast 预览失败。UI 只展示本类型映射后的友好文案。
@@ -163,6 +167,14 @@ class PodcastPreviewService {
       final content = response.data;
       if (content == null || content.isEmpty) {
         throw const PodcastPreviewException(PodcastPreviewErrorKind.emptyFeed);
+      }
+      if (isAntiBotChallenge(
+        contentType: response.headers.value('content-type'),
+        body: content,
+      )) {
+        throw const PodcastPreviewException(
+          PodcastPreviewErrorKind.blockedByAntiBot,
+        );
       }
       return content;
     } on PodcastPreviewException {

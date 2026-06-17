@@ -17,6 +17,7 @@ import '../../models/collection.dart';
 import '../../providers/audio_library_provider.dart';
 import '../../providers/collection_provider.dart';
 import '../../services/refresh_coordinator.dart';
+import 'anti_bot_detector.dart';
 import 'podcast_feed_parser.dart';
 import 'podcast_models.dart';
 import 'podcast_url_resolver.dart';
@@ -32,6 +33,13 @@ class PodcastAlreadySubscribedException implements Exception {
   const PodcastAlreadySubscribedException(this.collectionName);
   @override
   String toString() => 'PodcastAlreadySubscribedException: $collectionName';
+}
+
+/// 源站返回反爬/人机验证挑战页、Dio 无法通过时抛出。
+class PodcastFeedBlockedException implements Exception {
+  const PodcastFeedBlockedException();
+  @override
+  String toString() => 'PodcastFeedBlockedException';
 }
 
 @riverpod
@@ -196,6 +204,12 @@ class PodcastRepository {
     final content = response.data;
     if (content == null || content.isEmpty) {
       throw const PodcastParseException('Feed 内容为空');
+    }
+    if (isAntiBotChallenge(
+      contentType: response.headers.value('content-type'),
+      body: content,
+    )) {
+      throw const PodcastFeedBlockedException();
     }
     return content;
   }

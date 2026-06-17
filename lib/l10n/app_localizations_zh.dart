@@ -2839,6 +2839,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get podcastPreviewParseFailed => '播客源格式暂不支持，无法读取单集列表。';
 
   @override
+  String get podcastFeedBlocked => '该播客源在当前网络下拦截了自动访问。请稍后重试，或切换到其他网络。';
+
+  @override
   String get podcastPreviewEmpty => '暂未获取到单集。';
 
   @override

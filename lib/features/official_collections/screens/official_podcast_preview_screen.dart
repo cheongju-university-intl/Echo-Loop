@@ -34,6 +34,10 @@ class _OfficialPodcastPreviewScreenState
     extends ConsumerState<OfficialPodcastPreviewScreen> {
   bool _subscribing = false;
 
+  /// 错误卡「重试」进行中标志。挑战页失败返回很快，靠它给按钮一个可见的
+  /// 加载态，避免「点了没反应」的错觉。
+  bool _retrying = false;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -95,8 +99,8 @@ class _OfficialPodcastPreviewScreenState
           _PodcastPreviewHeader(podcast: podcast),
           _PodcastPreviewErrorCard(
             message: _formatPreviewError(error),
-            onRetry: () =>
-                ref.invalidate(podcastPreviewProvider(widget.podcastId)),
+            retrying: _retrying,
+            onRetry: () => _retryPreview(podcast),
           ),
         ],
       ),
@@ -136,6 +140,15 @@ class _OfficialPodcastPreviewScreenState
     } catch (_) {
       // provider 的错误态由 build 渲染。
     }
+  }
+
+  /// 错误卡「重试」：强制重新拉取并给按钮加载态，避免快速失败时无反馈。
+  Future<void> _retryPreview(CatalogPodcast podcast) async {
+    if (_retrying) return;
+    setState(() => _retrying = true);
+    await _refreshPreview(podcast);
+    if (!mounted) return;
+    setState(() => _retrying = false);
   }
 
   Widget _buildCta(
@@ -259,6 +272,7 @@ class _OfficialPodcastPreviewScreenState
         PodcastPreviewErrorKind.network => l10n.podcastPreviewNetworkFailed,
         PodcastPreviewErrorKind.appleLookup => l10n.podcastPreviewAppleFailed,
         PodcastPreviewErrorKind.parseFailed => l10n.podcastPreviewParseFailed,
+        PodcastPreviewErrorKind.blockedByAntiBot => l10n.podcastFeedBlocked,
         PodcastPreviewErrorKind.emptyFeed => l10n.podcastPreviewEmpty,
         PodcastPreviewErrorKind.rssUnavailable =>
           l10n.podcastPreviewNetworkFailed,
@@ -449,10 +463,12 @@ class _EpisodePreviewTile extends StatelessWidget {
 class _PodcastPreviewErrorCard extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
+  final bool retrying;
 
   const _PodcastPreviewErrorCard({
     required this.message,
     required this.onRetry,
+    this.retrying = false,
   });
 
   @override
@@ -484,7 +500,19 @@ class _PodcastPreviewErrorCard extends StatelessWidget {
                   ),
                 ),
               ),
-              TextButton(onPressed: onRetry, child: Text(l10n.discoverRetry)),
+              TextButton(
+                onPressed: retrying ? null : onRetry,
+                child: retrying
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                      )
+                    : Text(l10n.discoverRetry),
+              ),
             ],
           ),
         ),

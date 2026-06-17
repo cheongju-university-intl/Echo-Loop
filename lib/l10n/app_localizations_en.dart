@@ -2950,6 +2950,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This podcast feed format is not supported, so the episode list could not be read.';
 
   @override
+  String get podcastFeedBlocked =>
+      'This podcast source is blocking automated access on the current network. Try again later or switch to a different network.';
+
+  @override
   String get podcastPreviewEmpty => 'No episodes were found yet.';
 
   @override

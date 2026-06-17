@@ -5210,6 +5210,12 @@ abstract class AppLocalizations {
   /// **'This podcast feed format is not supported, so the episode list could not be read.'**
   String get podcastPreviewParseFailed;
 
+  /// No description provided for @podcastFeedBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This podcast source is blocking automated access on the current network. Try again later or switch to a different network.'**
+  String get podcastFeedBlocked;
+
   /// No description provided for @podcastPreviewEmpty.
   ///
   /// In en, this message translates to:

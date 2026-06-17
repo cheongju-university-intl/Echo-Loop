@@ -1522,6 +1522,7 @@
   "podcastPreviewNetworkFailed": "Could not fetch podcast content. Apple Podcasts or some RSS feeds may be unavailable on the current network. Try again later or switch networks.",
   "podcastPreviewAppleFailed": "Could not resolve the Apple Podcasts link. The current network may not reach Apple's podcast lookup service. Try again later or switch networks.",
   "podcastPreviewParseFailed": "This podcast feed format is not supported, so the episode list could not be read.",
+  "podcastFeedBlocked": "This podcast source is blocking automated access on the current network. Try again later or switch to a different network.",
   "podcastPreviewEmpty": "No episodes were found yet.",
   "officialBadge": "Curated",
   "officialDeprecatedBadge": "Removed",

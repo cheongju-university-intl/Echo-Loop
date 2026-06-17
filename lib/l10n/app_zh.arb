@@ -1149,6 +1149,7 @@
   "podcastPreviewNetworkFailed": "无法获取播客内容。Apple Podcasts 或部分 RSS 源在当前网络下可能不可访问，请稍后重试或切换网络。",
   "podcastPreviewAppleFailed": "无法解析 Apple Podcasts 链接。当前网络可能无法访问 Apple 播客查询服务，请稍后重试或切换网络。",
   "podcastPreviewParseFailed": "播客源格式暂不支持，无法读取单集列表。",
+  "podcastFeedBlocked": "该播客源在当前网络下拦截了自动访问。请稍后重试，或切换到其他网络。",
   "podcastPreviewEmpty": "暂未获取到单集。",
   "officialBadge": "精选",
   "officialDeprecatedBadge": "已下架",
