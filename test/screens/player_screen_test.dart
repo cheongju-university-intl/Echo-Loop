@@ -310,57 +310,6 @@ void main() {
         expect(find.text('Sentence Detail'), findsOneWidget);
         await _disposeTree(tester);
       });
-
-      testWidgets('进讲解页挂起 LP 监听、返回后恢复，currentFullIndex 不被重置', (
-        tester,
-      ) async {
-        final item = createTestAudioItem();
-        final sentences = createTestSentences(count: 3);
-        // 预构建 notifier 实例，便于读取 suspend/resume 调用计数
-        final practice = TestListeningPractice(
-          ListeningPracticeState(
-            currentAudioItem: item,
-            sentences: sentences,
-            currentFullIndex: 1, // 非 0，验证返回后不会被抹成 0
-          ),
-        );
-
-        await tester.pumpWidget(
-          createTestScreen(
-            const PlayerScreen(),
-            overrides: [
-              appSettingsProvider.overrideWith(() => TestAppSettings()),
-              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
-              collectionListProvider.overrideWith(() => TestCollectionList()),
-              listeningPracticeProvider.overrideWith(() => practice),
-              audioEngineProvider.overrideWith(
-                () => TestAudioEngine(
-                  initialState: const AudioEngineState(
-                    totalDuration: Duration(seconds: 120),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-        await tester.pump();
-
-        // 点击句子 → 导航前应已挂起监听，尚未恢复
-        await tester.tap(find.byType(MaskedSentenceTile).first);
-        await tester.pumpAndSettle();
-        expect(find.text('Sentence Detail'), findsOneWidget);
-        expect(practice.suspendListenersCallCount, 1);
-        expect(practice.resumeListenersCallCount, 0);
-
-        // 返回 free player → 恢复监听
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(practice.resumeListenersCallCount, 1);
-
-        // currentFullIndex 未被重置为 0（修复点：避免主播放按钮跳回第一句）
-        expect(practice.state.currentFullIndex, 1);
-        await _disposeTree(tester);
-      });
     });
   });
 }

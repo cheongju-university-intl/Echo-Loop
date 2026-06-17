@@ -3,6 +3,15 @@
 > 最后更新：2026-06-17（v41→v42 迁移：清理仍停在 v1 盲听首步的存量进度，改用 v2 流程）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：修复自由播放器看完句子讲解返回后主播放按钮跳回第一句
+
+free player 点句子进讲解页 → 试听单句 → 返回 → 点主播放按钮，结果从第一句重播。根因：讲解页旁路驱动同一个 `AudioEngine`（`playRangeOnce`，会 `newSession()` 顶掉 LP 的 session），而 `ListeningPractice` 的位置/状态监听器 **不校验 session**——默认连续模式下 `_updateCurrentSentence` 把 `currentFullIndex` 改成了被试听的句子。盲听播放器的位置监听本就有 `isActiveSession` 守卫（`blind_listen_player_provider.dart:732`），free player 缺失。修复即向 LP 监听器补上同款 session 守卫。
+
+- [x] `listening_practice_provider.dart`：新增 `_playbackSessionId` 字段，在 `_playContinuous`/`_playSubtitleDriven` 的 `newSession()` 后记录；`_updateCurrentSentence` 与 `_handlePlaybackCompleted` 开头加 `if (!_engine.isActiveSession(_playbackSessionId)) return;`，外来 session 的引擎事件一律忽略，与盲听播放器保持一致。
+- [x] 测试：新增 `test/providers/listening_practice/session_guard_test.dart`（外来 session 位置事件不改 `currentFullIndex` 的回归用例 + LP 自身 session 正常推进高亮的正向用例）。`flutter analyze` 改动文件 0 issue；相关 provider/screen 测试全绿。
+
+  **完成时间**: 2026-06-17
+
 ## 已完成：自由练习全能播放器复用盲听句子列表组件
 
 自由练习「全能播放器」(`PlayerScreen`) 原用自有 `SentenceListView`（整条点击=播放、右侧书签切换按钮、显示时间范围）。改为复用全文盲听的共享组件 `ParagraphSentenceListCard`/`MaskedSentenceTile`，统一交互：点击左侧编号区从该句继续播放、点击句子主体进讲解页、内置「尊重用户手动滚动」的自动跟随。约束：仅共享句子列表组件，不共享 provider/controller，不给共享组件加新职责。

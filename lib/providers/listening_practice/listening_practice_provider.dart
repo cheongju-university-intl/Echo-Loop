@@ -34,6 +34,16 @@ class ListeningPractice extends _$ListeningPractice {
   /// 连续播放模式的全曲循环计数（重新播放时重置）
   int _audioLoopCount = 0;
 
+  /// LP 自己发起播放时持有的 AudioEngine sessionId。
+  ///
+  /// engine 的 position/playerState 流是全局共享的：句子讲解页等组件会旁路
+  /// 驱动同一个 engine（`playRangeOnce`），并通过 `newSession()` 顶掉当前 session。
+  /// 监听回调只处理「属于 LP 当前播放 session」的事件，外来 session 的事件一律
+  /// 忽略——否则讲解页试听单句时，位置流会把 `currentFullIndex` 改成被试听的句子，
+  /// 返回后主播放按钮就从那一句（常表现为第一句）重新开始。
+  /// 与盲听播放器 `_startPositionTracking` 的 `isActiveSession` 守卫保持一致。
+  int _playbackSessionId = -1;
+
   @override
   ListeningPracticeState build() {
     _setupListeners();
@@ -120,6 +130,8 @@ class ListeningPractice extends _$ListeningPractice {
   }
 
   void _updateCurrentSentence(Duration position) {
+    // 仅处理 LP 自己发起的播放 session，忽略讲解页等外来 session 的位置事件
+    if (!_engine.isActiveSession(_playbackSessionId)) return;
     if (!_shouldUseContinuousMode() || !_engine.isPlaying) return;
     if (state.sentences.isEmpty) return;
 
@@ -134,6 +146,8 @@ class ListeningPractice extends _$ListeningPractice {
   }
 
   void _handlePlaybackCompleted() {
+    // 仅处理 LP 自己发起的播放 session，忽略讲解页等外来 session 的完成事件
+    if (!_engine.isActiveSession(_playbackSessionId)) return;
     if (!_shouldUseContinuousMode()) return;
 
     if (state.settings.loopAudioEnabled) {
@@ -357,6 +371,7 @@ class ListeningPractice extends _$ListeningPractice {
   /// [resume] 为 true 时跳过 seek，从当前暂停位置继续播放
   Future<void> _playContinuous({bool resume = false}) async {
     final sessionId = _engine.newSession();
+    _playbackSessionId = sessionId;
 
     if (!resume) {
       final startIndex = state.currentFullIndex;
@@ -396,6 +411,7 @@ class ListeningPractice extends _$ListeningPractice {
     int startIndex,
   ) async {
     final sessionId = _engine.newSession();
+    _playbackSessionId = sessionId;
 
     if (playList.isEmpty) return;
 

@@ -471,21 +471,11 @@ class FakeListeningPractice extends ListeningPractice {
   @override
   Future<void> saveCurrentPlaybackState() async {}
 
-  /// suspendListeners 调用次数（测试断言用）
-  int suspendListenersCallCount = 0;
-
-  /// resumeListeners 调用次数（测试断言用）
-  int resumeListenersCallCount = 0;
+  @override
+  void suspendListeners() {}
 
   @override
-  void suspendListeners() {
-    suspendListenersCallCount++;
-  }
-
-  @override
-  void resumeListeners() {
-    resumeListenersCallCount++;
-  }
+  void resumeListeners() {}
 
   @override
   Future<void> syncBookmarks() async {}

@@ -493,10 +493,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return;
     }
 
-    // 讲解页会旁路驱动同一个 AudioEngine（playRangeOnce 试听单句），其播放完成
-    // 事件若被 LP 的监听器接住，会触发 _handlePlaybackCompleted() 把 currentFullIndex
-    // 重置为 0，导致返回后主播放按钮跳回第一句。与盲听/精听一致：导航期间挂起监听。
-    controller.suspendListeners();
     await context.push(
       AppRoutes.sentenceDetail,
       extra: SentenceDetailArgs(
@@ -508,9 +504,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         endTimeMs: sentence.endTime.inMilliseconds,
       ),
     );
-    // 必须在 mounted 检查之前恢复：LP 是 keepAlive provider，若页面已销毁仍要恢复
-    // 监听，否则监听器永久失效。
-    controller.resumeListeners();
 
     _isNavigatingToDetail = false;
 
