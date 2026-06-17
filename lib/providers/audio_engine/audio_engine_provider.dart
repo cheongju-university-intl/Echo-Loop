@@ -43,6 +43,10 @@ class AudioEngine extends _$AudioEngine {
   bool get isPlaying => _audioPlayer.playing;
   Duration get currentPosition => _audioPlayer.position;
 
+  /// 当前 session id。调用方据此判断「引擎是否仍停在自己上次驱动的 session」，
+  /// 用于隔离讲解页等外来组件对共享引擎的旁路驱动。
+  int get currentSessionId => state.sessionId;
+
   // --- 音频加载 ---
   Future<Duration?> loadAudio(AudioItem item, double speed) async {
     try {

@@ -335,8 +335,12 @@ class ListeningPractice extends _$ListeningPractice {
     }
 
     if (_shouldUseContinuousMode()) {
-      // 暂停后恢复：engine 有位置且未完成播放，跳过 seek 直接继续
+      // 暂停后恢复：engine 有位置且未完成播放，跳过 seek 直接继续。
+      // 仅当引擎仍停在 LP 自己的 session 时才算「暂停后恢复」；若期间被讲解页等
+      // 外来 session 驱动过（clip/position 已被改写），必须按 currentFullIndex
+      // 重新定位，而不是从引擎当前（被污染的）位置继续。
       final isResume =
+          _engine.isActiveSession(_playbackSessionId) &&
           _engine.currentPosition > Duration.zero &&
           _engine.audioPlayer.processingState != ja.ProcessingState.completed;
       if (!isResume) {
@@ -497,6 +501,10 @@ class ListeningPractice extends _$ListeningPractice {
 
   Future<void> pause() async {
     await _engine.pause();
+    // 记录暂停后的 session 为 LP 自己持有：普通的「暂停→继续」仍视为 LP 拥有引擎
+    // （可从当前位置续播）；但若期间被讲解页等外来 session 进一步驱动，引擎 session
+    // 会被顶掉，play() 便不再续播引擎位置，而是按 currentFullIndex 重新定位。
+    _playbackSessionId = _engine.currentSessionId;
   }
 
   Future<void> stop() async {
