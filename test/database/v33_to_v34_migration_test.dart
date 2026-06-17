@@ -85,17 +85,21 @@ void main() {
         );
       }
 
-      // (1) 全新 audio：所有 review stage 升 v2
-      final fresh = byId['audio-fresh']!;
-      expect(fresh['review0'], 2);
-      expect(fresh['review1'], 2);
-      expect(fresh['review2'], 2);
-      expect(fresh['review28'], 2);
+      // (1) 全新 audio（firstLearn/blindListen/v1）会被后续 v41→v42 迁移清理掉
+      //     （仍停在 v1 盲听首步 → 删除，重新打开时建全新 v2 进度），故链式迁移到
+      //     head 后该行已不存在。本用例验 v34 review 版本判定改用 audio-only-firstlearn。
+      expect(
+        byId.containsKey('audio-fresh'),
+        isFalse,
+        reason: 'firstLearn/blindListen/v1 行被 v41→v42 清理',
+      );
 
       // (2) firstLearn 完成但无 review completion：review 全 v2
       final onlyFirstLearn = byId['audio-only-firstlearn']!;
       expect(onlyFirstLearn['review0'], 2);
       expect(onlyFirstLearn['review1'], 2);
+      expect(onlyFirstLearn['review2'], 2);
+      expect(onlyFirstLearn['review28'], 2);
 
       // (3) review0/1 已碰过 → 锁 v1；review2+ 没碰过 → v2
       final midReview1 = byId['audio-mid-review1']!;

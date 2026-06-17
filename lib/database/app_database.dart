@@ -85,7 +85,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 41;
+  static const currentSchemaVersion = 42;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -559,6 +559,24 @@ class AppDatabase extends _$AppDatabase {
         if (from < 38) {
           await _ensurePodcastColumns();
         }
+        // v41→v42：firstLearn v2（盲听后置）上线后，清理「仍停在 v1 盲听第一步」
+        // 的存量进度行。删除后该 audio 无进度行 → plan 回退 kLatestPlanVersions
+        // （firstLearn=2）→ 显示新版流程；重新打开时 ensureProgress 建全新 v2 进度。
+        //
+        // 背景：v33→v34 迁移把存量 audio 的 firstLearn 一律锁 v1。当时无 v2，合理；
+        // 但 v2 上线后，从未真正开始（仍在盲听步）的存量音频被永久锁在旧顺序。
+        //
+        // 必须放在最后：依赖 v33→v34 块创建的 plan_versions_json 列（迁移块按源码
+        // 顺序而非版本号执行，老库 from<34 块在此块之前才会跑到）。
+        if (from < 42) {
+          final lpExists = await customSelect(
+            "SELECT COUNT(*) AS cnt FROM sqlite_master "
+            "WHERE type='table' AND name = 'learning_progresses'",
+          ).getSingle();
+          if ((lpExists.data['cnt'] as int) > 0) {
+            await _clearUnstartedV1FirstLearnProgress();
+          }
+        }
       },
     );
   }
@@ -704,6 +722,58 @@ class AppDatabase extends _$AppDatabase {
       'DB.migrate',
       'v33→v34 done. 全 v2 (未碰过任何 review) = $allV2Count, '
           '部分锁 v1 = $lockedV1Count, current_sub_stage snap = $subStageSnappedCount',
+    );
+  }
+
+  /// v41→v42 迁移内核：删除「仍停在 v1 盲听第一步」的 firstLearn 进度行。
+  ///
+  /// 判定：`current_stage='firstLearn'` 且 `current_sub_stage='blindListen'`
+  /// 且 plan 快照里 `firstLearn == 1`。这类 audio 还没迈过 v1 第 1 步，进度行
+  /// 只有难度 / 盲听计数等可丢弃信息，直接删除即可。删除后无进度行 → plan 回退
+  /// kLatestPlanVersions（firstLearn=2）→ 显示新版顺序（精听优先）。
+  ///
+  /// **安全点**：v2 音频里 blindListen 是第 3 步，进行到第 3 步的 v2 行同样是
+  /// `firstLearn:blindListen`，但有真实进度。必须校验 json `firstLearn == 1`，
+  /// 只删 v1 行，绝不能仅凭 current_sub_stage='blindListen' 误删进行中的 v2。
+  Future<void> _clearUnstartedV1FirstLearnProgress() async {
+    final rows = await customSelect(
+      "SELECT audio_item_id, plan_versions_json FROM learning_progresses "
+      "WHERE current_stage = 'firstLearn' AND current_sub_stage = 'blindListen'",
+    ).get();
+    if (rows.isEmpty) {
+      AppLogger.log('DB.migrate', 'v41→v42 清理 v1 盲听首步: 无候选行, skip');
+      return;
+    }
+
+    final idsToDelete = <String>[];
+    for (final row in rows) {
+      final audioId = row.data['audio_item_id'] as String;
+      final raw = row.data['plan_versions_json'] as String? ?? '';
+      // 解析失败 / 空 json 视为非 v1（dense baseline 一定含 firstLearn），跳过。
+      int? firstLearnVersion;
+      if (raw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map && decoded['firstLearn'] is int) {
+            firstLearnVersion = decoded['firstLearn'] as int;
+          }
+        } catch (_) {
+          firstLearnVersion = null;
+        }
+      }
+      if (firstLearnVersion == 1) idsToDelete.add(audioId);
+    }
+
+    for (final audioId in idsToDelete) {
+      await customStatement(
+        "DELETE FROM learning_progresses WHERE audio_item_id = ?",
+        [audioId],
+      );
+    }
+    AppLogger.log(
+      'DB.migrate',
+      'v41→v42 清理 v1 盲听首步: 候选 ${rows.length} 行, '
+          '删除 ${idsToDelete.length} 行 (firstLearn==1)',
     );
   }
 
