@@ -1,7 +1,17 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-18（Free Player Tab 激活态视觉优化）
+> 最后更新：2026-06-18（Free Player 单句模式改为精听模式）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player 单句模式改为精听模式（复用 AnnotationContentView）
+
+自由播放器的「单句模式」原本只是一张简单卡片（句子大字 + 序号 + 时间 + 收藏图标，隐藏字幕仅模糊句子文本），语义上其实就是「精听模式」。改为与「逐句精听」复用同一套解析 UI（`AnnotationContentView`：解析/翻译/意群工具栏 + 句子 + 翻译 + 解析 + 难句标记行）。与逐句精听唯一不同：自由播放器有「隐藏字幕」开关，隐藏时遮蔽**整个解析内容区**（含工具栏、句子、翻译、解析）且禁用点击。
+
+- [x] `player_screen.dart`：重写 `_buildSingleSentenceView`，弃用旧卡片，改为「序号+时间 + `BookmarkToggleRow` 难句标记行 + `AnnotationContentView`（被遮罩 Stack 包裹）」，接入方式参照 `sentence_detail_screen.dart`；`onStopMainPlayer` 接 `controller.pause()` 让意群试听前停主播放；隐藏字幕遮罩复用原模糊视觉（`ImageFilter.blur(5,5)` + `onSurface` 0.05）外加 `IgnorePointer` 实现禁用。删除随之失效的整卡右键/长按上下文菜单（`_showContextMenu` + `text_context_menu` import）。
+- [x] 测试：`player_screen_test` 新增「单句模式（精听）」group——验证渲染 `AnnotationContentView` + `BookmarkToggleRow`、隐藏字幕叠加遮罩/显示字幕无遮罩、点击标记行切换收藏。复用 `intensive_listen_player_screen_test` 的 AI/DAO/学习设置 override 套路避免真实网络/DB。
+- [x] 验证：`flutter analyze` 改动文件 0 issue；`player_screen_test` 全 15 例绿；`flutter test` 全套 2860 例通过。
+
+  **完成时间**: 2026-06-18
 
 ## 已完成：Free Player Tab 激活态视觉优化
 

@@ -7,20 +7,77 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:echo_loop/screens/player_screen.dart';
 import 'package:echo_loop/widgets/common/paragraph_sentence_list_card.dart';
 import 'package:echo_loop/widgets/common/masked_sentence_tile.dart';
+import 'package:echo_loop/widgets/common/bookmark_toggle_row.dart';
 import 'package:echo_loop/widgets/playback_controls.dart';
+import 'package:echo_loop/widgets/practice/annotation_content_view.dart';
 import 'package:echo_loop/models/audio_engine_state.dart';
+import 'package:echo_loop/models/playback_settings.dart';
 import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
+import 'package:echo_loop/providers/sentence_ai_provider.dart';
+import 'package:echo_loop/database/providers.dart';
+import 'package:echo_loop/database/app_database.dart' show AudioItem, Bookmark;
+import 'package:echo_loop/database/daos/audio_item_dao.dart';
+import 'package:echo_loop/database/daos/bookmark_dao.dart';
+import 'package:echo_loop/services/sentence_ai_api_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
+
+class _MockApiClient extends Mock implements SentenceAiApiClient {}
+
+/// 测试用 BookmarkDao（AnnotationContentView 词典/收藏依赖）
+class _TestBookmarkDao implements BookmarkDao {
+  @override
+  Future<List<Bookmark>> getByAudioId(String audioItemId) async => const [];
+
+  @override
+  Stream<List<Bookmark>> watchByAudioId(String audioItemId) =>
+      Stream<List<Bookmark>>.value(const []);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
+}
+
+/// 测试用 AudioItemDao（词级时间戳加载返回空）
+class _TestAudioItemDao implements AudioItemDao {
+  @override
+  Future<AudioItem?> getById(String id) async => null;
+
+  @override
+  Future<void> updateWordTimestamps(String audioItemId, String? json) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
+}
+
+/// 单句模式（精听）所需 overrides：在音频 overrides 基础上补齐
+/// [AnnotationContentView] 的 AI / DAO / 学习设置依赖。
+List<Override> _singleSentenceOverrides({
+  required ListeningPracticeState practiceState,
+  AudioEngineState? engineState,
+}) {
+  return [
+    ..._audioOverrides(practiceState: practiceState, engineState: engineState),
+    ...learningSettingsOverrides(),
+    bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+    audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
+    sentenceAiNotifierProvider.overrideWithValue(
+      SentenceAiNotifier(
+        cacheDao: createStubbedMockCacheDao(),
+        apiClient: _MockApiClient(),
+      ),
+    ),
+  ];
+}
 
 /// 有音频状态的通用 provider overrides
 List<Override> _audioOverrides({
@@ -323,6 +380,113 @@ void main() {
 
         // 导航到讲解页 stub
         expect(find.text('Sentence Detail'), findsOneWidget);
+        await _disposeTree(tester);
+      });
+    });
+
+    group('单句模式（精听）', () {
+      testWidgets('复用精听解析组件 AnnotationContentView + 难句标记行', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _singleSentenceOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+                settings: const PlaybackSettings(singleSentenceMode: true),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // 不再是旧的列表卡片，而是精听解析视图 + 难句标记行
+        expect(find.byType(AnnotationContentView), findsOneWidget);
+        expect(find.byType(BookmarkToggleRow), findsOneWidget);
+        expect(find.byType(ParagraphSentenceListCard), findsNothing);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('隐藏字幕时叠加遮罩，显示字幕时无遮罩', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        // showTranscript = false → 遮罩存在
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _singleSentenceOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+                settings: const PlaybackSettings(
+                  singleSentenceMode: true,
+                  showTranscript: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // 遮罩存在：模糊层 + IgnorePointer 禁用下层交互
+        expect(find.byType(BackdropFilter), findsOneWidget);
+        expect(find.byType(IgnorePointer), findsWidgets);
+        await _disposeTree(tester);
+
+        // showTranscript = true → 无遮罩
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _singleSentenceOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+                settings: const PlaybackSettings(singleSentenceMode: true),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(BackdropFilter), findsNothing);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('点击难句标记行切换收藏状态', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _singleSentenceOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+                settings: const PlaybackSettings(singleSentenceMode: true),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // 初始未标记
+        expect(find.text('Tap to mark as difficult'), findsOneWidget);
+
+        await tester.tap(find.byType(BookmarkToggleRow));
+        await tester.pump();
+
+        // 切换后显示已标记文案
+        expect(find.text('Tap to mark as difficult'), findsNothing);
+        expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
         await _disposeTree(tester);
       });
     });

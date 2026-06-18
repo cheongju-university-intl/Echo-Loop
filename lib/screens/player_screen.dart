@@ -12,14 +12,16 @@ import '../models/sentence.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/collection_provider.dart';
+import '../providers/sentence_ai_provider.dart';
 import '../router/app_router.dart';
 import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../widgets/playback_controls.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/common/audio_app_bar_title.dart';
+import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/player_hotkey_scope.dart';
-import '../widgets/common/text_context_menu.dart';
+import '../widgets/practice/annotation_content_view.dart';
 import 'sentence_detail_screen.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -366,6 +368,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
   }
 
+  /// 单句模式（= 精听模式）：复用逐句精听的解析内容视图
+  ///
+  /// 与「逐句精听」共享 [AnnotationContentView]（解析/翻译/意群工具栏 + 句子 +
+  /// 翻译 + 解析），并在顶部叠加难句标记行。与逐句精听唯一的不同：本页支持
+  /// 「隐藏字幕」——[PlaybackSettings.showTranscript] 为 false 时，整个解析内容区
+  /// （含工具栏、句子、翻译、解析）被模糊遮罩并禁用点击，由控制栏眼睛图标恢复
+  /// 显示后才可操作。
   Widget _buildSingleSentenceView(
     ListeningPracticeState playerState,
     ListeningPractice controller,
@@ -375,93 +384,78 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final isBookmarked = playerState.bookmarkedIndices.contains(
       currentSentence.index,
     );
-    final isMobile = !kIsWeb && (Platform.isIOS || Platform.isAndroid);
+    final audioItem = playerState.currentAudioItem;
+    if (audioItem == null) {
+      return const SizedBox.shrink();
+    }
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: GestureDetector(
-          onSecondaryTapDown: (details) {
-            _showContextMenu(
-              context,
-              details.globalPosition,
-              currentSentence.text,
-            );
-          },
-          onLongPressStart: isMobile
-              ? (details) => _showContextMenu(
-                  context,
-                  details.globalPosition,
-                  currentSentence.text,
-                )
-              : null,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.m),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      Text(
-                        currentSentence.text,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.normal),
-                        textAlign: TextAlign.left,
-                      ),
-                      if (!playerState.settings.showTranscript)
-                        Positioned.fill(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                              child: Container(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.05),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.m),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Text(
-                              '#${currentSentence.index + 1}',
-                              style: AppTextStyles.caption(context),
-                            ),
-                            const SizedBox(width: AppSpacing.l),
-                            Text(
-                              '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
-                              style: AppTextStyles.caption(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                          color: isBookmarked
-                              ? AppTheme.bookmarkColor
-                              : Theme.of(context).colorScheme.outline,
-                        ),
-                        onPressed: () =>
-                            controller.toggleBookmark(currentSentence.index),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 序号 + 时间区间（弱化辅助信息）
+          Padding(
+            padding: const EdgeInsets.only(
+              top: AppSpacing.m,
+              bottom: AppSpacing.s,
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '#${currentSentence.index + 1}',
+                  style: AppTextStyles.caption(context),
+                ),
+                const SizedBox(width: AppSpacing.l),
+                Text(
+                  '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
+                  style: AppTextStyles.caption(context),
+                ),
+              ],
             ),
           ),
-        ),
+          // 难句标记行（复用精听）—— 不被遮蔽，盲听时仍可标记
+          BookmarkToggleRow(
+            isDifficult: isBookmarked,
+            onTap: () => controller.toggleBookmark(currentSentence.index),
+          ),
+          const SizedBox(height: AppSpacing.m),
+          // 精听解析内容 + 隐藏字幕遮罩
+          Expanded(
+            child: Stack(
+              children: [
+                AnnotationContentView(
+                  // 切句时重建，确保 AnnotationContentView 内部意群等状态重置
+                  key: ValueKey(currentSentence.index),
+                  text: currentSentence.text,
+                  aiNotifier: ref.read(sentenceAiNotifierProvider),
+                  audioItemId: audioItem.id,
+                  sentenceIndex: currentSentence.index,
+                  sentenceStartMs: currentSentence.startTime.inMilliseconds,
+                  sentenceEndMs: currentSentence.endTime.inMilliseconds,
+                  // 意群试听与主播放共用引擎，播放前先暂停主播放
+                  onStopMainPlayer: () => controller.pause(),
+                ),
+                // 隐藏字幕遮罩：覆盖整个内容区（含工具栏），模糊且不可点击
+                if (!playerState.settings.showTranscript)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ClipRRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                          child: Container(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.05),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -508,10 +502,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     await controller.restorePosition();
     // 返回后刷新收藏状态（讲解页可能修改了收藏）
     await controller.syncBookmarks();
-  }
-
-  void _showContextMenu(BuildContext context, Offset position, String text) {
-    TextContextMenu.show(context, position, text);
   }
 
   Widget _buildControlPanel(
