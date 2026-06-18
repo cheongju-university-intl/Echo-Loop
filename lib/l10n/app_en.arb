@@ -99,6 +99,21 @@
       "seconds": { "type": "int" }
     }
   },
+  "sleepTimer": "Sleep timer",
+  "sleepTimerMinutes": "{count} min",
+  "@sleepTimerMinutes": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "sleepTimerRemaining": "Time remaining",
+  "sleepTimerOff": "Turn off timer",
+  "sleepTimerA11yActive": "Sleep timer, {time} remaining, tap to adjust",
+  "@sleepTimerA11yActive": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
   "fullText": "Full Text",
   "bookmarked": "Bookmarked",
   "noSubtitle": "No Subtitle",

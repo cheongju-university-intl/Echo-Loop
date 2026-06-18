@@ -243,6 +243,25 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get sleepTimer => '定时停止';
+
+  @override
+  String sleepTimerMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get sleepTimerRemaining => '剩余时间';
+
+  @override
+  String get sleepTimerOff => '关闭定时';
+
+  @override
+  String sleepTimerA11yActive(String time) {
+    return '定时停止，剩余 $time，点击调整';
+  }
+
+  @override
   String get fullText => '全文';
 
   @override

@@ -17,6 +17,7 @@ import '../router/app_router.dart';
 import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../widgets/playback_controls.dart';
+import '../widgets/sleep_timer.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/common/audio_app_bar_title.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
@@ -100,6 +101,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         appBar: AppBar(
           titleSpacing: 0,
           title: _buildAppBarTitle(playerState, l10n),
+          actions: const [SleepTimerButton()],
         ),
         body: !playerState.hasAudio
             ? Center(child: Text(l10n.noAudioLoaded))

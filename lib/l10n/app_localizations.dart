@@ -548,6 +548,36 @@ abstract class AppLocalizations {
   /// **'{seconds}s'**
   String loopIntervalValue(int seconds);
 
+  /// No description provided for @sleepTimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep timer'**
+  String get sleepTimer;
+
+  /// No description provided for @sleepTimerMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String sleepTimerMinutes(int count);
+
+  /// No description provided for @sleepTimerRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Time remaining'**
+  String get sleepTimerRemaining;
+
+  /// No description provided for @sleepTimerOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off timer'**
+  String get sleepTimerOff;
+
+  /// No description provided for @sleepTimerA11yActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep timer, {time} remaining, tap to adjust'**
+  String sleepTimerA11yActive(String time);
+
   /// No description provided for @fullText.
   ///
   /// In en, this message translates to:
