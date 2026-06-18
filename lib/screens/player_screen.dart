@@ -536,7 +536,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               children: [
                 _buildProgressBar(playerState, isMobile),
                 const PlaybackControls(),
-                if (!isMobile) _buildInfoBar(playerState),
+                _buildInfoBar(playerState, centered: isMobile),
               ],
             ),
           ),
@@ -597,81 +597,96 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
   }
 
-  Widget _buildInfoBar(ListeningPracticeState playerState) {
+  /// 底部状态栏：模式 + 循环徽标 + 倍速。
+  ///
+  /// [centered] 为 true（移动端）时状态行整体居中显示在播放按钮下方，且不显示
+  /// macOS 快捷键提示；为 false（桌面端）时左对齐并在右侧排布快捷键提示。
+  Widget _buildInfoBar(
+    ListeningPracticeState playerState, {
+    bool centered = false,
+  }) {
     final l10n = AppLocalizations.of(context)!;
-    final captionStyle = AppTextStyles.caption(context);
-    final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    // 状态栏为辅助信息，统一弱化到低对比灰，避免与控制按钮抢注意力
+    final mutedColor = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.45);
+    final captionStyle = AppTextStyles.caption(
+      context,
+    ).copyWith(color: mutedColor);
+    final iconColor = mutedColor;
+
+    final statusRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              playerState.settings.singleSentenceMode
+                  ? Icons.format_quote
+                  : Icons.article,
+              size: 14,
+              color: iconColor,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              playerState.settings.singleSentenceMode
+                  ? l10n.singleSentenceMode
+                  : l10n.listMode,
+              style: captionStyle,
+            ),
+          ],
+        ),
+        // 倍速
+        const SizedBox(width: 12),
+        Text('${playerState.settings.playbackSpeed}x', style: captionStyle),
+        // 整篇循环徽标
+        if (playerState.settings.loopWhole) ...[
+          const SizedBox(width: 12),
+          _buildLoopBadge(
+            icon: Icons.repeat,
+            count: playerState.settings.wholeLoopCount,
+            iconColor: iconColor,
+            captionStyle: captionStyle,
+          ),
+        ],
+        // 单句循环徽标
+        if (playerState.settings.loopSentence) ...[
+          const SizedBox(width: 12),
+          _buildLoopBadge(
+            icon: Icons.repeat_one,
+            count: playerState.settings.sentenceLoopCount,
+            iconColor: iconColor,
+            captionStyle: captionStyle,
+          ),
+        ],
+      ],
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.m,
         vertical: AppSpacing.s,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    playerState.settings.singleSentenceMode
-                        ? Icons.format_quote
-                        : Icons.article,
-                    size: 14,
-                    color: iconColor,
+      child: centered
+          ? Center(child: statusRow)
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                statusRow,
+                const Spacer(),
+                if (!kIsWeb && Platform.isMacOS)
+                  SizedBox(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        child: _HotkeyTipsCarousel(l10n: l10n),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 3),
-                  Text(
-                    playerState.settings.singleSentenceMode
-                        ? l10n.singleSentenceMode
-                        : l10n.listMode,
-                    style: captionStyle,
-                  ),
-                ],
-              ),
-              // 整篇循环徽标
-              if (playerState.settings.loopWhole) ...[
-                const SizedBox(width: 12),
-                _buildLoopBadge(
-                  icon: Icons.repeat,
-                  count: playerState.settings.wholeLoopCount,
-                  iconColor: iconColor,
-                  captionStyle: captionStyle,
-                ),
               ],
-              // 单句循环徽标
-              if (playerState.settings.loopSentence) ...[
-                const SizedBox(width: 12),
-                _buildLoopBadge(
-                  icon: Icons.repeat_one,
-                  count: playerState.settings.sentenceLoopCount,
-                  iconColor: iconColor,
-                  captionStyle: captionStyle,
-                ),
-              ],
-              const SizedBox(width: 12),
-              Text(
-                '${playerState.settings.playbackSpeed}x',
-                style: captionStyle,
-              ),
-            ],
-          ),
-          const Spacer(),
-          if (!kIsWeb && Platform.isMacOS)
-            SizedBox(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 280),
-                  child: _HotkeyTipsCarousel(l10n: l10n),
-                ),
-              ),
             ),
-        ],
-      ),
     );
   }
 

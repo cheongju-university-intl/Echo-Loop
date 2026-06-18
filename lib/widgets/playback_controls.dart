@@ -70,9 +70,9 @@ class PlaybackControls extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 12),
               _buildSpeedButton(context, playerState, controller),
-              const SizedBox(width: 4),
+              const SizedBox(width: 12),
               _buildToggleButton(
                 context,
                 icon: playerState.settings.showTranscript
@@ -87,7 +87,7 @@ class PlaybackControls extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 12),
               const _LoopButton(),
             ],
           ),
@@ -222,12 +222,18 @@ class PlaybackControls extends ConsumerWidget {
     required bool isActive,
     required VoidCallback onPressed,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return IconButton(
       icon: Icon(icon),
       iconSize: 22,
+      // 激活态：浅色调底 + 主色图标（MD3 tonal toggle，轻量、不与主播放按钮抢注意力）；
+      // 未激活态：灰图标无背景。
       color: isActive
-          ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          ? colorScheme.primary
+          : colorScheme.onSurface.withValues(alpha: 0.6),
+      style: isActive
+          ? IconButton.styleFrom(backgroundColor: colorScheme.primaryContainer)
+          : null,
       onPressed: onPressed,
     );
   }
@@ -240,10 +246,11 @@ class PlaybackControls extends ConsumerWidget {
     return PopupMenuButton<double>(
       icon: Text(
         '${playerState.settings.playbackSpeed}x',
+        // 与未激活切换按钮一致的弱化灰，避免比图标更扎眼
         style: TextStyle(
           fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         ),
       ),
       itemBuilder: (context) {
@@ -354,6 +361,7 @@ class _LoopButtonState extends ConsumerState<_LoopButton> {
     final icon = settings.loopSentence && !settings.loopWhole
         ? Icons.repeat_one
         : Icons.repeat;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return OverlayPortal(
       controller: _portalController,
@@ -362,9 +370,15 @@ class _LoopButtonState extends ConsumerState<_LoopButton> {
         key: _buttonKey,
         icon: Icon(icon),
         iconSize: 22,
+        // 与其它切换按钮一致：激活态浅色调底 + 主色图标，未激活态灰图标。
         color: isActive
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ? colorScheme.primary
+            : colorScheme.onSurface.withValues(alpha: 0.6),
+        style: isActive
+            ? IconButton.styleFrom(
+                backgroundColor: colorScheme.primaryContainer,
+              )
+            : null,
         onPressed: _portalController.toggle,
       ),
     );
