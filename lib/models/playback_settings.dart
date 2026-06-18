@@ -53,11 +53,14 @@ class PlaybackSettings {
   /// 单句循环是否为无限（开启且次数为 0）。
   bool get isInfiniteSentence => loopSentence && sentenceLoopCount == 0;
 
+  /// 序列化为 JSON。
+  ///
+  /// **循环开关 [loopWhole]/[loopSentence] 不落盘**——它们是「现在想刷这条」的临时
+  /// 意图，加载任何音频都默认归为关，不应被全局记忆。循环参数（次数/间隔）作为全局
+  /// 偏好保留，使用户重新打开循环时沿用上次设置。
   Map<String, dynamic> toJson() => {
-    'loopWhole': loopWhole,
     'wholeLoopCount': wholeLoopCount,
     'wholeInterval': wholeInterval.inMilliseconds,
-    'loopSentence': loopSentence,
     'sentenceLoopCount': sentenceLoopCount,
     'sentenceInterval': sentenceInterval.inMilliseconds,
     'playbackSpeed': playbackSpeed,
@@ -67,25 +70,30 @@ class PlaybackSettings {
 
   /// 从 JSON 还原设置，并兼容旧版持久化数据。
   ///
-  /// 以是否含 `loopWhole`/`loopSentence` 键区分新旧 schema：
-  /// - 新 schema：直接读取六个循环字段（带范围校验）。
-  /// - 旧 schema：把单一 `repeatMode`（及更旧的 `loopEnabled`/`loopAudioEnabled`
-  ///   布尔）迁移为新字段——`one`→单句循环，`all`→整篇循环（∞，保留旧「整段循环=
-  ///   永远循环」语义），`off`→两者皆关。旧 `loopCount`/`pauseInterval` 顺带迁移到
-  ///   单句循环参数，越界值静默截断到新范围。
+  /// **循环开关 [loopWhole]/[loopSentence] 一律还原为 `false`**（不从落盘数据恢复，
+  /// 见 [toJson]）；仅恢复循环参数（次数/间隔）、速度、视图、字幕等偏好。
+  ///
+  /// 新旧 schema 以是否含循环参数键（`wholeLoopCount`/`sentenceLoopCount`/
+  /// `wholeInterval`/`sentenceInterval`）区分——新 [toJson] 一定写这些参数：
+  /// - 新 schema：读取循环参数（带范围校验）。
+  /// - 旧 schema：把旧 `loopCount`/`pauseInterval` 迁移为单句循环参数偏好；旧的
+  ///   `repeatMode`/`loopEnabled`/`loopAudioEnabled` 开关一律忽略（开关不再持久化）。
   factory PlaybackSettings.fromJson(Map<String, dynamic> json) {
     final speed = (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0;
     final single = json['singleSentenceMode'] == true;
     final transcript = json['showTranscript'] ?? true;
 
-    final hasNew =
-        json.containsKey('loopWhole') || json.containsKey('loopSentence');
-    if (hasNew) {
+    final hasNewParams =
+        json.containsKey('wholeLoopCount') ||
+        json.containsKey('sentenceLoopCount') ||
+        json.containsKey('wholeInterval') ||
+        json.containsKey('sentenceInterval') ||
+        json.containsKey('loopWhole') ||
+        json.containsKey('loopSentence');
+    if (hasNewParams) {
       return PlaybackSettings(
-        loopWhole: json['loopWhole'] == true,
         wholeLoopCount: _parseCount(json['wholeLoopCount'], 3),
         wholeInterval: _parseInterval(json['wholeInterval'], 3),
-        loopSentence: json['loopSentence'] == true,
         sentenceLoopCount: _parseCount(json['sentenceLoopCount'], 3),
         sentenceInterval: _parseInterval(json['sentenceInterval'], 2),
         playbackSpeed: speed,
@@ -94,32 +102,21 @@ class PlaybackSettings {
       );
     }
 
-    // 旧 schema 迁移
-    switch (_legacyMode(json)) {
-      case 'one':
-        return PlaybackSettings(
-          loopSentence: true,
-          sentenceLoopCount: _parseCount(json['loopCount'], 3),
-          sentenceInterval: _parseInterval(json['pauseInterval'], 2),
-          playbackSpeed: speed,
-          singleSentenceMode: single,
-          showTranscript: transcript,
-        );
-      case 'all':
-        return PlaybackSettings(
-          loopWhole: true,
-          wholeLoopCount: 0, // ∞：保留旧整段循环的无限语义
-          playbackSpeed: speed,
-          singleSentenceMode: single,
-          showTranscript: transcript,
-        );
-      default:
-        return PlaybackSettings(
-          playbackSpeed: speed,
-          singleSentenceMode: single,
-          showTranscript: transcript,
-        );
+    // 旧 schema：仅迁移参数偏好，开关一律不恢复
+    if (_legacyMode(json) == 'one') {
+      return PlaybackSettings(
+        sentenceLoopCount: _parseCount(json['loopCount'], 3),
+        sentenceInterval: _parseInterval(json['pauseInterval'], 2),
+        playbackSpeed: speed,
+        singleSentenceMode: single,
+        showTranscript: transcript,
+      );
     }
+    return PlaybackSettings(
+      playbackSpeed: speed,
+      singleSentenceMode: single,
+      showTranscript: transcript,
+    );
   }
 
   /// 解析循环次数：`0`=∞；`1-10` 合法；`>10` 截到 10；其余非法值回退 [def]。

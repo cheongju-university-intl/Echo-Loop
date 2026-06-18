@@ -66,9 +66,10 @@ void main() {
 
         expect(find.byType(Slider), findsNWidgets(2));
         expect(find.text('Repeat Count'), findsOneWidget);
-        // 间隔 label 去掉「（秒）」，单位仅在右侧值列以紧凑形式 Ns 体现
-        expect(find.text('Interval'), findsOneWidget);
+        // 间隔 label 不带单位；值列英文用「Ns」、次数用「Nx」
+        expect(find.text('Interval Duration'), findsOneWidget);
         expect(find.text('3s'), findsWidgets);
+        expect(find.text('3x'), findsWidgets);
       });
 
       testWidgets('两组循环同时开启时展开 4 个滑块', (tester) async {

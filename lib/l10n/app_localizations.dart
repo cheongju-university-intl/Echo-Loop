@@ -527,7 +527,7 @@ abstract class AppLocalizations {
   /// No description provided for @intervalTime.
   ///
   /// In en, this message translates to:
-  /// **'Interval'**
+  /// **'Interval Duration'**
   String get intervalTime;
 
   /// No description provided for @times.
@@ -535,6 +535,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'times'**
   String get times;
+
+  /// No description provided for @loopCountValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}x'**
+  String loopCountValue(int count);
+
+  /// No description provided for @loopIntervalValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String loopIntervalValue(int seconds);
 
   /// No description provided for @fullText.
   ///

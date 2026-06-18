@@ -22,12 +22,35 @@ void main() {
     });
 
     group('toJson / fromJson 往返序列化', () {
-      test('完整字段往返一致', () {
+      test('循环开关不持久化：往返后恒为关', () {
         const settings = PlaybackSettings(
           loopWhole: true,
+          loopSentence: true,
+          playbackSpeed: 1.5,
+        );
+        final restored = PlaybackSettings.fromJson(settings.toJson());
+
+        // 开关不落盘，还原后一律为关
+        expect(restored.loopWhole, isFalse);
+        expect(restored.loopSentence, isFalse);
+      });
+
+      test('toJson 不含循环开关键，但含循环参数键', () {
+        const settings = PlaybackSettings(loopWhole: true, loopSentence: true);
+        final json = settings.toJson();
+
+        expect(json.containsKey('loopWhole'), isFalse);
+        expect(json.containsKey('loopSentence'), isFalse);
+        expect(json.containsKey('wholeLoopCount'), isTrue);
+        expect(json.containsKey('sentenceLoopCount'), isTrue);
+        expect(json.containsKey('wholeInterval'), isTrue);
+        expect(json.containsKey('sentenceInterval'), isTrue);
+      });
+
+      test('循环参数与其他偏好往返保留', () {
+        const settings = PlaybackSettings(
           wholeLoopCount: 5,
           wholeInterval: Duration(seconds: 4),
-          loopSentence: true,
           sentenceLoopCount: 2,
           sentenceInterval: Duration(seconds: 1),
           playbackSpeed: 1.5,
@@ -36,10 +59,8 @@ void main() {
         );
         final restored = PlaybackSettings.fromJson(settings.toJson());
 
-        expect(restored.loopWhole, settings.loopWhole);
         expect(restored.wholeLoopCount, settings.wholeLoopCount);
         expect(restored.wholeInterval, settings.wholeInterval);
-        expect(restored.loopSentence, settings.loopSentence);
         expect(restored.sentenceLoopCount, settings.sentenceLoopCount);
         expect(restored.sentenceInterval, settings.sentenceInterval);
         expect(restored.playbackSpeed, settings.playbackSpeed);
@@ -57,65 +78,52 @@ void main() {
         expect(json['sentenceInterval'], 3000);
       });
 
-      test('无限循环往返一致', () {
+      test('循环次数 0（∞）作为参数往返保留', () {
         const settings = PlaybackSettings(
-          loopWhole: true,
           wholeLoopCount: 0,
-          loopSentence: true,
           sentenceLoopCount: 0,
         );
         final restored = PlaybackSettings.fromJson(settings.toJson());
-        expect(restored.isInfiniteWhole, isTrue);
-        expect(restored.isInfiniteSentence, isTrue);
+        expect(restored.wholeLoopCount, 0);
+        expect(restored.sentenceLoopCount, 0);
       });
     });
 
-    group('旧字段迁移', () {
-      test('旧 repeatMode=one 迁移为单句循环', () {
+    group('旧字段兼容（开关不恢复，仅迁移参数）', () {
+      test('旧 repeatMode=one 仅迁移单句循环参数，开关恒关', () {
         final settings = PlaybackSettings.fromJson({
           'repeatMode': 'one',
           'loopCount': 5,
           'pauseInterval': 4000,
         });
-        expect(settings.loopSentence, isTrue);
         expect(settings.sentenceLoopCount, 5);
         expect(settings.sentenceInterval, const Duration(seconds: 4));
+        expect(settings.loopSentence, isFalse);
         expect(settings.loopWhole, isFalse);
       });
 
-      test('旧 repeatMode=all 迁移为整篇循环（∞）', () {
+      test('旧 repeatMode=all 不再开启整篇循环', () {
         final settings = PlaybackSettings.fromJson({'repeatMode': 'all'});
-        expect(settings.loopWhole, isTrue);
-        expect(settings.wholeLoopCount, 0);
-        expect(settings.isInfiniteWhole, isTrue);
+        expect(settings.loopWhole, isFalse);
         expect(settings.loopSentence, isFalse);
       });
 
-      test('旧 repeatMode=off 迁移为两者皆关', () {
+      test('旧 repeatMode=off 两者皆关', () {
         final settings = PlaybackSettings.fromJson({'repeatMode': 'off'});
         expect(settings.loopWhole, isFalse);
         expect(settings.loopSentence, isFalse);
       });
 
-      test('更旧 loopEnabled=true 迁移为单句循环', () {
+      test('更旧 loopEnabled=true 不再开启循环', () {
         final settings = PlaybackSettings.fromJson({'loopEnabled': true});
-        expect(settings.loopSentence, isTrue);
-        expect(settings.loopWhole, isFalse);
-      });
-
-      test('更旧 loopAudioEnabled=true 迁移为整篇循环', () {
-        final settings = PlaybackSettings.fromJson({'loopAudioEnabled': true});
-        expect(settings.loopWhole, isTrue);
         expect(settings.loopSentence, isFalse);
+        expect(settings.loopWhole, isFalse);
       });
 
-      test('单句循环优先于整段循环', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopEnabled': true,
-          'loopAudioEnabled': true,
-        });
-        expect(settings.loopSentence, isTrue);
+      test('更旧 loopAudioEnabled=true 不再开启循环', () {
+        final settings = PlaybackSettings.fromJson({'loopAudioEnabled': true});
         expect(settings.loopWhole, isFalse);
+        expect(settings.loopSentence, isFalse);
       });
 
       test('迁移时旧 loopCount 超范围截断到 10', () {
@@ -126,66 +134,46 @@ void main() {
         expect(settings.sentenceLoopCount, 10);
       });
 
-      test('新 schema 字段优先于旧字段', () {
+      test('仅含参数键的 JSON 被识别为新 schema，参数保留', () {
         final settings = PlaybackSettings.fromJson({
-          'loopWhole': true,
           'wholeLoopCount': 4,
-          'repeatMode': 'one',
-          'loopEnabled': true,
+          'sentenceLoopCount': 2,
         });
-        expect(settings.loopWhole, isTrue);
         expect(settings.wholeLoopCount, 4);
+        expect(settings.sentenceLoopCount, 2);
+        expect(settings.loopWhole, isFalse);
         expect(settings.loopSentence, isFalse);
       });
     });
 
     group('fromJson 范围校验', () {
-      test('次数 = 0 视为无限（∞）', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopSentence': true,
-          'sentenceLoopCount': 0,
-        });
+      test('次数 = 0 解析为 0（∞ 语义）', () {
+        final settings = PlaybackSettings.fromJson({'sentenceLoopCount': 0});
         expect(settings.sentenceLoopCount, 0);
-        expect(settings.isInfiniteSentence, isTrue);
       });
 
       test('次数 > 10 截断为 10', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopWhole': true,
-          'wholeLoopCount': 100,
-        });
+        final settings = PlaybackSettings.fromJson({'wholeLoopCount': 100});
         expect(settings.wholeLoopCount, 10);
       });
 
       test('次数为负重置为默认 3', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopSentence': true,
-          'sentenceLoopCount': -5,
-        });
+        final settings = PlaybackSettings.fromJson({'sentenceLoopCount': -5});
         expect(settings.sentenceLoopCount, 3);
       });
 
       test('次数非 int 类型使用默认 3', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopWhole': true,
-          'wholeLoopCount': 'abc',
-        });
+        final settings = PlaybackSettings.fromJson({'wholeLoopCount': 'abc'});
         expect(settings.wholeLoopCount, 3);
       });
 
       test('间隔负值截断为 0', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopSentence': true,
-          'sentenceInterval': -1000,
-        });
+        final settings = PlaybackSettings.fromJson({'sentenceInterval': -1000});
         expect(settings.sentenceInterval, Duration.zero);
       });
 
       test('间隔 > 10 秒截断为 10 秒', () {
-        final settings = PlaybackSettings.fromJson({
-          'loopWhole': true,
-          'wholeInterval': 60000,
-        });
+        final settings = PlaybackSettings.fromJson({'wholeInterval': 60000});
         expect(settings.wholeInterval, const Duration(seconds: 10));
       });
     });

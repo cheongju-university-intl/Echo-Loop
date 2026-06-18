@@ -227,10 +227,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get infiniteRepeat => '无限 ∞';
 
   @override
-  String get intervalTime => '间隔';
+  String get intervalTime => '间隔时长';
 
   @override
   String get times => '次';
+
+  @override
+  String loopCountValue(int count) {
+    return '$count 次';
+  }
+
+  @override
+  String loopIntervalValue(int seconds) {
+    return '$seconds 秒';
+  }
 
   @override
   String get fullText => '全文';

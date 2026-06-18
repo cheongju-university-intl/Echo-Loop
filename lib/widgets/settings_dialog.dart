@@ -237,15 +237,14 @@ class _LoopSection extends StatelessWidget {
                       valueLabel: _countLabel(l10n, count),
                       onChanged: (pos) => onCountChanged(_sliderToCount(pos)),
                     ),
-                    // 间隔时长：0-10 秒（值列用紧凑单位 Ns 表达，label 不带单位）
+                    // 间隔时长：0-10 秒（值列带「秒」单位）
                     _LabeledSliderRow(
                       label: l10n.intervalTime,
                       sliderValue: intervalSeconds.toDouble(),
                       min: 0,
                       max: 10,
                       divisions: 10,
-                      valueLabel: '${intervalSeconds}s',
-                      a11yLabel: '$intervalSeconds ${l10n.seconds}',
+                      valueLabel: l10n.loopIntervalValue(intervalSeconds),
                       onChanged: (v) => onIntervalChanged(v.round()),
                     ),
                   ],
@@ -262,9 +261,9 @@ class _LoopSection extends StatelessWidget {
   /// 滑块位置 → 次数模型值：11=∞(0)。
   static int _sliderToCount(double pos) => pos >= 11 ? 0 : pos.round();
 
-  /// 次数显示文案：∞ 或「N 次」。
+  /// 次数显示文案：∞ 或本地化「N 次 / Nx」。
   static String _countLabel(AppLocalizations l10n, int count) =>
-      count == 0 ? '∞' : '$count ${l10n.times}';
+      count == 0 ? '∞' : l10n.loopCountValue(count);
 }
 
 /// 紧凑的「标签 + 滑条 + 当前值」单行组件。
@@ -277,7 +276,6 @@ class _LabeledSliderRow extends StatelessWidget {
     required this.divisions,
     required this.valueLabel,
     required this.onChanged,
-    this.a11yLabel,
   });
 
   final String label;
@@ -288,9 +286,6 @@ class _LabeledSliderRow extends StatelessWidget {
 
   /// 右侧及拖动气泡显示的当前值文案。
   final String valueLabel;
-
-  /// 无障碍朗读用的完整文案（如「2 秒」）；为空时回退到 [valueLabel]。
-  final String? a11yLabel;
 
   final ValueChanged<double> onChanged;
 
@@ -324,7 +319,7 @@ class _LabeledSliderRow extends StatelessWidget {
               divisions: divisions,
               label: valueLabel,
               onChanged: onChanged,
-              semanticFormatterCallback: (_) => a11yLabel ?? valueLabel,
+              semanticFormatterCallback: (_) => valueLabel,
             ),
           ),
         ),

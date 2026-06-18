@@ -85,8 +85,20 @@
   "autoPlayNextSentence": "Auto Play Next Sentence",
   "repeatCount": "Repeat Count",
   "infiniteRepeat": "Infinite ∞",
-  "intervalTime": "Interval",
+  "intervalTime": "Interval Duration",
   "times": "times",
+  "loopCountValue": "{count}x",
+  "@loopCountValue": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "loopIntervalValue": "{seconds}s",
+  "@loopIntervalValue": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
   "fullText": "Full Text",
   "bookmarked": "Bookmarked",
   "noSubtitle": "No Subtitle",
