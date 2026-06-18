@@ -180,8 +180,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         TabBar(
           controller: _tabController,
           labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-          // 药丸指示器四周均匀留白，不顶满整个 tab（其余样式见 tabBarTheme）
-          indicatorPadding: const EdgeInsets.all(6),
           tabs: [
             Tab(
               child: Row(
