@@ -16,18 +16,12 @@ import '../models/playback_settings.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../theme/app_theme.dart';
 
-/// 循环设置浮层内容（气泡卡片 + 向下箭头）。
+/// 循环设置浮层内容（气泡卡片内部内容）。
 ///
-/// 由调用方放进 Overlay 并锚定到循环按钮上方。卡片底部带一个指向按钮的小三角
-/// [caretX] 是箭头尖端相对卡片左边缘的水平位置（按按钮中心计算并夹紧在卡片内）。
+/// 由调用方用 [AnchoredBubble] 锚定到循环按钮上方并套上气泡卡片外壳，本组件只负责
+/// 卡片内的两组循环设置（整篇 / 单句）。
 class LoopSettingsPopup extends ConsumerWidget {
-  const LoopSettingsPopup({super.key, this.width = 280, this.caretX = 140});
-
-  /// 气泡宽度。
-  final double width;
-
-  /// 向下箭头尖端相对卡片左边缘的水平位置。
-  final double caretX;
+  const LoopSettingsPopup({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,110 +34,53 @@ class LoopSettingsPopup extends ConsumerWidget {
 
     void update(PlaybackSettings next) => controller.updateSettings(next);
 
-    final surface = theme.colorScheme.surface;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          elevation: 8,
-          color: surface,
-          borderRadius: BorderRadius.circular(16),
-          clipBehavior: Clip.antiAlias,
-          child: SizedBox(
-            width: width,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.m,
-                vertical: AppSpacing.s,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 整篇循环
-                  _LoopSection(
-                    icon: Icons.repeat,
-                    title: l10n.wholeTextLoop,
-                    enabled: settings.loopWhole,
-                    count: settings.wholeLoopCount,
-                    intervalSeconds: settings.wholeInterval.inSeconds,
-                    onEnabledChanged: (v) =>
-                        update(settings.copyWith(loopWhole: v)),
-                    onCountChanged: (v) =>
-                        update(settings.copyWith(wholeLoopCount: v)),
-                    onIntervalChanged: (v) => update(
-                      settings.copyWith(wholeInterval: Duration(seconds: v)),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.xs,
-                    ),
-                    child: Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: theme.colorScheme.outlineVariant,
-                    ),
-                  ),
-                  // 单句循环
-                  _LoopSection(
-                    icon: Icons.repeat_one,
-                    title: l10n.singleSentenceLoop,
-                    enabled: settings.loopSentence,
-                    count: settings.sentenceLoopCount,
-                    intervalSeconds: settings.sentenceInterval.inSeconds,
-                    onEnabledChanged: (v) =>
-                        update(settings.copyWith(loopSentence: v)),
-                    onCountChanged: (v) =>
-                        update(settings.copyWith(sentenceLoopCount: v)),
-                    onIntervalChanged: (v) => update(
-                      settings.copyWith(sentenceInterval: Duration(seconds: v)),
-                    ),
-                  ),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.m,
+        vertical: AppSpacing.s,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 整篇循环
+          _LoopSection(
+            icon: Icons.repeat,
+            title: l10n.wholeTextLoop,
+            enabled: settings.loopWhole,
+            count: settings.wholeLoopCount,
+            intervalSeconds: settings.wholeInterval.inSeconds,
+            onEnabledChanged: (v) => update(settings.copyWith(loopWhole: v)),
+            onCountChanged: (v) => update(settings.copyWith(wholeLoopCount: v)),
+            onIntervalChanged: (v) =>
+                update(settings.copyWith(wholeInterval: Duration(seconds: v))),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: theme.colorScheme.outlineVariant,
             ),
           ),
-        ),
-        // 向下箭头：贴在卡片底边、指向循环按钮（上移 1px 盖住接缝）
-        ExcludeSemantics(
-          child: Transform.translate(
-            offset: const Offset(0, -1),
-            child: CustomPaint(
-              size: Size(width, 8),
-              painter: _CaretPainter(caretX: caretX, color: surface),
+          // 单句循环
+          _LoopSection(
+            icon: Icons.repeat_one,
+            title: l10n.singleSentenceLoop,
+            enabled: settings.loopSentence,
+            count: settings.sentenceLoopCount,
+            intervalSeconds: settings.sentenceInterval.inSeconds,
+            onEnabledChanged: (v) => update(settings.copyWith(loopSentence: v)),
+            onCountChanged: (v) =>
+                update(settings.copyWith(sentenceLoopCount: v)),
+            onIntervalChanged: (v) => update(
+              settings.copyWith(sentenceInterval: Duration(seconds: v)),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-}
-
-/// 气泡向下箭头：等腰三角，底边在上贴卡片、尖端朝下指向按钮。
-class _CaretPainter extends CustomPainter {
-  const _CaretPainter({required this.caretX, required this.color});
-
-  /// 尖端相对左边缘的水平位置。
-  final double caretX;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const halfWidth = 8.0;
-    final x = caretX.clamp(halfWidth, size.width - halfWidth);
-    final path = Path()
-      ..moveTo(x - halfWidth, 0)
-      ..lineTo(x + halfWidth, 0)
-      ..lineTo(x, size.height)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(_CaretPainter old) =>
-      old.caretX != caretX || old.color != color;
 }
 
 /// 单组循环区块：紧凑主开关行 + 开启后展开的两行「标签 + 滑条 + 值」。

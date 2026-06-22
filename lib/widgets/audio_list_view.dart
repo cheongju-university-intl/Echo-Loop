@@ -13,6 +13,7 @@ import '../providers/new_user_guide_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'audio_list_tile.dart';
+import 'common/app_popup_menu.dart';
 import 'dialogs/confirm_dialog.dart';
 import 'edit_collection_membership_sheet.dart';
 import 'edit_tag_membership_sheet.dart';
@@ -326,7 +327,8 @@ class AudioSortButton extends ConsumerWidget {
         icon: const Icon(Icons.sort),
         onSelected: (t) => onChanged!(t),
         itemBuilder: (context) => [
-          for (final t in types) _sortMenuItem(_labelFor(t, l10n), t, cur),
+          for (final t in types)
+            _sortMenuItem(context, _labelFor(t, l10n), t, cur),
         ],
       );
     }
@@ -340,32 +342,46 @@ class AudioSortButton extends ConsumerWidget {
       itemBuilder: (context) {
         final cur = ref.read(audioListSettingsProvider).sortType;
         return [
-          _sortMenuItem(l10n.sortByNameAsc, AudioSortType.nameAsc, cur),
-          _sortMenuItem(l10n.sortByNameDesc, AudioSortType.nameDesc, cur),
-          _sortMenuItem(l10n.sortByDateAsc, AudioSortType.dateAsc, cur),
-          _sortMenuItem(l10n.sortByDateDesc, AudioSortType.dateDesc, cur),
+          _sortMenuItem(
+            context,
+            l10n.sortByNameAsc,
+            AudioSortType.nameAsc,
+            cur,
+          ),
+          _sortMenuItem(
+            context,
+            l10n.sortByNameDesc,
+            AudioSortType.nameDesc,
+            cur,
+          ),
+          _sortMenuItem(
+            context,
+            l10n.sortByDateAsc,
+            AudioSortType.dateAsc,
+            cur,
+          ),
+          _sortMenuItem(
+            context,
+            l10n.sortByDateDesc,
+            AudioSortType.dateDesc,
+            cur,
+          ),
         ];
       },
     );
   }
 
   PopupMenuItem<AudioSortType> _sortMenuItem(
+    BuildContext context,
     String label,
     AudioSortType type,
     AudioSortType current,
   ) {
-    return PopupMenuItem(
+    return appPopupMenuItem(
+      context,
       value: type,
-      child: Row(
-        children: [
-          if (type == current)
-            const Icon(Icons.check, size: 18)
-          else
-            const SizedBox(width: 18),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      ),
+      label: label,
+      selected: type == current,
     );
   }
 }

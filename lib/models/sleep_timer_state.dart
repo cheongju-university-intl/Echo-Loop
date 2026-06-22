@@ -15,7 +15,12 @@ class SleepTimerState {
   /// 剩余时长。`null`=未激活。
   final Duration? remaining;
 
-  const SleepTimerState({this.remaining});
+  /// 当前生效的预设分钟数；未激活时为 `null`。
+  ///
+  /// 单独存这个字段是为了让 UI 能稳定标记当前档位，而不是用剩余时间反推档位。
+  final int? presetMinutes;
+
+  const SleepTimerState({this.remaining, this.presetMinutes});
 
   /// 是否有定时器正在运行。
   bool get isActive => remaining != null;

@@ -2033,7 +2033,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get flashcardAutoPlayWord => '自动播放单词发音';
 
   @override
-  String get freePlay => '自由练习';
+  String get freePlay => '随心听';
 
   @override
   String get wordAiAnalysis => 'AI 解析';
@@ -2673,11 +2673,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get guidePlanStartTranscriptionDescription => '点击这里，让 AI 为这段音频生成字幕。';
 
   @override
-  String get guidePlanFreePlayTitle => '自由练习';
+  String get guidePlanFreePlayTitle => '随心听';
 
   @override
   String get guidePlanFreePlayDescription =>
-      '这是一个全能的、灵活的音频播放器，适合自由练习，你可以按照自己的节奏学习。';
+      '这是一个全能、灵活的音频播放器，你可以按照自己的节奏随心听、随心练。';
 
   @override
   String get guidePlanStartLearningTitle => '按计划学习';
@@ -3142,7 +3142,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSkipRetellSubtitle => '学习计划遇到复述任务时自动跳过';
 
   @override
-  String get autoSkipRetellDescription => '开启后，复述类任务会自动标记为已跳过；你随时可以在自由练习里完成它们。';
+  String get autoSkipRetellDescription => '开启后，复述类任务会自动标记为已跳过；你随时可以在随心听里完成它们。';
 
   @override
   String get autoExpandCachedAnnotationToggle => '自动展开句子讲解';

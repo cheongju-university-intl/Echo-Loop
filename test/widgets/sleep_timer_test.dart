@@ -39,7 +39,6 @@ void main() {
 
     // 初始未激活：timer_outlined 图标。
     expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.timer), findsNothing);
 
     await tester.tap(find.byIcon(Icons.timer_outlined));
     await tester.pumpAndSettle();
@@ -52,10 +51,9 @@ void main() {
     }
     // 未激活时无「关闭定时」「剩余时间」。
     expect(find.text('Turn off timer'), findsNothing);
-    expect(find.text('Time remaining'), findsNothing);
   });
 
-  testWidgets('点选预设启动定时并收起浮层、图标转激活', (tester) async {
+  testWidgets('点选预设启动定时并收起浮层、右上角改为倒计时胶囊', (tester) async {
     await tester.pumpWidget(_buildTestApp());
 
     await tester.tap(find.byIcon(Icons.timer_outlined));
@@ -63,12 +61,13 @@ void main() {
     await tester.tap(find.text('30 min'));
     await tester.pumpAndSettle();
 
-    // 浮层收起（预设行消失），图标转激活态。
+    // 浮层收起（预设行消失），右上角改为倒计时而不是实心图标。
     expect(find.text('5 min'), findsNothing);
-    expect(find.byIcon(Icons.timer), findsOneWidget);
+    expect(find.byIcon(Icons.timer), findsNothing);
+    expect(find.textContaining(RegExp(r'^\d\d:\d\d$')), findsOneWidget);
   });
 
-  testWidgets('激活态浮层显示剩余时间、关闭项与当前档打勾', (tester) async {
+  testWidgets('激活态浮层只显示关闭项与当前档打勾，不再显示大号倒计时', (tester) async {
     await tester.pumpWidget(_buildTestApp());
 
     await tester.tap(find.byIcon(Icons.timer_outlined));
@@ -77,12 +76,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // 再次打开浮层。
-    await tester.tap(find.byIcon(Icons.timer));
+    await tester.tap(find.textContaining(RegExp(r'^\d\d:\d\d$')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Time remaining'), findsOneWidget);
-    // 剩余时间 mm:ss（ticker 在 pumpAndSettle 期间可能已走过几秒，故用模式匹配）。
-    expect(find.textContaining(RegExp(r'^\d\d:\d\d$')), findsOneWidget);
+    expect(find.text('Time remaining'), findsNothing);
     expect(find.text('Turn off timer'), findsOneWidget);
     // 当前档打勾。
     expect(find.byIcon(Icons.check), findsOneWidget);
@@ -92,5 +89,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
     expect(find.byIcon(Icons.timer), findsNothing);
+  });
+
+  testWidgets('关闭定时时图标从第一帧就在最终位置，不再二次右跳', (tester) async {
+    await tester.pumpWidget(_buildTestApp());
+
+    await tester.tap(find.byIcon(Icons.timer_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('30 min'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining(RegExp(r'^\d\d:\d\d$')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Turn off timer'));
+    await tester.pump(const Duration(milliseconds: 40));
+
+    final earlyDx = tester.getTopRight(find.byIcon(Icons.timer_outlined)).dx;
+
+    await tester.pumpAndSettle();
+
+    final settledDx = tester.getTopRight(find.byIcon(Icons.timer_outlined)).dx;
+    expect(earlyDx, closeTo(settledDx, 0.01));
+  });
+
+  testWidgets('激活一段时间后当前预设仍保持打勾', (tester) async {
+    await tester.pumpWidget(_buildTestApp());
+
+    await tester.tap(find.byIcon(Icons.timer_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('30 min'));
+    await tester.pump(const Duration(minutes: 3, seconds: 12));
+
+    await tester.tap(find.textContaining(RegExp(r'^\d\d:\d\d$')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('30 min'), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
   });
 }

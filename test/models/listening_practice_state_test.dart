@@ -36,6 +36,15 @@ void main() {
         expect(state.lastPlayedFullIndex, isNull);
         expect(state.lastPlayedBookmarkIndex, isNull);
         expect(state.settings, isA<PlaybackSettings>());
+        expect(state.fullSettings, isA<PlaybackSettings>());
+        expect(state.bookmarkSettings, isA<PlaybackSettings>());
+        expect(state.fullSettings.loopSentence, isFalse);
+        expect(state.bookmarkSettings.loopSentence, isTrue);
+        expect(state.bookmarkSettings.sentenceLoopCount, 1);
+        expect(
+          state.bookmarkSettings.sentenceInterval,
+          const Duration(seconds: 1),
+        );
         expect(state.playlistMode, PlaylistMode.full);
         expect(state.bookmarkedIndices, isEmpty);
         expect(state.isLoading, isFalse);
@@ -59,6 +68,22 @@ void main() {
         expect(copied.isLoading, isTrue);
         // 未修改保持原值
         expect(copied.playlistMode, PlaylistMode.full);
+      });
+
+      test('settings 仅更新当前激活 tab 的设置', () {
+        const state = ListeningPracticeState(
+          fullSettings: PlaybackSettings(playbackSpeed: 1.0),
+          bookmarkSettings: PlaybackSettings(playbackSpeed: 0.8),
+          playlistMode: PlaylistMode.bookmarks,
+        );
+
+        final copied = state.copyWith(
+          settings: const PlaybackSettings(playbackSpeed: 1.5),
+        );
+
+        expect(copied.fullSettings.playbackSpeed, 1.0);
+        expect(copied.bookmarkSettings.playbackSpeed, 1.5);
+        expect(copied.settings.playbackSpeed, 1.5);
       });
     });
 
@@ -165,6 +190,16 @@ void main() {
         final stateWithSentences = state.copyWith(sentences: sentences);
 
         expect(stateWithSentences.currentSentence, isNull);
+      });
+
+      test('bookmarks 模式下 settings 返回 bookmarkSettings', () {
+        const state = ListeningPracticeState(
+          playlistMode: PlaylistMode.bookmarks,
+          fullSettings: PlaybackSettings(playbackSpeed: 1.25),
+          bookmarkSettings: PlaybackSettings(playbackSpeed: 0.75),
+        );
+
+        expect(state.settings.playbackSpeed, 0.75);
       });
     });
 

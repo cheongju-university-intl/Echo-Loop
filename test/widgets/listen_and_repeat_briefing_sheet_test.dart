@@ -34,7 +34,7 @@ void main() {
         (widget) =>
             widget is DropdownButton<double> &&
             widget.value == 1.0 &&
-            widget.elevation == 0,
+            widget.elevation == 8,
       ),
       findsOneWidget,
     );

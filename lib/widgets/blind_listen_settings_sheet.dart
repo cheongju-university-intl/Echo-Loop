@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'common/app_dropdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../models/blind_listen_settings.dart';
@@ -101,9 +102,8 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  DropdownButton<int>(
+                  AppDropdown<int>(
                     value: settings.repeatCount,
-                    underline: const SizedBox.shrink(),
                     items: List.generate(5, (i) {
                       final count = i + 1;
                       return DropdownMenuItem(

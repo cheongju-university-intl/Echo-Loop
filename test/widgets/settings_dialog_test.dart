@@ -97,6 +97,21 @@ void main() {
 
         expect(find.text('∞'), findsOneWidget);
       });
+
+      testWidgets('收藏 tab 默认展开单句循环 1 次 + 1 秒', (tester) async {
+        await tester.pumpWidget(
+          _buildLoopPopupTest(
+            practiceState: const ListeningPracticeState(
+              playlistMode: PlaylistMode.bookmarks,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(Slider), findsNWidgets(2));
+        expect(find.text('1x'), findsOneWidget);
+        expect(find.text('1s'), findsOneWidget);
+      });
     });
 
     group('交互', () {
@@ -129,6 +144,42 @@ void main() {
 
         expect(controller.state.settings.loopWhole, isTrue);
         expect(find.byType(Slider), findsNWidgets(2));
+      });
+
+      testWidgets('收藏 tab 修改循环设置时不串改全文 tab', (tester) async {
+        late ListeningPractice controller;
+        await tester.pumpWidget(
+          createTestApp(
+            Align(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  controller = ref.read(listeningPracticeProvider.notifier);
+                  return const LoopSettingsPopup();
+                },
+              ),
+            ),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              listeningPracticeProvider.overrideWith(
+                () => TestListeningPractice(
+                  const ListeningPracticeState(
+                    playlistMode: PlaylistMode.bookmarks,
+                    fullSettings: PlaybackSettings(loopWhole: true),
+                    bookmarkSettings: PlaybackSettings(loopWhole: false),
+                  ),
+                ),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byType(Switch).first);
+        await tester.pumpAndSettle();
+
+        expect(controller.state.fullSettings.loopWhole, isTrue);
+        expect(controller.state.bookmarkSettings.loopWhole, isTrue);
       });
     });
   });

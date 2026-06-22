@@ -194,16 +194,24 @@ class AppTheme {
             ),
 
       // 弹出菜单（PopupMenuButton）主题：
-      // 默认背景在纯黑上边界不清，深色抬高背景 + 加细描边让菜单浮起。浅色用默认。
-      popupMenuTheme: isLight
-          ? null
-          : PopupMenuThemeData(
-              color: _sheetBlack,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: colorScheme.outlineVariant, width: 1),
-              ),
-            ),
+      // 统一为更克制的悬浮卡片：圆角更大、描边更弱，主要靠轻阴影和留白建立层级，
+      // 避免菜单本身像一块硬边白板。深色仍抬高到 _sheetBlack，浅色保持纯净 surface。
+      popupMenuTheme: PopupMenuThemeData(
+        color: isLight ? colorScheme.surface : _sheetBlack,
+        elevation: isLight ? 10 : 12,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: isLight
+            ? Colors.black.withValues(alpha: 0.09)
+            : Colors.black.withValues(alpha: 0.28),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.52),
+            width: 0.75,
+          ),
+        ),
+        menuPadding: const EdgeInsets.symmetric(vertical: 6),
+      ),
 
       // 列表项主题：圆角 + 宽松间距
       listTileTheme: ListTileThemeData(

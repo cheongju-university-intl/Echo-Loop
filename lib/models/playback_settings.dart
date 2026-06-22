@@ -1,3 +1,24 @@
+/// Free Player 支持的离散速度档位。
+const List<double> kFreePlayerPlaybackSpeeds = [
+  0.4,
+  0.5,
+  0.6,
+  0.7,
+  0.8,
+  0.9,
+  1.0,
+  1.1,
+  1.2,
+  1.3,
+  1.4,
+  1.5,
+  2.0,
+];
+
+double normalizeFreePlayerPlaybackSpeed(double speed) {
+  return kFreePlayerPlaybackSpeeds.contains(speed) ? speed : 1.0;
+}
+
 /// 自由练习播放器设置模型。
 ///
 /// 循环行为由两组**相互独立、可同时开启**的开关描述：
@@ -79,7 +100,9 @@ class PlaybackSettings {
   /// - 旧 schema：把旧 `loopCount`/`pauseInterval` 迁移为单句循环参数偏好；旧的
   ///   `repeatMode`/`loopEnabled`/`loopAudioEnabled` 开关一律忽略（开关不再持久化）。
   factory PlaybackSettings.fromJson(Map<String, dynamic> json) {
-    final speed = (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0;
+    final speed = normalizeFreePlayerPlaybackSpeed(
+      (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0,
+    );
     final single = json['singleSentenceMode'] == true;
     final transcript = json['showTranscript'] ?? true;
 
@@ -168,4 +191,24 @@ class PlaybackSettings {
       showTranscript: showTranscript ?? this.showTranscript,
     );
   }
+}
+
+/// 收藏 tab 的默认循环设置。
+///
+/// 收藏句通常不是连续上下文；默认开启单句循环并在句间留 1 秒停顿，可避免收藏跳播时
+/// 两句无缝硬切，听感更接近“逐句复盘”而不是“连续播放”。
+const PlaybackSettings kDefaultBookmarkPlaybackSettings = PlaybackSettings(
+  loopSentence: true,
+  sentenceLoopCount: 1,
+  sentenceInterval: Duration(seconds: 1),
+);
+
+/// 将任意设置规范化为收藏 tab 默认循环语义，同时保留其他偏好字段。
+PlaybackSettings withBookmarkLoopDefaults(PlaybackSettings settings) {
+  return settings.copyWith(
+    loopWhole: false,
+    loopSentence: true,
+    sentenceLoopCount: kDefaultBookmarkPlaybackSettings.sentenceLoopCount,
+    sentenceInterval: kDefaultBookmarkPlaybackSettings.sentenceInterval,
+  );
 }

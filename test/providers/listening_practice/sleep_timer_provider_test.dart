@@ -48,10 +48,12 @@ void main() {
 
       notifier.start(const Duration(minutes: 5));
       expect(container.read(sleepTimerProvider).isActive, true);
+      expect(container.read(sleepTimerProvider).presetMinutes, 5);
       expect(container.read(sleepTimerProvider).remaining,
           const Duration(minutes: 5));
 
       async.elapse(const Duration(minutes: 1));
+      expect(container.read(sleepTimerProvider).presetMinutes, 5);
       expect(container.read(sleepTimerProvider).remaining,
           const Duration(minutes: 4));
     });
@@ -83,6 +85,7 @@ void main() {
       async.elapse(const Duration(minutes: 4));
       // 在旧计时到点前重设为新的 10 分钟。
       notifier.start(const Duration(minutes: 10));
+      expect(container.read(sleepTimerProvider).presetMinutes, 10);
       expect(container.read(sleepTimerProvider).remaining,
           const Duration(minutes: 10));
 

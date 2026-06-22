@@ -11,7 +11,8 @@ class ListeningPracticeState {
   final int? currentBookmarkIndex;
   final int? lastPlayedFullIndex;
   final int? lastPlayedBookmarkIndex;
-  final PlaybackSettings settings;
+  final PlaybackSettings fullSettings;
+  final PlaybackSettings bookmarkSettings;
   final PlaylistMode playlistMode;
   final Set<int> bookmarkedIndices;
   final bool isLoading;
@@ -23,11 +24,19 @@ class ListeningPracticeState {
     this.currentBookmarkIndex,
     this.lastPlayedFullIndex,
     this.lastPlayedBookmarkIndex,
-    this.settings = const PlaybackSettings(),
+    PlaybackSettings? settings,
+    PlaybackSettings fullSettings = const PlaybackSettings(),
+    PlaybackSettings bookmarkSettings = kDefaultBookmarkPlaybackSettings,
     this.playlistMode = PlaylistMode.full,
     this.bookmarkedIndices = const {},
     this.isLoading = false,
-  });
+  }) : fullSettings = settings ?? fullSettings,
+       bookmarkSettings = settings ?? bookmarkSettings;
+
+  /// 当前激活 Tab 生效的播放设置。
+  PlaybackSettings get settings => playlistMode == PlaylistMode.bookmarks
+      ? bookmarkSettings
+      : fullSettings;
 
   // 计算属性
   List<Sentence> get bookmarkedSentences =>
@@ -53,11 +62,25 @@ class ListeningPracticeState {
     bool clearLastPlayedFullIndex = false,
     int? lastPlayedBookmarkIndex,
     bool clearLastPlayedBookmarkIndex = false,
+    PlaybackSettings? fullSettings,
+    PlaybackSettings? bookmarkSettings,
     PlaybackSettings? settings,
     PlaylistMode? playlistMode,
     Set<int>? bookmarkedIndices,
     bool? isLoading,
   }) {
+    final nextPlaylistMode = playlistMode ?? this.playlistMode;
+    var nextFullSettings = fullSettings ?? this.fullSettings;
+    var nextBookmarkSettings = bookmarkSettings ?? this.bookmarkSettings;
+
+    if (settings != null) {
+      if (nextPlaylistMode == PlaylistMode.bookmarks) {
+        nextBookmarkSettings = settings;
+      } else {
+        nextFullSettings = settings;
+      }
+    }
+
     return ListeningPracticeState(
       currentAudioItem: clearCurrentAudioItem
           ? null
@@ -75,8 +98,9 @@ class ListeningPracticeState {
       lastPlayedBookmarkIndex: clearLastPlayedBookmarkIndex
           ? null
           : (lastPlayedBookmarkIndex ?? this.lastPlayedBookmarkIndex),
-      settings: settings ?? this.settings,
-      playlistMode: playlistMode ?? this.playlistMode,
+      fullSettings: nextFullSettings,
+      bookmarkSettings: nextBookmarkSettings,
+      playlistMode: nextPlaylistMode,
       bookmarkedIndices: bookmarkedIndices ?? this.bookmarkedIndices,
       isLoading: isLoading ?? this.isLoading,
     );

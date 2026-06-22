@@ -22,6 +22,7 @@ import '../l10n/app_localizations.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
+import 'common/app_popup_menu.dart';
 import '../features/official_collections/download/download_progress.dart';
 import '../features/official_collections/download/official_download_notifier.dart';
 import '../features/official_collections/data/official_collection_api.dart';
@@ -598,17 +599,6 @@ class AudioListTile extends ConsumerWidget {
     );
   }
 
-  /// 构建菜单项行，避免英文文案在窄菜单中溢出。
-  Widget _buildMenuItemRow(Widget icon, String label) {
-    return Row(
-      children: [
-        icon,
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, overflow: TextOverflow.ellipsis)),
-      ],
-    );
-  }
-
   /// 构建弹出菜单
   Widget _buildPopupMenu(
     BuildContext context,
@@ -640,112 +630,112 @@ class AudioListTile extends ConsumerWidget {
         padding: EdgeInsets.zero,
         child: Center(child: _buildMenuIcon(theme)),
         itemBuilder: (context) => [
-          PopupMenuItem(
+          appPopupMenuItem(
+            context,
             value: 'togglePin',
-            child: _buildMenuItemRow(
-              _buildPinnedMenuIcon(isPinned: audioItem.isPinned),
-              audioItem.isPinned ? l10n.unpinAudio : l10n.pinAudio,
-            ),
+            icon: _buildPinnedMenuIcon(isPinned: audioItem.isPinned),
+            label: audioItem.isPinned ? l10n.unpinAudio : l10n.pinAudio,
           ),
           if (!isOfficial)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'rename',
-              child: _buildMenuItemRow(
-                const Icon(Icons.edit, size: 20),
-                l10n.renameAudio,
-              ),
+              icon: const Icon(Icons.edit, size: 20),
+              label: l10n.renameAudio,
             ),
           if (!isOfficial)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'manageSubtitles',
-              child: _buildMenuItemRow(
-                const Icon(Icons.subtitles_outlined, size: 20),
-                l10n.manageSubtitles,
-              ),
+              icon: const Icon(Icons.subtitles_outlined, size: 20),
+              label: l10n.manageSubtitles,
             ),
           if (!isOfficial && audioItem.hasTranscript)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'editSubtitles',
-              child: _buildMenuItemRow(
-                const Icon(Icons.edit_note, size: 20),
-                l10n.editSubtitles,
-              ),
+              icon: const Icon(Icons.edit_note, size: 20),
+              label: l10n.editSubtitles,
             ),
           if (isOfficial)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'updateOfficialSubtitle',
-              child: _buildMenuItemRow(
-                const Icon(Icons.sync, size: 20),
-                l10n.updateOfficialSubtitle,
-              ),
+              icon: const Icon(Icons.sync, size: 20),
+              label: l10n.updateOfficialSubtitle,
             ),
           // 播客单集天然属于其 RSS 订阅合集，再加入本地自建合集属低频且易与
           // 「管理订阅」语义混淆，故与官方音频一致隐藏此项。
           if (!isOfficial && !isPodcastEpisode)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'manage',
-              child: _buildMenuItemRow(
-                const Icon(Icons.folder_outlined, size: 20),
-                l10n.manageCollections,
-              ),
+              icon: const Icon(Icons.folder_outlined, size: 20),
+              label: l10n.manageCollections,
             ),
           if (!isOfficial)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'manageTags',
-              child: _buildMenuItemRow(
-                const Icon(Icons.label_outline, size: 20),
-                l10n.manageTags,
-              ),
+              icon: const Icon(Icons.label_outline, size: 20),
+              label: l10n.manageTags,
             ),
           if (!isOfficial)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'export',
-              child: _buildMenuItemRow(
-                const Icon(Icons.ios_share, size: 20),
-                l10n.exportAudio,
-              ),
+              icon: const Icon(Icons.ios_share, size: 20),
+              label: l10n.exportAudio,
             ),
           // 仅在已开始学习时显示「暂停 / 恢复」与「重置」
           if (hasProgress)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'togglePause',
-              child: _buildMenuItemRow(
-                Icon(
-                  isPausedForMenu
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
-                  size: 20,
-                ),
-                isPausedForMenu ? l10n.resumeLearning : l10n.pauseLearning,
+              icon: Icon(
+                isPausedForMenu
+                    ? Icons.play_arrow_rounded
+                    : Icons.pause_rounded,
+                size: 20,
               ),
+              label: isPausedForMenu
+                  ? l10n.resumeLearning
+                  : l10n.pauseLearning,
             ),
           if (hasProgress)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'resetProgress',
-              child: _buildMenuItemRow(
-                Icon(
-                  Icons.restart_alt,
-                  size: 20,
-                  color: theme.colorScheme.error,
-                ),
-                l10n.resetLearningProgress,
+              icon: Icon(
+                Icons.restart_alt,
+                size: 20,
+                color: theme.colorScheme.error,
               ),
+              label: l10n.resetLearningProgress,
+              destructive: true,
             ),
+          if (!isOfficial && !isPodcastEpisode && hasProgress)
+            const PopupMenuDivider(height: 10),
+          if (!isOfficial && !isPodcastEpisode && !hasProgress)
+            const PopupMenuDivider(height: 10),
           if (!isOfficial && !isPodcastEpisode)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'delete',
-              child: _buildMenuItemRow(
-                Icon(Icons.delete, size: 20, color: theme.colorScheme.error),
-                l10n.delete,
+              icon: Icon(
+                Icons.delete,
+                size: 20,
+                color: theme.colorScheme.error,
               ),
+              label: l10n.delete,
+              destructive: true,
             ),
           if (audioItem.podcastEpisodeGuid != null)
-            PopupMenuItem(
+            appPopupMenuItem(
+              context,
               value: 'podcastEpisodeInfo',
-              child: _buildMenuItemRow(
-                const Icon(Icons.info_outline, size: 20),
-                l10n.podcastEpisodeMeta,
-              ),
+              icon: const Icon(Icons.info_outline, size: 20),
+              label: l10n.podcastEpisodeMeta,
             ),
         ],
         onSelected: (value) {

@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../common/app_dropdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/intensive_listen_settings.dart';
@@ -255,9 +256,8 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(l10n.intensiveListenRepeatCount, style: theme.textTheme.bodyLarge),
-        DropdownButton<int>(
+        AppDropdown<int>(
           value: settings.repeatCount,
-          underline: const SizedBox.shrink(),
           items: List.generate(10, (i) => i + 1).map((count) {
             return DropdownMenuItem(
               value: count,
@@ -385,9 +385,8 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
               l10n.intensiveListenPauseMultiplierLabel,
               style: theme.textTheme.bodyLarge,
             ),
-            DropdownButton<double>(
+            AppDropdown<double>(
               value: settings.pauseMultiplier,
-              underline: const SizedBox.shrink(),
               items: IntensiveListenSettings.multiplierOptions.map((value) {
                 return DropdownMenuItem(
                   value: value,

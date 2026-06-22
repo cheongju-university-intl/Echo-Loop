@@ -634,6 +634,9 @@ class _BlindListenPlayerScreenState
               bookmarkedSentenceIndices: playerState.bookmarkedSentenceIndices,
               onSentenceTap: _handleSentenceDetail,
               onSentencePlayFrom: _handleSentencePlayFrom,
+              onSentenceBookmarkToggle: (sentence) => ref
+                  .read(blindListenPlayerProvider.notifier)
+                  .toggleBookmark(widget.audioItemId, sentence),
               guideTargetLocalIdx: guideTargetLocalIdx,
               numberAreaGuideStep: numberStep,
               bodyAreaGuideStep: bodyStep,

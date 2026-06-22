@@ -240,6 +240,21 @@ void main() {
       expect(find.text('Test Audio'), findsOneWidget);
     });
 
+    testWidgets('AppBar 显示强化后的自由练习入口并可点击进入播放器', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('learning_plan_free_play_button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('learning_plan_free_play_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Player'), findsOneWidget);
+    });
+
     testWidgets('显示进度卡片（0%，未开始）', (tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();

@@ -961,6 +961,19 @@ class FakeBlindListenPlayer extends BlindListenPlayer {
   Future<void> initializeBookmarks(String audioItemId) async {}
 
   @override
+  Future<void> toggleBookmark(String audioItemId, Sentence sentence) async {
+    final bookmarks = Set<int>.from(state.bookmarkedSentenceIndices);
+    if (bookmarks.contains(sentence.index)) {
+      bookmarks.remove(sentence.index);
+      sentence.isBookmarked = false;
+    } else {
+      bookmarks.add(sentence.index);
+      sentence.isBookmarked = true;
+    }
+    state = state.copyWith(bookmarkedSentenceIndices: bookmarks);
+  }
+
+  @override
   Future<void> seekToSentence(int globalSentenceIndex) async {}
 
   @override
@@ -1428,6 +1441,19 @@ class FakeRetellPlayer extends RetellPlayer {
 
   @override
   void regenerateKeywords() {}
+
+  @override
+  Future<void> toggleBookmark(String audioItemId, Sentence sentence) async {
+    final bookmarks = Set<int>.from(state.bookmarkedSentenceIndices);
+    if (bookmarks.contains(sentence.index)) {
+      bookmarks.remove(sentence.index);
+      sentence.isBookmarked = false;
+    } else {
+      bookmarks.add(sentence.index);
+      sentence.isBookmarked = true;
+    }
+    state = state.copyWith(bookmarkedSentenceIndices: bookmarks);
+  }
 
   @override
   void disposePlayer() {

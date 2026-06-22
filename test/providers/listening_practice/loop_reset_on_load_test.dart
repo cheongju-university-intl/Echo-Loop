@@ -1,8 +1,8 @@
 /// 循环开关「不持久化、随加载新音频重置」回归测试
 ///
 /// 验证：
-/// 1. 加载一条**新**音频时，循环开关（loopWhole/loopSentence）重置为关；
-///    循环参数（次数/间隔）作为偏好保留。
+/// 1. 加载一条**新**音频时，全文 tab 循环开关重置为关；收藏 tab 恢复默认的
+///    「单句循环开 + 1 次 + 1 秒」。
 /// 2. 重新加载**同一**音频（loadAudio 早返回路径）不动循环开关。
 library;
 
@@ -99,7 +99,7 @@ void main() {
     await db.close();
   });
 
-  test('加载新音频时循环开关重置为关，循环参数保留', () async {
+  test('加载新音频时全文循环重置为关，收藏恢复默认循环', () async {
     lp.seed(
       audioItem: createTestAudioItem(id: 'audio-1'),
       settings: loopOnSettings,
@@ -107,12 +107,17 @@ void main() {
 
     await lp.loadAudio(createTestAudioItem(id: 'audio-2'));
 
-    final settings = container.read(listeningPracticeProvider).settings;
-    expect(settings.loopWhole, isFalse);
-    expect(settings.loopSentence, isFalse);
-    // 参数偏好不受重置影响
-    expect(settings.sentenceLoopCount, 5);
-    expect(settings.wholeLoopCount, 7);
+    final state = container.read(listeningPracticeProvider);
+    expect(state.fullSettings.loopWhole, isFalse);
+    expect(state.fullSettings.loopSentence, isFalse);
+    // 全文 tab 参数偏好仍保留
+    expect(state.fullSettings.sentenceLoopCount, 5);
+    expect(state.fullSettings.wholeLoopCount, 7);
+    // 收藏 tab 恢复非连续收藏句的默认逐句跳播语义
+    expect(state.bookmarkSettings.loopWhole, isFalse);
+    expect(state.bookmarkSettings.loopSentence, isTrue);
+    expect(state.bookmarkSettings.sentenceLoopCount, 1);
+    expect(state.bookmarkSettings.sentenceInterval, const Duration(seconds: 1));
   });
 
   test('重新加载同一音频（早返回）不重置循环开关', () async {

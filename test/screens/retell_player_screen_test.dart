@@ -74,6 +74,8 @@ class _TrackingRetellPlayer extends _StaticRetellPlayer {
 
   int seekCalls = 0;
   int? lastSeekGlobalIndex;
+  int bookmarkCalls = 0;
+  int? lastBookmarkedSentenceIndex;
 
   @override
   void enterWaitingForUser({
@@ -90,6 +92,13 @@ class _TrackingRetellPlayer extends _StaticRetellPlayer {
     seekCalls += 1;
     lastSeekGlobalIndex = globalSentenceIndex;
     await super.seekToSentence(globalSentenceIndex);
+  }
+
+  @override
+  Future<void> toggleBookmark(String audioItemId, Sentence sentence) async {
+    bookmarkCalls += 1;
+    lastBookmarkedSentenceIndex = sentence.index;
+    await super.toggleBookmark(audioItemId, sentence);
   }
 }
 
@@ -1039,6 +1048,44 @@ void main() {
 
       expect(trackingPlayer.seekCalls, 1);
       expect(trackingPlayer.lastSeekGlobalIndex, testParagraphs[0][1].index);
+    });
+
+    testWidgets('点击右侧收藏按钮直接切换收藏，不进入讲解页', (tester) async {
+      final testParagraphs = createTestParagraphs();
+      final initialState = RetellPlayerState(
+        currentParagraphIndex: 0,
+        totalParagraphs: testParagraphs.length,
+        phase: RetellPhase.listening,
+        isPlaying: true,
+        playingSentenceIndex: 0,
+        displayMode: RetellDisplayMode.showAll,
+        settings: const RetellSettings(keywordMethod: KeywordMethod.random),
+      );
+      final trackingPlayer = _TrackingRetellPlayer(
+        initialState,
+        testParagraphs,
+        const {},
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: initialState,
+          paragraphs: testParagraphs,
+          playerFactory: (_, __, ___) => trackingPlayer,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('$kMaskedSentenceBookmarkHitAreaKeyPrefix-0'),
+        ),
+      );
+      await tester.pump();
+
+      expect(trackingPlayer.bookmarkCalls, 1);
+      expect(trackingPlayer.lastBookmarkedSentenceIndex, 0);
+      expect(trackingPlayer.waitingCalls, 0);
     });
   });
 }

@@ -2769,7 +2769,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap here to let AI generate subtitles for this audio.';
 
   @override
-  String get guidePlanFreePlayTitle => 'Free Practice';
+  String get guidePlanFreePlayTitle => 'Free Play';
 
   @override
   String get guidePlanFreePlayDescription =>

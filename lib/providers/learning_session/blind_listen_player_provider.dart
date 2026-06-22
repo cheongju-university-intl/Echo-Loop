@@ -16,6 +16,8 @@ import '../../analytics/analytics_providers.dart';
 import '../../analytics/audio_event_params.dart';
 import '../../services/app_logger.dart';
 import '../../analytics/models/event_names.dart';
+import '../../features/usage/usage_event.dart';
+import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
 import '../../models/blind_listen_settings.dart';
 import '../../models/sentence.dart';
@@ -28,6 +30,7 @@ import '../audio_engine/audio_engine_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../learning_progress_provider.dart';
 import '../listening_practice/bookmark_manager.dart';
+import '../notification_permission_provider.dart';
 import '../settings_provider.dart';
 import 'countdown_controller.dart';
 import 'learning_session_provider.dart';
@@ -476,6 +479,58 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     final allSentences = _paragraphs.expand((p) => p).toList();
     BookmarkManager.updateSentenceBookmarkStatus(allSentences, indices);
     state = state.copyWith(bookmarkedSentenceIndices: indices);
+  }
+
+  /// 切换句子收藏状态。
+  ///
+  /// 盲听列表右侧收藏按钮直接调用该入口，避免用户必须进入讲解页才能收藏/取消收藏。
+  Future<void> toggleBookmark(String audioItemId, Sentence sentence) async {
+    final dao = ref.read(bookmarkDaoProvider);
+    final isCurrentlyBookmarked = state.bookmarkedSentenceIndices.contains(
+      sentence.index,
+    );
+
+    if (isCurrentlyBookmarked) {
+      await BookmarkManager.removeBookmarksFromDb(audioItemId, {
+        sentence.index,
+      }, dao: dao);
+    } else {
+      await BookmarkManager.addBookmarkToDb(audioItemId, sentence, dao: dao);
+    }
+
+    final analyticsParams = {
+      ...ref.audioEventParams(audioItemId),
+      EventParams.sentenceIndex: sentence.index,
+      EventParams.action: isCurrentlyBookmarked ? 'remove' : 'add',
+    };
+    if (!isCurrentlyBookmarked) {
+      await ref
+          .read(usageTrackerProvider)
+          .record(
+            UsageEvent.bookmarkSentenceSaved,
+            analyticsParams: analyticsParams,
+          );
+    } else {
+      ref
+          .read(analyticsServiceProvider)
+          .track(Events.bookmarkToggle, analyticsParams);
+    }
+
+    final newSet = Set<int>.from(state.bookmarkedSentenceIndices);
+    if (isCurrentlyBookmarked) {
+      newSet.remove(sentence.index);
+      sentence.isBookmarked = false;
+    } else {
+      newSet.add(sentence.index);
+      sentence.isBookmarked = true;
+    }
+    state = state.copyWith(bookmarkedSentenceIndices: newSet);
+
+    if (!isCurrentlyBookmarked) {
+      unawaited(
+        ref.read(notificationPermissionServiceProvider).maybeTriggerPrompt(),
+      );
+    }
   }
 
   /// 进入等待用户状态。

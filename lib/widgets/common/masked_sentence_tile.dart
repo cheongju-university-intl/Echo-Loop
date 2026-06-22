@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../theme/app_theme.dart';
@@ -25,16 +26,21 @@ const String kMaskedSentenceNumberHitAreaKeyPrefix =
 const String kMaskedSentenceBodyHitAreaKeyPrefix =
     'masked-sentence-body-hit-area';
 
+/// 句子收藏按钮 key 前缀（供 widget test 精准点击右侧收藏热区）。
+@visibleForTesting
+const String kMaskedSentenceBookmarkHitAreaKeyPrefix =
+    'masked-sentence-bookmark-hit-area';
+
 /// Wrap 子元素间距（px）— 模拟自然空格宽度
 const _wordSpacing = 4.0;
 
 /// 遮盖句子 Tile
 ///
-/// 两个独立点击区：
+/// 三个独立点击区：
 /// - **编号区**（左侧 48dp 宽，撑满 tile 全高）：`onPlayFromTap`，点击从该句开播。
 ///   当前播放句的编号位置渲染 ▶ play_arrow 图标，提示"点击=播放"。
-/// - **主体区**（右侧 Expanded）：`onDetailTap`，点击进入句子讲解页。
-///   保留原"整行点击进讲解"语义不变（仅可点击区域改为文本 + 书签所在区域）。
+/// - **主体区**（中间 Expanded）：`onDetailTap`，点击进入句子讲解页。
+/// - **收藏区**（右侧独立按钮）：`onBookmarkTap`，直接收藏/取消收藏。
 class MaskedSentenceTile extends StatelessWidget {
   /// 句子数据
   final Sentence sentence;
@@ -48,7 +54,7 @@ class MaskedSentenceTile extends StatelessWidget {
   /// 是否为当前播放中的句子
   final bool isPlayingSentence;
 
-  /// 是否已收藏（只读标记）
+  /// 是否已收藏
   final bool isBookmarked;
 
   /// 点击编号区回调：从该句开始播放
@@ -56,6 +62,9 @@ class MaskedSentenceTile extends StatelessWidget {
 
   /// 点击主体（文本/书签）区回调：进入句子讲解页
   final VoidCallback? onDetailTap;
+
+  /// 点击右侧收藏按钮回调：直接切换收藏状态
+  final VoidCallback? onBookmarkTap;
 
   /// 新手引导：编号区 GuideStep（非空时包 GuideTarget 高亮编号区）
   final GuideStep? numberAreaGuideStep;
@@ -72,6 +81,7 @@ class MaskedSentenceTile extends StatelessWidget {
     this.isBookmarked = false,
     this.onPlayFromTap,
     this.onDetailTap,
+    this.onBookmarkTap,
     this.numberAreaGuideStep,
     this.bodyAreaGuideStep,
   });
@@ -119,11 +129,18 @@ class MaskedSentenceTile extends StatelessWidget {
                     '$kMaskedSentenceBodyHitAreaKeyPrefix-${sentence.index}',
                   ),
                   theme: theme,
-                  isBookmarked: isBookmarked,
                   onTap: onDetailTap,
                   child: _buildMaskedText(theme, tokenize(sentence.text)),
                 ),
               ),
+            ),
+            _SentenceBookmarkHitArea(
+              key: ValueKey(
+                '$kMaskedSentenceBookmarkHitAreaKeyPrefix-${sentence.index}',
+              ),
+              theme: theme,
+              isBookmarked: isBookmarked,
+              onTap: onBookmarkTap,
             ),
           ],
         ),
@@ -179,7 +196,7 @@ class MaskedSentenceTile extends StatelessWidget {
 
 /// 编号点击区
 ///
-/// 固定 48dp 宽（≥ Material a11y 触达基线），撑满 tile 全高。
+/// 固定 40dp 宽，给正文释放更多横向空间，同时保留独立播放热区。
 /// 当前播放句渲染 ▶ play_arrow（与正在播放视觉绑定），否则渲染数字。
 class _SentenceNumberHitArea extends StatelessWidget {
   final int displayNumber;
@@ -198,7 +215,7 @@ class _SentenceNumberHitArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inner = SizedBox(
-      width: 48,
+      width: 40,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
         child: Center(
@@ -232,19 +249,17 @@ class _SentenceNumberHitArea extends StatelessWidget {
   }
 }
 
-/// 主体点击区（文本 + 书签）
+/// 主体点击区（文本）
 ///
 /// 撑满剩余宽度，撑满 tile 全高。点击进入句子讲解页。
 class _SentenceBodyHitArea extends StatelessWidget {
   final ThemeData theme;
-  final bool isBookmarked;
   final VoidCallback? onTap;
   final Widget child;
 
   const _SentenceBodyHitArea({
     super.key,
     required this.theme,
-    required this.isBookmarked,
     required this.child,
     this.onTap,
   });
@@ -253,21 +268,12 @@ class _SentenceBodyHitArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final inner = Padding(
       padding: const EdgeInsets.only(
-        right: AppSpacing.m,
+        left: AppSpacing.xs,
+        right: AppSpacing.s,
         top: AppSpacing.s,
         bottom: AppSpacing.s,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(child: child),
-          if (isBookmarked)
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Icon(Icons.bookmark, size: 14, color: Colors.amber),
-            ),
-        ],
-      ),
+      child: child,
     );
 
     if (onTap == null) return inner;
@@ -278,6 +284,67 @@ class _SentenceBodyHitArea extends StatelessWidget {
         splashColor: Colors.transparent,
         highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
         child: inner,
+      ),
+    );
+  }
+}
+
+/// 收藏按钮点击区
+///
+/// 视觉上收窄为句子右侧的轻量标记，不与句子文本竞争注意力；
+/// 交互上仍保持独立热区，避免和中间文本进讲解混在一起。
+class _SentenceBookmarkHitArea extends StatelessWidget {
+  final ThemeData theme;
+  final bool isBookmarked;
+  final VoidCallback? onTap;
+
+  const _SentenceBookmarkHitArea({
+    super.key,
+    required this.theme,
+    required this.isBookmarked,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final semanticLabel = isBookmarked
+        ? l10n.intensiveListenMarkedDifficult
+        : l10n.intensiveListenNotDifficult;
+    final iconColor = isBookmarked
+        ? Colors.amber
+        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.28);
+
+    final inner = SizedBox(
+      width: 38,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
+        child: Center(
+          child: Icon(
+            isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+            size: 14,
+            color: iconColor,
+            semanticLabel: semanticLabel,
+          ),
+        ),
+      ),
+    );
+
+    if (onTap == null) return inner;
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Tooltip(
+        message: semanticLabel,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            splashColor: Colors.transparent,
+            highlightColor: theme.colorScheme.primary.withValues(alpha: 0.03),
+            child: inner,
+          ),
+        ),
       ),
     );
   }

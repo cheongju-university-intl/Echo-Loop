@@ -255,6 +255,142 @@ void main() {
     expect(engine.lastClipStart, isNull);
   });
 
+  test('全文与收藏 tab 各自保存独立设置', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(playbackSpeed: 1.0),
+      bookmarkedIndices: {0, 2},
+    );
+
+    await lp.updateSettings(
+      const PlaybackSettings(playbackSpeed: 1.25, showTranscript: false),
+    );
+    await lp.setPlaylistMode(PlaylistMode.bookmarks);
+    await lp.updateSettings(
+      const PlaybackSettings(
+        playbackSpeed: 0.8,
+        singleSentenceMode: true,
+        loopSentence: true,
+      ),
+    );
+    await lp.setPlaylistMode(PlaylistMode.full);
+
+    final state = container.read(listeningPracticeProvider);
+    expect(state.fullSettings.playbackSpeed, 1.25);
+    expect(state.fullSettings.showTranscript, isFalse);
+    expect(state.fullSettings.singleSentenceMode, isFalse);
+    expect(state.bookmarkSettings.playbackSpeed, 0.8);
+    expect(state.bookmarkSettings.singleSentenceMode, isTrue);
+    expect(state.bookmarkSettings.loopSentence, isTrue);
+    expect(state.settings.playbackSpeed, 1.25);
+  });
+
+  test('切换到收藏 tab 时立即应用收藏 tab 的倍速设置', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(playbackSpeed: 1.0),
+      bookmarkedIndices: {0, 2},
+    );
+    lp.state = lp.state.copyWith(
+      bookmarkSettings: const PlaybackSettings(playbackSpeed: 0.75),
+    );
+
+    await lp.setPlaylistMode(PlaylistMode.bookmarks);
+
+    expect(
+      container.read(listeningPracticeProvider).settings.playbackSpeed,
+      0.75,
+    );
+    expect(engine.playbackSpeed, 0.75);
+  });
+
+  test('切换到收藏 tab 时默认启用单句循环 1 次 + 1 秒', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(playbackSpeed: 1.0),
+      bookmarkedIndices: {0, 2},
+    );
+
+    await lp.setPlaylistMode(PlaylistMode.bookmarks);
+
+    final settings = container.read(listeningPracticeProvider).settings;
+    expect(settings.loopSentence, isTrue);
+    expect(settings.sentenceLoopCount, 1);
+    expect(settings.sentenceInterval, const Duration(seconds: 1));
+  });
+
+  test('切换 tab 时停止上一个 tab 播放，且新 tab 不自动续播', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(playbackSpeed: 1.0),
+      bookmarkedIndices: {2, 4},
+    );
+
+    await start();
+    expect(engine.playCount, 1);
+    expect(engine.isPlaying, isTrue);
+
+    await lp.setPlaylistMode(PlaylistMode.bookmarks);
+
+    final state = container.read(listeningPracticeProvider);
+    expect(state.playlistMode, PlaylistMode.bookmarks);
+    expect(state.currentBookmarkIndex, 2);
+    expect(engine.stopCount, 1);
+    expect(engine.playCount, 1);
+    expect(engine.isPlaying, isFalse);
+    expect(engine.lastSeek, const Duration(milliseconds: 6200));
+  });
+
+  test('播放中打开单句循环：当前句不中断，播完后从当前句句首开始循环', () async {
+    lp.seed(sentences: sentences, settings: const PlaybackSettings());
+
+    await start();
+    expect(engine.playCount, 1);
+    expect(engine.lastClipStart, isNull);
+
+    await lp.updateSettings(
+      const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 2,
+        sentenceInterval: Duration.zero,
+      ),
+    );
+
+    expect(engine.playCount, 1);
+    expect(engine.lastClipStart, isNull);
+
+    engine.emitPosition(const Duration(milliseconds: 3000));
+    await flushBoundary();
+
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 0);
+    expect(engine.playCount, 2);
+    expect(engine.lastClipStart, Duration.zero);
+    expect(engine.lastClipEnd, const Duration(milliseconds: 1800));
+    expect(engine.lastSeek, Duration.zero);
+
+    await completeClip();
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 0);
+    expect(engine.lastClipStart, Duration.zero);
+  });
+
+  test('暂停时打开单句循环：只改设置，不自动播放', () async {
+    lp.seed(sentences: sentences, settings: const PlaybackSettings());
+
+    await lp.updateSettings(
+      const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 2,
+        sentenceInterval: Duration.zero,
+      ),
+    );
+
+    final state = container.read(listeningPracticeProvider);
+    expect(state.settings.loopSentence, isTrue);
+    expect(engine.playCount, 0);
+    expect(engine.lastSeek, isNull);
+    expect(engine.lastClipStart, isNull);
+  });
+
   test('有限单句循环：每个句子都独立循环 2 次后再进入下一句', () async {
     lp.seed(
       sentences: sentences,
@@ -376,6 +512,30 @@ void main() {
     expect(engine.lastClipStart, const Duration(milliseconds: 9100));
   });
 
+  test('播放中在收藏 tab 点击进度条不会先清空 clip', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 2,
+        sentenceInterval: Duration.zero,
+      ),
+      bookmarkedIndices: {0, 2, 4},
+      playlistMode: PlaylistMode.bookmarks,
+    );
+
+    await start();
+    expect(engine.lastClipStart, Duration.zero);
+
+    await lp.seekAbsolute(const Duration(milliseconds: 9500));
+
+    expect(container.read(listeningPracticeProvider).currentBookmarkIndex, 2);
+    expect(engine.clearClipCount, 0);
+    expect(engine.lastSeek, Duration.zero);
+    expect(engine.lastClipStart, const Duration(milliseconds: 6200));
+    expect(engine.lastClipEnd, const Duration(milliseconds: 7900));
+  });
+
   test('手动切到下一句后，有限单句循环从新句第一次开始', () async {
     lp.seed(
       sentences: sentences,
@@ -399,6 +559,88 @@ void main() {
     expect(container.read(listeningPracticeProvider).currentFullIndex, 1);
     expect(engine.lastSeek, Duration.zero);
     expect(engine.lastClipStart, const Duration(milliseconds: 2600));
+  });
+
+  test('播放中关闭单句循环：当前 clip 播完后切回 gapless，不重播当前句', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 2,
+        sentenceInterval: Duration.zero,
+      ),
+    );
+
+    await start();
+    expect(engine.lastClipStart, Duration.zero);
+    expect(engine.playCount, 1);
+
+    await lp.updateSettings(const PlaybackSettings());
+
+    expect(engine.playCount, 1);
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 0);
+
+    await completeClip();
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 1);
+    expect(engine.playCount, 2);
+    expect(engine.lastSeek, const Duration(milliseconds: 2600));
+
+    engine.emitPosition(const Duration(milliseconds: 6500));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 2);
+    expect(engine.lastClipStart, Duration.zero);
+  });
+
+  test('全文非循环播完后，再点播放从第 1 句重新开始', () async {
+    lp.seed(sentences: sentences, settings: const PlaybackSettings());
+
+    await start();
+    engine.emitPosition(const Duration(milliseconds: 17600));
+    await Future<void>.delayed(Duration.zero);
+    engine.emitCompleted();
+    await flushBoundary();
+
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 4);
+    expect(engine.stopCount, 1);
+    expect(engine.isPlaying, isFalse);
+
+    await lp.play();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 0);
+    expect(engine.lastSeek, Duration.zero);
+    expect(engine.playCount, 2);
+  });
+
+  test('收藏非循环播完后，再点播放从收藏列表第 1 句重新开始', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(),
+      bookmarkedIndices: {1, 4},
+      playlistMode: PlaylistMode.bookmarks,
+    );
+    lp.state = lp.state.copyWith(
+      currentBookmarkIndex: 4,
+      lastPlayedBookmarkIndex: 4,
+    );
+
+    await start();
+    engine.emitCompleted();
+    await flushBoundary();
+
+    final endedState = container.read(listeningPracticeProvider);
+    expect(endedState.currentBookmarkIndex, 4);
+    expect(engine.stopCount, 1);
+    expect(engine.isPlaying, isFalse);
+
+    await lp.play();
+    await Future<void>.delayed(Duration.zero);
+
+    final restartedState = container.read(listeningPracticeProvider);
+    expect(restartedState.currentBookmarkIndex, 1);
+    expect(engine.lastClipStart, const Duration(milliseconds: 2600));
+    expect(engine.lastClipEnd, const Duration(milliseconds: 6200));
+    expect(engine.playCount, 2);
   });
 
   test('单句循环与整篇循环同开：每句 2 遍，末尾回卷后重新计数', () async {

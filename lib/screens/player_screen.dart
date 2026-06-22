@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../l10n/app_localizations.dart';
+import '../models/playback_settings.dart';
 import '../models/retell_settings.dart';
 import '../models/sentence.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
@@ -36,6 +37,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _previousTabIndex = 0;
+  Duration? _seekPreviewPosition;
+  int _seekPreviewToken = 0;
 
   /// 防止进入讲解页重入（点击主体区 → pause + 导航）
   bool _isNavigatingToDetail = false;
@@ -225,8 +228,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     ListeningPractice controller,
   ) {
     final l10n = AppLocalizations.of(context)!;
+    final settings = playerState.fullSettings;
 
-    if (playerState.settings.singleSentenceMode) {
+    if (settings.singleSentenceMode) {
       if (playerState.currentFullIndex == null &&
           playerState.sentences.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -239,6 +243,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           playerState,
           controller,
           playerState.currentFullIndex!,
+          settings,
         );
       }
       return Center(
@@ -260,7 +265,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     // 全文列表中 sentence.index == 列表位置，currentFullIndex 即本地位置索引
     return ParagraphSentenceListCard(
       sentences: playerState.sentences,
-      displayMode: playerState.settings.showTranscript
+      displayMode: settings.showTranscript
           ? RetellDisplayMode.showAll
           : RetellDisplayMode.hideAll,
       keywordMap: const {},
@@ -269,6 +274,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       bookmarkedSentenceIndices: playerState.bookmarkedIndices,
       onSentencePlayFrom: (s) => controller.selectFullSentence(s.index),
       onSentenceTap: _handleSentenceDetail,
+      onSentenceBookmarkToggle: (s) => controller.toggleBookmark(s.index),
     );
   }
 
@@ -278,6 +284,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   ) {
     final l10n = AppLocalizations.of(context)!;
     final bookmarkedSentences = playerState.bookmarkedSentences;
+    final settings = playerState.bookmarkSettings;
 
     if (bookmarkedSentences.isEmpty) {
       return Center(
@@ -308,7 +315,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       );
     }
 
-    if (playerState.settings.singleSentenceMode) {
+    if (settings.singleSentenceMode) {
       if (playerState.currentBookmarkIndex == null ||
           !playerState.bookmarkedIndices.contains(
             playerState.currentBookmarkIndex,
@@ -335,6 +342,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         playerState,
         controller,
         playerState.currentBookmarkIndex!,
+        settings,
       );
     }
 
@@ -356,7 +364,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
     return ParagraphSentenceListCard(
       sentences: bookmarkedSentences,
-      displayMode: playerState.settings.showTranscript
+      displayMode: settings.showTranscript
           ? RetellDisplayMode.showAll
           : RetellDisplayMode.hideAll,
       keywordMap: const {},
@@ -365,6 +373,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       bookmarkedSentenceIndices: playerState.bookmarkedIndices,
       onSentencePlayFrom: (s) => controller.selectBookmarkedSentence(s.index),
       onSentenceTap: _handleSentenceDetail,
+      onSentenceBookmarkToggle: (s) => controller.toggleBookmark(s.index),
     );
   }
 
@@ -379,6 +388,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     ListeningPracticeState playerState,
     ListeningPractice controller,
     int index,
+    PlaybackSettings settings,
   ) {
     final currentSentence = playerState.sentences[index];
     final isBookmarked = playerState.bookmarkedIndices.contains(
@@ -437,7 +447,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   onStopMainPlayer: () => controller.pause(),
                 ),
                 // 隐藏字幕遮罩：覆盖整个内容区（含工具栏），模糊且不可点击
-                if (!playerState.settings.showTranscript)
+                if (!settings.showTranscript)
                   Positioned.fill(
                     child: IgnorePointer(
                       child: ClipRRect(
@@ -547,7 +557,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       child: StreamBuilder<Duration>(
         stream: engineNotifier.absolutePositionStream,
         builder: (context, snapshot) {
-          final position = snapshot.data ?? Duration.zero;
+          final position = _seekPreviewPosition ?? snapshot.data ?? Duration.zero;
           final total = engine.totalDuration ?? Duration.zero;
 
           // 时间标签直接用 ProgressBar 内置的 sides 布局放在进度条两侧同一行，
@@ -555,7 +565,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           return ProgressBar(
             progress: position,
             total: total,
-            onSeek: (duration) => controller.seekAbsolute(duration),
+            onSeek: (duration) {
+              final token = ++_seekPreviewToken;
+              setState(() {
+                _seekPreviewPosition = duration;
+              });
+              unawaited(_settleSeekPreview(token, duration, controller));
+            },
             barHeight: 3,
             thumbRadius: 8,
             thumbGlowRadius: 14,
@@ -566,6 +582,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         },
       ),
     );
+  }
+
+  Future<void> _settleSeekPreview(
+    int token,
+    Duration target,
+    ListeningPractice controller,
+  ) async {
+    await controller.seekAbsolute(target);
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted || token != _seekPreviewToken) return;
+    setState(() {
+      _seekPreviewPosition = null;
+    });
   }
 
   /// 底部状态栏：模式 + 循环徽标 + 倍速。

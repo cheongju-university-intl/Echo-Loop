@@ -17,6 +17,7 @@ import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../services/app_network_image_cache.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common/app_popup_menu.dart';
 import '../widgets/common/form_input_style.dart';
 import '../widgets/common/secondary_action_button.dart';
 import '../widgets/dialogs/confirm_dialog.dart';
@@ -39,21 +40,25 @@ class CollectionSortButton extends ConsumerWidget {
         final current = ref.read(collectionListProvider).sortType;
         return [
           _sortMenuItem(
+            context,
             l10n.sortByNameAsc,
             CollectionSortType.nameAsc,
             current,
           ),
           _sortMenuItem(
+            context,
             l10n.sortByNameDesc,
             CollectionSortType.nameDesc,
             current,
           ),
           _sortMenuItem(
+            context,
             l10n.sortByDateAsc,
             CollectionSortType.dateAsc,
             current,
           ),
           _sortMenuItem(
+            context,
             l10n.sortByDateDesc,
             CollectionSortType.dateDesc,
             current,
@@ -64,22 +69,16 @@ class CollectionSortButton extends ConsumerWidget {
   }
 
   PopupMenuItem<CollectionSortType> _sortMenuItem(
+    BuildContext context,
     String label,
     CollectionSortType type,
     CollectionSortType current,
   ) {
-    return PopupMenuItem(
+    return appPopupMenuItem(
+      context,
       value: type,
-      child: Row(
-        children: [
-          if (type == current)
-            const Icon(Icons.check, size: 18)
-          else
-            const SizedBox(width: 18),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      ),
+      label: label,
+      selected: type == current,
     );
   }
 }
@@ -717,16 +716,6 @@ class _CollectionInlineError extends StatelessWidget {
   }
 }
 
-Widget _buildCollectionMenuItemRow(Widget icon, String label) {
-  return Row(
-    children: [
-      icon,
-      const SizedBox(width: 8),
-      Expanded(child: Text(label, overflow: TextOverflow.ellipsis)),
-    ],
-  );
-}
-
 Widget _buildCollectionPinIcon({required bool isPinned}) {
   return Transform.rotate(
     angle: 0.52,
@@ -828,10 +817,25 @@ class _CollectionListTile extends ConsumerWidget {
                       ),
                     ),
                     itemBuilder: (context) => collection.isPodcast
-                        ? _buildPodcastMenuItems(collection, l10n, theme)
+                        ? _buildPodcastMenuItems(
+                            context,
+                            collection,
+                            l10n,
+                            theme,
+                          )
                         : collection.isOfficial
-                        ? _buildOfficialMenuItems(collection, l10n, theme)
-                        : _buildLocalMenuItems(collection, l10n, theme),
+                        ? _buildOfficialMenuItems(
+                            context,
+                            collection,
+                            l10n,
+                            theme,
+                          )
+                        : _buildLocalMenuItems(
+                            context,
+                            collection,
+                            l10n,
+                            theme,
+                          ),
                     onSelected: (value) {
                       if (value == 'togglePin') {
                         ref
@@ -1113,31 +1117,31 @@ void _showRemoveOfficialConfirmDialog(
 
 /// 本地合集（source='local'）的菜单项：pin/unpin 切换 / 重命名 / 删除。
 List<PopupMenuEntry<String>> _buildLocalMenuItems(
+  BuildContext context,
   Collection collection,
   AppLocalizations l10n,
   ThemeData theme,
 ) {
   return [
-    PopupMenuItem(
+    appPopupMenuItem(
+      context,
       value: 'togglePin',
-      child: _buildCollectionMenuItemRow(
-        _buildCollectionPinIcon(isPinned: collection.isPinned),
-        collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
-      ),
+      icon: _buildCollectionPinIcon(isPinned: collection.isPinned),
+      label: collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
     ),
-    PopupMenuItem(
+    appPopupMenuItem(
+      context,
       value: 'rename',
-      child: _buildCollectionMenuItemRow(
-        const Icon(Icons.edit),
-        l10n.renameCollection,
-      ),
+      icon: const Icon(Icons.edit, size: 20),
+      label: l10n.renameCollection,
     ),
-    PopupMenuItem(
+    const PopupMenuDivider(height: 10),
+    appPopupMenuItem(
+      context,
       value: 'delete',
-      child: _buildCollectionMenuItemRow(
-        Icon(Icons.delete, color: theme.colorScheme.error),
-        l10n.delete,
-      ),
+      icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error),
+      label: l10n.delete,
+      destructive: true,
     ),
   ];
 }
@@ -1145,62 +1149,70 @@ List<PopupMenuEntry<String>> _buildLocalMenuItems(
 /// 官方合集菜单项：pin（允许）/ 从我的合集移除（彻底清空）；
 /// 不允许重命名、不允许删除合集内的音频。
 List<PopupMenuEntry<String>> _buildOfficialMenuItems(
+  BuildContext context,
   Collection collection,
   AppLocalizations l10n,
   ThemeData theme,
 ) {
   return [
-    PopupMenuItem(
+    appPopupMenuItem(
+      context,
       value: 'togglePin',
-      child: _buildCollectionMenuItemRow(
-        _buildCollectionPinIcon(isPinned: collection.isPinned),
-        collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
-      ),
+      icon: _buildCollectionPinIcon(isPinned: collection.isPinned),
+      label: collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
     ),
-    PopupMenuItem(
+    const PopupMenuDivider(height: 10),
+    appPopupMenuItem(
+      context,
       value: 'removeOfficial',
-      child: _buildCollectionMenuItemRow(
-        Icon(Icons.remove_circle_outline, color: theme.colorScheme.error),
-        l10n.removeFromMyCollections,
+      icon: Icon(
+        Icons.remove_circle_outline,
+        size: 20,
+        color: theme.colorScheme.error,
       ),
+      label: l10n.removeFromMyCollections,
+      destructive: true,
     ),
   ];
 }
 
 /// Podcast 合集菜单项：pin / 重命名 / 详情 / 退订（彻底清空）。
 List<PopupMenuEntry<String>> _buildPodcastMenuItems(
+  BuildContext context,
   Collection collection,
   AppLocalizations l10n,
   ThemeData theme,
 ) {
   return [
-    PopupMenuItem(
+    appPopupMenuItem(
+      context,
       value: 'togglePin',
-      child: _buildCollectionMenuItemRow(
-        _buildCollectionPinIcon(isPinned: collection.isPinned),
-        collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
-      ),
+      icon: _buildCollectionPinIcon(isPinned: collection.isPinned),
+      label: collection.isPinned ? l10n.unpinCollection : l10n.pinCollection,
     ),
-    PopupMenuItem(
+    appPopupMenuItem(
+      context,
       value: 'rename',
-      child: _buildCollectionMenuItemRow(
-        const Icon(Icons.edit),
-        l10n.renameCollection,
-      ),
+      icon: const Icon(Icons.edit, size: 20),
+      label: l10n.renameCollection,
     ),
-    PopupMenuItem(
+    appPopupMenuItem(
+      context,
       value: 'podcastDetails',
-      child: _buildCollectionMenuItemRow(
-        const Icon(Icons.info_outline),
-        l10n.podcastDetails,
-      ),
+      icon: const Icon(Icons.info_outline, size: 20),
+      label: l10n.podcastDetails,
     ),
-    PopupMenuItem(
+    const PopupMenuDivider(height: 10),
+    appPopupMenuItem(
+      context,
       value: 'podcastUnsubscribe',
-      child: _buildCollectionMenuItemRow(
-        Icon(Icons.remove_circle_outline, color: theme.colorScheme.error),
-        l10n.podcastUnsubscribe,
+      icon: Icon(
+        Icons.remove_circle_outline,
+        size: 20,
+        color: theme.colorScheme.error,
       ),
+      label: l10n.podcastUnsubscribe,
+      destructive: true,
     ),
   ];
 }

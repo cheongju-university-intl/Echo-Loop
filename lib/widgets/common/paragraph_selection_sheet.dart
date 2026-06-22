@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'app_dropdown.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/blind_listen_settings.dart';
 import '../../models/retell_settings.dart';
@@ -268,11 +269,10 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                 ),
                 SizedBox(
                   width: 80,
-                  child: DropdownButton<int>(
+                  child: AppDropdown<int>(
                     value: _targetSeconds,
                     isExpanded: true,
                     isDense: true,
-                    underline: const SizedBox.shrink(),
                     items: paragraphDurationOptions.map((s) {
                       final label = switch (s) {
                         0 => l10n.retellBriefingSentenceLevel,
@@ -303,11 +303,10 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                   ),
                   SizedBox(
                     width: 80,
-                    child: DropdownButton<double>(
+                    child: AppDropdown<double>(
                       value: _pauseMultiplier,
                       isExpanded: true,
                       isDense: true,
-                      underline: const SizedBox.shrink(),
                       items: [
                         DropdownMenuItem(
                           value: -1.0,
@@ -347,12 +346,10 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                   ),
                   SizedBox(
                     width: 80,
-                    child: DropdownButton<double>(
+                    child: AppDropdown<double>(
                       value: _playbackSpeed,
                       isExpanded: true,
                       isDense: true,
-                      elevation: 0,
-                      underline: const SizedBox.shrink(),
                       items:
                           (widget.playbackSpeedOptions ??
                                   BlindListenSettings
@@ -389,11 +386,10 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                   ),
                   SizedBox(
                     width: 80,
-                    child: DropdownButton<KeywordRatio>(
+                    child: AppDropdown<KeywordRatio>(
                       value: _keywordRatio,
                       isExpanded: true,
                       isDense: true,
-                      underline: const SizedBox.shrink(),
                       items: KeywordRatio.values
                           .map(
                             (r) => DropdownMenuItem(

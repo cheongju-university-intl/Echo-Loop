@@ -11,6 +11,7 @@ import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/models/blind_listen_settings.dart';
 import 'package:echo_loop/models/intensive_listen_settings.dart'
     show ShadowingControlMode;
+import 'package:echo_loop/models/sentence.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
 import 'package:echo_loop/providers/learning_session/blind_listen_player_provider.dart';
@@ -18,6 +19,7 @@ import 'package:echo_loop/providers/learning_session/learning_session_provider.d
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import 'package:echo_loop/screens/blind_listen_player_screen.dart';
 import 'package:echo_loop/theme/app_theme.dart';
+import 'package:echo_loop/widgets/common/masked_sentence_tile.dart';
 import 'package:echo_loop/widgets/common/playback_controls.dart';
 
 import '../helpers/mock_providers.dart';
@@ -27,6 +29,34 @@ class _StaticBlindListenPlayer extends TestBlindListenPlayer {
 
   @override
   Future<void> startPlaying() async {}
+}
+
+class _TrackingBlindListenPlayer extends _StaticBlindListenPlayer {
+  _TrackingBlindListenPlayer(super.initialState, this.paragraphs);
+
+  final List<List<Sentence>> paragraphs;
+
+  int bookmarkCalls = 0;
+  int? lastBookmarkedSentenceIndex;
+
+  @override
+  List<Sentence> get currentParagraphSentences =>
+      paragraphs[state.currentParagraphIndex];
+
+  @override
+  Future<void> toggleBookmark(String audioItemId, Sentence sentence) async {
+    bookmarkCalls += 1;
+    lastBookmarkedSentenceIndex = sentence.index;
+    await super.toggleBookmark(audioItemId, sentence);
+  }
+}
+
+List<List<Sentence>> _testParagraphs() {
+  final sentences = createTestSentences(count: 4);
+  return [
+    [sentences[0], sentences[1]],
+    [sentences[2], sentences[3]],
+  ];
 }
 
 void main() {
@@ -269,5 +299,33 @@ void main() {
     // - Widget 单测（masked_sentence_tile_test）验证 tile 编号区→onPlayFromTap 分发
     // - 复述 Screen 单测验证 onPlayFromTap → player.seekToSentence 的接线
     // 盲听 Screen 接入是同款代码（_handleSentencePlayFrom + onSentencePlayFrom 透传），不重复测。
+
+    testWidgets('点击右侧收藏按钮直接切换收藏，不进入讲解页', (tester) async {
+      final trackingPlayer = _TrackingBlindListenPlayer(
+        const BlindListenPlayerState(
+          currentParagraphIndex: 0,
+          totalParagraphs: 2,
+          currentRepeatCount: 1,
+          displayMode: BlindListenDisplayMode.hideAll,
+        ),
+        _testParagraphs(),
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(playerFactory: (_) => trackingPlayer),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('$kMaskedSentenceBookmarkHitAreaKeyPrefix-0'),
+        ),
+      );
+      await tester.pump();
+
+      expect(trackingPlayer.bookmarkCalls, 1);
+      expect(trackingPlayer.lastBookmarkedSentenceIndex, 0);
+      expect(find.text('Sentence Detail'), findsNothing);
+    });
   });
 }

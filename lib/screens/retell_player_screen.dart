@@ -1230,6 +1230,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                 bookmarkedSentenceIndices: state.bookmarkedSentenceIndices,
                 onSentenceTap: _handleSentenceDetail,
                 onSentencePlayFrom: _handleSentencePlayFrom,
+                onSentenceBookmarkToggle: (sentence) => ref
+                    .read(retellPlayerProvider.notifier)
+                    .toggleBookmark(widget.audioItemId, sentence),
                 guideTargetLocalIdx: guideTargetLocalIdx,
                 numberAreaGuideStep: numberStep,
                 bodyAreaGuideStep: bodyStep,

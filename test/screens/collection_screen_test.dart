@@ -396,6 +396,7 @@ void main() {
         expect(find.text('Rename'), findsOneWidget);
         expect(find.text('Details'), findsOneWidget);
         expect(find.text('Refresh Feed'), findsNothing);
+        expect(find.byType(PopupMenuDivider), findsOneWidget);
 
         await tester.tap(find.text('Details'));
         await tester.pumpAndSettle();

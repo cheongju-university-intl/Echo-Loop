@@ -101,6 +101,63 @@ void main() {
         // 默认 showTranscript=true 显示 visibility 图标
         expect(find.byIcon(Icons.visibility), findsOneWidget);
       });
+
+      testWidgets('收藏 tab 渲染收藏 tab 自己的设置', (tester) async {
+        await tester.pumpWidget(
+          createTestApp(
+            const PlaybackControls(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              listeningPracticeProvider.overrideWith(
+                () => TestListeningPractice(
+                  const ListeningPracticeState(
+                    playlistMode: PlaylistMode.bookmarks,
+                    fullSettings: PlaybackSettings(
+                      playbackSpeed: 1.25,
+                      showTranscript: true,
+                    ),
+                    bookmarkSettings: PlaybackSettings(
+                      playbackSpeed: 0.8,
+                      showTranscript: false,
+                      singleSentenceMode: true,
+                      loopSentence: true,
+                    ),
+                  ),
+                ),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('0.8x'), findsOneWidget);
+        expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+        expect(find.byIcon(Icons.repeat_one), findsOneWidget);
+      });
+
+      testWidgets('收藏 tab 默认显示默认单句循环图标', (tester) async {
+        await tester.pumpWidget(
+          createTestApp(
+            const PlaybackControls(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              listeningPracticeProvider.overrideWith(
+                () => TestListeningPractice(
+                  const ListeningPracticeState(
+                    playlistMode: PlaylistMode.bookmarks,
+                  ),
+                ),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.repeat_one), findsOneWidget);
+        expect(find.byIcon(Icons.repeat), findsNothing);
+      });
     });
 
     group('交互', () {
@@ -191,9 +248,17 @@ void main() {
         await tester.pumpAndSettle();
 
         // 应显示速度选项
+        expect(find.text('0.4x'), findsOneWidget);
         expect(find.text('0.5x'), findsOneWidget);
-        expect(find.text('0.75x'), findsOneWidget);
-        expect(find.text('1.25x'), findsOneWidget);
+        expect(find.text('0.6x'), findsOneWidget);
+        expect(find.text('0.7x'), findsOneWidget);
+        expect(find.text('0.8x'), findsOneWidget);
+        expect(find.text('0.9x'), findsOneWidget);
+        expect(find.text('1.0x'), findsWidgets);
+        expect(find.text('1.1x'), findsOneWidget);
+        expect(find.text('1.2x'), findsOneWidget);
+        expect(find.text('1.3x'), findsOneWidget);
+        expect(find.text('1.4x'), findsOneWidget);
         expect(find.text('1.5x'), findsOneWidget);
         expect(find.text('2.0x'), findsOneWidget);
       });

@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../common/app_dropdown.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../theme/app_theme.dart';
@@ -179,12 +180,10 @@ class _IntensiveListenBriefingSheetState
               ),
               SizedBox(
                 width: 80,
-                child: DropdownButton<double>(
+                child: AppDropdown<double>(
                   value: _pauseMultiplier,
                   isExpanded: true,
                   isDense: true,
-                  elevation: 0,
-                  underline: const SizedBox.shrink(),
                   items: _kPauseMultiplierOptions
                       .map(
                         (value) => DropdownMenuItem(
@@ -218,12 +217,10 @@ class _IntensiveListenBriefingSheetState
               ),
               SizedBox(
                 width: 80,
-                child: DropdownButton<double>(
+                child: AppDropdown<double>(
                   value: _playbackSpeed,
                   isExpanded: true,
                   isDense: true,
-                  elevation: 0,
-                  underline: const SizedBox.shrink(),
                   items: IntensiveListenSettings.briefingPlaybackSpeedOptions
                       .map(
                         (speed) => DropdownMenuItem(

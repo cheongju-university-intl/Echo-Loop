@@ -73,6 +73,9 @@ class ParagraphSentenceListCard extends StatefulWidget {
   /// 点击句子编号区回调：从该句开始播放
   final ValueChanged<Sentence>? onSentencePlayFrom;
 
+  /// 点击句子右侧收藏按钮回调：直接切换收藏状态
+  final ValueChanged<Sentence>? onSentenceBookmarkToggle;
+
   /// 新手引导：挂引导 step 的句子本地索引（默认挂在 idx=1，回退到 idx=0）
   final int? guideTargetLocalIdx;
 
@@ -93,6 +96,7 @@ class ParagraphSentenceListCard extends StatefulWidget {
     this.bookmarkedSentenceIndices = const {},
     this.onSentenceTap,
     this.onSentencePlayFrom,
+    this.onSentenceBookmarkToggle,
     this.guideTargetLocalIdx,
     this.numberAreaGuideStep,
     this.bodyAreaGuideStep,
@@ -103,7 +107,13 @@ class ParagraphSentenceListCard extends StatefulWidget {
       _ParagraphSentenceListCardState();
 }
 
-class _ParagraphSentenceListCardState extends State<ParagraphSentenceListCard> {
+class _ParagraphSentenceListCardState extends State<ParagraphSentenceListCard>
+    with AutomaticKeepAliveClientMixin {
+  // 在 TabBarView（底层 PageView）中保活：切 Tab 不销毁本列表 State，避免回到全文/
+  // 收藏 Tab 时重跑「初次定位 + 淡入」造成的列表重渲染闪烁，并保留滚动位置。
+  @override
+  bool get wantKeepAlive => true;
+
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
@@ -302,6 +312,7 @@ class _ParagraphSentenceListCardState extends State<ParagraphSentenceListCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin 要求调用
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
@@ -342,6 +353,7 @@ class _ParagraphSentenceListCardState extends State<ParagraphSentenceListCard> {
               final isGuideTarget = widget.guideTargetLocalIdx == sentenceIndex;
               final onSentenceTap = widget.onSentenceTap;
               final onSentencePlayFrom = widget.onSentencePlayFrom;
+              final onSentenceBookmarkToggle = widget.onSentenceBookmarkToggle;
               return MaskedSentenceTile(
                 sentence: sentence,
                 displayMode: widget.displayMode,
@@ -356,6 +368,9 @@ class _ParagraphSentenceListCardState extends State<ParagraphSentenceListCard> {
                 onPlayFromTap: onSentencePlayFrom == null
                     ? null
                     : () => onSentencePlayFrom(sentence),
+                onBookmarkTap: onSentenceBookmarkToggle == null
+                    ? null
+                    : () => onSentenceBookmarkToggle(sentence),
                 numberAreaGuideStep: isGuideTarget
                     ? widget.numberAreaGuideStep
                     : null,

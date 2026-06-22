@@ -951,6 +951,7 @@ void main() {
 
       expect(find.text('Delete'), findsOneWidget);
       expect(find.text('Episode Info'), findsNothing);
+      expect(find.byType(PopupMenuDivider), findsOneWidget);
     });
 
     testWidgets('点击官方更新字幕先弹出清空进度确认框', (tester) async {

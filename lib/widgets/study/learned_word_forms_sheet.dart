@@ -7,6 +7,7 @@ import '../../database/daos/learned_word_form_dao.dart';
 import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import '../common/app_popup_menu.dart';
 
 const int _pageSize = 50;
 const double _loadMoreThreshold = 200;
@@ -202,21 +203,31 @@ class _LearnedWordFormsSheetState extends ConsumerState<LearnedWordFormsSheet> {
                     initialValue: _sortMode,
                     onSelected: _changeSort,
                     itemBuilder: (context) => [
-                      PopupMenuItem(
+                      appPopupMenuItem(
+                        context,
                         value: LearnedWordSortMode.timeDesc,
-                        child: Text(l10n.learnedWordsSortTimeDesc),
+                        label: l10n.learnedWordsSortTimeDesc,
+                        selected: _sortMode == LearnedWordSortMode.timeDesc,
                       ),
-                      PopupMenuItem(
+                      appPopupMenuItem(
+                        context,
                         value: LearnedWordSortMode.timeAsc,
-                        child: Text(l10n.learnedWordsSortTimeAsc),
+                        label: l10n.learnedWordsSortTimeAsc,
+                        selected: _sortMode == LearnedWordSortMode.timeAsc,
                       ),
-                      PopupMenuItem(
+                      appPopupMenuItem(
+                        context,
                         value: LearnedWordSortMode.alphabeticalAsc,
-                        child: Text(l10n.flashcardSortAlphaAsc),
+                        label: l10n.flashcardSortAlphaAsc,
+                        selected:
+                            _sortMode == LearnedWordSortMode.alphabeticalAsc,
                       ),
-                      PopupMenuItem(
+                      appPopupMenuItem(
+                        context,
                         value: LearnedWordSortMode.alphabeticalDesc,
-                        child: Text(l10n.flashcardSortAlphaDesc),
+                        label: l10n.flashcardSortAlphaDesc,
+                        selected:
+                            _sortMode == LearnedWordSortMode.alphabeticalDesc,
                       ),
                     ],
                     child: Container(

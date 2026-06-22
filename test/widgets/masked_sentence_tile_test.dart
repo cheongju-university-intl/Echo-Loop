@@ -132,12 +132,13 @@ void main() {
 
   group('MaskedSentenceTile 双 hit area', () {
     /// 构造带双 callback 的 tile
-    Widget _buildInteractiveTile({
+    Widget buildInteractiveTile({
       required Sentence sentence,
       bool isPlayingSentence = false,
       bool isBookmarked = false,
       VoidCallback? onPlayFromTap,
       VoidCallback? onDetailTap,
+      VoidCallback? onBookmarkTap,
     }) {
       return createTestApp(
         MaskedSentenceTile(
@@ -148,6 +149,7 @@ void main() {
           isBookmarked: isBookmarked,
           onPlayFromTap: onPlayFromTap,
           onDetailTap: onDetailTap,
+          onBookmarkTap: onBookmarkTap,
         ),
       );
     }
@@ -156,7 +158,7 @@ void main() {
       var playFromCount = 0;
       var detailCount = 0;
       await tester.pumpWidget(
-        _buildInteractiveTile(
+        buildInteractiveTile(
           sentence: _sentence('Hello world', index: 0),
           onPlayFromTap: () => playFromCount += 1,
           onDetailTap: () => detailCount += 1,
@@ -176,7 +178,7 @@ void main() {
       var playFromCount = 0;
       var detailCount = 0;
       await tester.pumpWidget(
-        _buildInteractiveTile(
+        buildInteractiveTile(
           sentence: _sentence('Hello world', index: 0),
           onPlayFromTap: () => playFromCount += 1,
           onDetailTap: () => detailCount += 1,
@@ -192,9 +194,35 @@ void main() {
       expect(playFromCount, 0);
     });
 
+    testWidgets('点击右侧收藏区触发 onBookmarkTap，不触发其他回调', (tester) async {
+      var playFromCount = 0;
+      var detailCount = 0;
+      var bookmarkCount = 0;
+      await tester.pumpWidget(
+        buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 0),
+          onPlayFromTap: () => playFromCount += 1,
+          onDetailTap: () => detailCount += 1,
+          onBookmarkTap: () => bookmarkCount += 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('$kMaskedSentenceBookmarkHitAreaKeyPrefix-0'),
+        ),
+      );
+      await tester.pump();
+
+      expect(bookmarkCount, 1);
+      expect(playFromCount, 0);
+      expect(detailCount, 0);
+    });
+
     testWidgets('isPlayingSentence=true 时编号位置渲染 play_arrow 图标', (tester) async {
       await tester.pumpWidget(
-        _buildInteractiveTile(
+        buildInteractiveTile(
           sentence: _sentence('Hello world', index: 4),
           isPlayingSentence: true,
           onPlayFromTap: () {},
@@ -210,7 +238,7 @@ void main() {
 
     testWidgets('isPlayingSentence=false 时编号位置渲染数字', (tester) async {
       await tester.pumpWidget(
-        _buildInteractiveTile(
+        buildInteractiveTile(
           sentence: _sentence('Hello world', index: 4),
           isPlayingSentence: false,
           onPlayFromTap: () {},
@@ -223,30 +251,31 @@ void main() {
       expect(find.byIcon(Icons.play_arrow), findsNothing);
     });
 
-    testWidgets('编号点击区宽度 ≥ 48dp（Material a11y 触达基线）', (tester) async {
+    testWidgets('编号点击区宽度收窄为 40dp', (tester) async {
       await tester.pumpWidget(
-        _buildInteractiveTile(
+        buildInteractiveTile(
           sentence: _sentence('Hello world', index: 0),
           onPlayFromTap: () {},
         ),
       );
       await tester.pumpAndSettle();
 
-      // 编号文本 "1" 的祖先 SizedBox 至少 48dp 宽
+      // 编号文本 "1" 的祖先 SizedBox 应收窄为 40dp。
       final sizedBoxes = tester.widgetList<SizedBox>(
         find.ancestor(of: find.text('1'), matching: find.byType(SizedBox)),
       );
-      final hasAtLeast48 = sizedBoxes.any((s) => (s.width ?? 0) >= 48);
-      expect(hasAtLeast48, true);
+      final hasWidth40 = sizedBoxes.any((s) => s.width == 40);
+      expect(hasWidth40, true);
     });
 
-    testWidgets('isBookmarked=true 时书签图标渲染在文本区', (tester) async {
+    testWidgets('isBookmarked=true 时右侧渲染已收藏图标', (tester) async {
       await tester.pumpWidget(
-        _buildInteractiveTile(
+        buildInteractiveTile(
           sentence: _sentence('Hello world', index: 0),
           isBookmarked: true,
           onPlayFromTap: () {},
           onDetailTap: () {},
+          onBookmarkTap: () {},
         ),
       );
       await tester.pumpAndSettle();
@@ -256,7 +285,7 @@ void main() {
 
     testWidgets('callback 为 null 时不渲染 InkWell（仍可视）', (tester) async {
       await tester.pumpWidget(
-        _buildInteractiveTile(sentence: _sentence('Hello world', index: 0)),
+        buildInteractiveTile(sentence: _sentence('Hello world', index: 0)),
       );
       await tester.pumpAndSettle();
 

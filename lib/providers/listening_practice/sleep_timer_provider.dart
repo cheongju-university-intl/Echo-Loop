@@ -40,7 +40,10 @@ class SleepTimer extends _$SleepTimer {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       _tick(generation);
     });
-    state = SleepTimerState(remaining: total);
+    state = SleepTimerState(
+      remaining: total,
+      presetMinutes: total.inMinutes,
+    );
   }
 
   /// 取消定时器，恢复未激活态（不触发暂停）。
@@ -64,7 +67,10 @@ class SleepTimer extends _$SleepTimer {
       // 到点暂停（幂等：手动已暂停时再调一次无副作用）。
       ref.read(listeningPracticeProvider.notifier).pause();
     } else {
-      state = SleepTimerState(remaining: remaining);
+      state = SleepTimerState(
+        remaining: remaining,
+        presetMinutes: state.presetMinutes,
+      );
     }
   }
 

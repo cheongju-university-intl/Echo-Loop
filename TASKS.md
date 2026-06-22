@@ -1,7 +1,138 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-18（Free Player 播放架构重构）
+> 最后更新：2026-06-22（学习计划页 Free Player 入口显眼度优化 / 收藏 tab 进度条跳零修复）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player 整数倍速文案精确显示
+
+速度菜单和底部速度按钮此前会把整数倍速统一显示成 `1x` / `2x`，与产品预期不一致。现将整数倍速统一保留一位小数，确保默认档位和菜单选项显示为 `1.0x`、`2.0x`。
+
+- [x] `playback_controls.dart`：速度文案格式化改为整数倍速统一保留一位小数，显示为 `1.0x`、`2.0x`。
+- [x] `playback_controls_test.dart`：更新默认速度按钮和速度菜单断言，覆盖 `1.0x`、`2.0x` 文案。
+
+  **完成时间**: 2026-06-22 11:15:24 +0800
+
+## 已完成：弹出菜单样式收敛（更宽更轻 + 危险区分隔）
+
+音频 item / 合集 / 排序类弹出菜单此前统一成了白底描边卡片，但内容比例仍偏重：菜单整体狭长、边框存在感过强、图标和文字都太黑太粗，末尾删除项也缺少独立危险区。现将统一菜单骨架收敛为更克制的悬浮卡片和更紧凑的条目节奏，并在删除/退订前加入分隔，减少“长白条清单感”。
+
+- [x] `app_popup_menu.dart`：新增统一 `appPopupMenuItem()`，把菜单项高度收紧到 44；菜单行加最小宽度、固定图标列、较轻图标色和较低字重，稳定左右节奏。
+- [x] `app_theme.dart`：`popupMenuTheme` 改为更大圆角、更弱描边、更轻阴影，减少外框抢眼感，主要靠阴影和圆角建立层级。
+- [x] `audio_list_tile.dart` / `collection_screen.dart`：切到统一菜单项封装，并在删除 / 退订 / 移除前插入 `PopupMenuDivider`，把末尾危险操作单独分区。
+- [x] `audio_list_view.dart` / `recycle_bin_sheet_base.dart` / `learned_word_forms_sheet.dart`：排序类菜单同步切到更紧凑的统一条目高度，保持菜单系统一致。
+- [x] 测试：`audio_list_tile_test.dart` / `collection_screen_test.dart` 增加危险区分隔断言，验证菜单结构未回退。
+
+  **完成时间**: 2026-06-22 10:54:15 +0800
+
+## 已完成：Free Player 播放速度选项补齐
+
+Free Player 原先只有 7 个离散倍速档位，和参考播放器不一致，细粒度慢速训练选择不够。现将速度菜单补齐为 12 档，并统一显示格式，整数档位不再显示多余的小数位。
+
+- [x] `playback_controls.dart`：播放速度菜单从 `0.5 / 0.75 / 1 / 1.25 / 1.5 / 1.75 / 2` 调整为 `0.5 / 0.7 / 0.75 / 0.8 / 0.85 / 0.9 / 0.95 / 1 / 1.1 / 1.3 / 1.5 / 2`；新增统一速度文案格式化，显示为 `1x` / `2x` 而非 `1.0x` / `2.0x`。
+- [x] `playback_controls_test.dart`：更新默认按钮文案断言，并补齐完整速度菜单选项覆盖。
+- [x] 验证：`flutter analyze lib/widgets/playback_controls.dart test/widgets/playback_controls_test.dart` 通过；`flutter test test/widgets/playback_controls_test.dart` 16 passed。
+
+  **完成时间**: 2026-06-22 10:49:16 +0800
+
+## 已完成：Free Player 进度条 seek 抖动修复（收藏 tab / 全文 tab）
+
+收藏 tab 在播放中点击进度条时，旧流程会先 `clearClip()` 再重启句子驱动播放，导致进度条短暂回到音频 0 点；全文 tab 在 seek 过程中也会偶发先跳到前后错误位置再归位。现改为：收藏 tab 播放中直接切到目标句并重新起播，同时在进度条 UI 增加短暂的 seek 预览，屏蔽底层引擎中间态带来的圆点抖动。
+
+- [x] `listening_practice_provider.dart`：`seekAbsolute()` 增加播放中句子驱动分支，跳过 `clearClip()` / 中间 seek，直接 `_startCurrent()` 重起目标句。
+- [x] `player_screen.dart`：进度条 `onSeek` 增加短暂的目标位置预览，seek 完成前优先显示用户点击位置，避免全文 tab 圆点偶发前后跳动。
+- [x] `free_player_playback_flow_test.dart`：新增回归测试，覆盖收藏 tab 播放中点击进度条不再先清空 clip。
+- [x] 验证：`flutter analyze lib/screens/player_screen.dart lib/providers/listening_practice/listening_practice_provider.dart test/providers/listening_practice/free_player_playback_flow_test.dart test/screens/player_screen_test.dart` 通过；`flutter test test/providers/listening_practice/free_player_playback_flow_test.dart test/screens/player_screen_test.dart` 32 passed。
+
+  **完成时间**: 2026-06-22 08:55:41 +0800
+
+## 已完成：学习计划页 Free Player 入口显眼度优化
+
+学习计划页右上角的「自由练习」原本只是普通 `TextButton.icon`，在标题区视觉权重偏低，用户容易忽略。现改为更克制但更醒目的紧凑工具入口：提高底色对比、边框存在感和浮起感，在不明显挤压标题的前提下提高可发现性。
+
+- [x] `learning_plan_screen.dart`：将 AppBar 右上角入口替换为自定义 `_FreePlayAppBarButton`；使用更强的主色容器底、轻描边、轻量耳机图标和加粗文案强化视觉层级，并保持移动端紧凑宽度。
+- [x] `learning_plan_screen_test.dart`：新增回归测试，覆盖入口渲染与点击后进入 Player 路由。
+- [x] 验证：`flutter analyze lib/screens/learning_plan_screen.dart test/screens/learning_plan_screen_test.dart` 通过；`flutter test test/screens/learning_plan_screen_test.dart` 42 passed。
+
+  **完成时间**: 2026-06-22
+
+## 已完成：Free Player 睡眠定时器入口改为低干扰倒计时
+
+自由播放器右上角睡眠定时器此前激活后仍只显示图标，真正的剩余时间放在浮层里大字号展示，信息层级过重且抢占浮层注意力。现改为：激活后 AppBar 入口直接显示一个低存在感倒计时胶囊，浮层只保留标题、关闭操作和预设列表，当前档位稳定打勾，不再靠剩余时间近似推断。
+
+- [x] `sleep_timer_state.dart`：新增 `presetMinutes` 运行态字段，显式保存当前预设档位，避免 UI 用剩余时间反推选中项。
+- [x] `sleep_timer_provider.dart`：`start()` 写入预设分钟数，tick 期间仅刷新 `remaining` 并保留当前档位，到点/取消时统一清空。
+- [x] `sleep_timer.dart`：未激活保持弱化 `timer_outlined`；激活改为小号 `mm:ss` 轻量胶囊（弱底色 + 细描边 + tabular figures）；浮层删除大号倒计时区块，仅保留“关闭定时”和预设项。
+- [x] 测试：更新 provider / widget 回归，覆盖激活态胶囊显示、浮层去掉大号剩余时间、运行一段时间后当前档位仍正确打勾。
+
+  **完成时间**: 2026-06-22
+
+## 已完成：共享句子列表收藏图标视觉收敛
+
+右侧收藏按钮已改成更接近原句子 item 的轻量标记：已收藏保持小号 amber 书签，未收藏态进一步弱化，减少对句子正文的注意力抢占。
+
+- [x] `masked_sentence_tile.dart`：收藏图标缩到 14px，保持与原句子 item 一致的轻量标记风格；未收藏态使用更弱化的 `onSurfaceVariant` 半透明色。
+- [x] 验证：`flutter analyze lib/widgets/common/masked_sentence_tile.dart lib/widgets/common/paragraph_sentence_list_card.dart test/widgets/masked_sentence_tile_test.dart test/screens/player_screen_test.dart test/screens/blind_listen_player_screen_test.dart test/screens/retell_player_screen_test.dart` 通过；`flutter test test/widgets/masked_sentence_tile_test.dart` 通过（12 passed）。
+
+  **完成时间**: 2026-06-22
+
+## 已完成：共享句子列表改为三段式收藏交互
+
+共享句子列表组件 `ParagraphSentenceListCard` / `MaskedSentenceTile` 之前只有两段式交互：左侧编号区负责播放，右侧整块主体区进入讲解页，收藏/取消收藏只能进讲解页后再做。现改为三段式共享布局，供 Free Player、全文盲听、段落复述共用：左侧编号区继续从该句播放，中间文本区保留进入讲解页，右侧新增独立收藏按钮，支持直接收藏/取消收藏。
+
+- [x] `masked_sentence_tile.dart`：布局改为左播 / 中间文本 / 右侧收藏三段式；新增右侧收藏点击区、测试 key、tooltip / semantics，正文区不再混入只读书签图标。
+- [x] `paragraph_sentence_list_card.dart`：新增句子级 `onSentenceBookmarkToggle` 回调并透传给共享 tile，保持自动跟随、初次定位、guide step 逻辑不变。
+- [x] `player_screen.dart`：全文 Tab 和收藏 Tab 接入列表右侧收藏切换；中间文本进讲解页行为保持不变。
+- [x] `blind_listen_player_provider.dart` / `blind_listen_player_screen.dart`：补齐盲听 provider 的 `toggleBookmark` 能力，并把列表右侧按钮接到 provider。
+- [x] `retell_player_screen.dart`：接入复述列表右侧收藏切换。
+- [x] 测试：更新 `masked_sentence_tile_test.dart`，新增 Player / 盲听 / 复述页面对右侧收藏按钮的回归测试。
+- [x] 验证：`flutter analyze` 相关文件通过；`flutter test test/widgets/masked_sentence_tile_test.dart test/screens/player_screen_test.dart test/screens/blind_listen_player_screen_test.dart test/screens/retell_player_screen_test.dart` 全部通过（58 passed）。
+
+  **完成时间**: 2026-06-21
+
+## 已完成：Free Player 收藏 Tab 默认单句循环
+
+Free Player 的收藏句通常不是连续上下文，若按普通连续播放直接跳到下一条，听感会比较硬。现将收藏 tab 的默认循环语义统一为：默认开启单句循环，重复 1 次，间隔 1 秒；用“逐句停顿”替代“连续硬切”。全文 tab 保持原默认不变。
+
+- [x] `playback_settings.dart`：新增收藏 tab 默认循环常量/辅助函数，统一表达“单句循环开 + 1 次 + 1 秒”。
+- [x] `listening_practice_state.dart` / `storage_service.dart`：收藏 tab 默认设置、旧单份 schema 升级、双设置读取统一收敛到新的收藏默认循环语义。
+- [x] `listening_practice_provider.dart`：加载新音频时，全文 tab 仍重置为“不循环”，收藏 tab 恢复默认单句循环，确保难句跳播不连续硬切。
+- [x] 测试：更新 model / storage / provider / widget 回归，覆盖收藏默认设置、旧 schema 迁移、切到收藏 tab 生效、加载新音频后恢复默认循环。
+- [x] 验证：`flutter analyze` 改动文件 0 issue；`flutter test` 目标测试 86 passed。
+
+  **完成时间**: 2026-06-21
+
+## 已完成：Free Player 播放结束后重播语义统一
+
+Free Player 在非循环模式下播到末尾后，之前会停在结尾，但用户再次点击主播放按钮时会从**最后一句**重新开始，全文 Tab 和收藏 Tab 都不符合播放器常见语义。现统一为：两个 Tab 都在播放结束后保留结尾态；用户再次点击主播放按钮时，从**当前 Tab 对应播放列表的开头**重新开始。整篇循环开启时保持自动回卷不变。
+
+- [x] `listening_practice_provider.dart`：新增“当前播放列表已自然播完、等待从列表开头重播”的 provider 内部状态；全文 gapless 和收藏/单句 clip 两条自然结束路径统一置位；主播放按钮在该状态下改为从当前列表第 1 句启动，而不是从最后一句启动；手动 seek / 切句 / 切 Tab / 对齐当前位置等操作会清除结束态。
+- [x] `free_player_playback_flow_test.dart`：新增“全文非循环播完后再播从第 1 句开始”“收藏非循环播完后再播从收藏列表第 1 句开始”两个回归场景。
+- [x] 验证：`flutter analyze lib/providers/listening_practice/listening_practice_provider.dart test/providers/listening_practice/free_player_playback_flow_test.dart` 通过；`flutter test test/providers/listening_practice/free_player_playback_flow_test.dart` 12 passed。
+
+  **完成时间**: 2026-06-21
+
+## 已完成：Free Player 全文 / 收藏 Tab 设置解耦
+
+Free Player 之前只有一份全局 `PlaybackSettings`，导致全文 Tab 和收藏 Tab 共用倍速、字幕显隐、单句模式和循环设置；这与两种模式的训练语义不一致：全文是连续播放，收藏是难句跳播，用户在一边调出的设置会污染另一边。现改为按 Tab 维护两套完全独立的设置，并兼容旧版单份持久化数据自动迁移。
+
+- [x] `listening_practice_state.dart`：新增 `fullSettings` / `bookmarkSettings` 两份状态，保留 `settings` 作为“当前激活 Tab 生效设置”的派生入口，兼容既有调用方。
+- [x] `storage_service.dart`：`playback_settings` 持久化升级为双配置结构；兼容旧 schema，首次读取旧单份设置时复制为全文 / 收藏两份初始值。
+- [x] `listening_practice_provider.dart`：`loadSettings` / `updateSettings` / `setPlaylistMode` / `loadAudio` 改为读写两份设置；切 Tab 时立即应用目标 Tab 的倍速并停止上一个 Tab 播放，不自动续播；加载新音频时分别重置两边的循环开关。
+- [x] `player_screen.dart`：全文列表/收藏列表/单句视图按各自 Tab 的设置渲染，不再错误读取当前激活 Tab 的显示状态。
+- [x] 测试：新增 state / storage / provider / widget 回归，覆盖“双设置独立持久化”“旧 schema 迁移”“切 Tab 应用目标设置”“收藏设置不串改全文”。
+- [x] 验证：`flutter analyze` 改动文件 0 issue；`flutter test` 目标测试 56 passed。
+
+  **完成时间**: 2026-06-21
+
+## 已完成：修复 Free Player 单句循环开关误改播放状态
+
+单句循环开关此前会在播放中直接触发 `gapless ↔ clip` 驱动模型切换，导致当前句突然回到开头；在暂停态切换时，也可能因为复用同一条重启路径而意外恢复播放。修复目标是把“切换设置”和“切换当前播放任务模型”解耦：开关切换本身不改变播放/暂停态，不立刻跳句首；若播放中打开单句循环，则当前句先自然播完，再从**当前句句首**进入循环。整篇循环行为保持不变。
+
+- [x] `listening_practice_provider.dart`：拆分“当前实际播放模型”与“设置期望模型”，新增延迟交接标记；播放中开启单句循环时，当前句继续自然播放，播完后从当前句句首切到 clip；播放中关闭单句循环时，当前 clip 播完后切回 gapless；暂停态切换仅更新设置，不触发 `play/seek/newSession`。
+- [x] `free_player_playback_flow_test.dart`：新增 3 个回归场景，覆盖“播放中开启不跳句首”“暂停开启不自动播”“播放中关闭后当前 clip 播完再回 gapless”。
+- [x] 验证：`flutter analyze lib/providers/listening_practice/listening_practice_provider.dart test/providers/listening_practice/free_player_playback_flow_test.dart` 通过；`flutter test test/providers/listening_practice/free_player_playback_flow_test.dart` 10 passed；`flutter test test/providers/listening_practice/session_guard_test.dart` 6 passed（有既存测试日志告警，但不影响通过）。
+
+  **完成时间**: 2026-06-21
 
 ## 已完成：Free Player 播放架构重构（分模式播放，修复单句/整篇循环）
 

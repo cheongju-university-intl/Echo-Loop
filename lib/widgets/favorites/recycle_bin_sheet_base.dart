@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../database/daos/bookmark_dao.dart' show RecycleBinSortMode;
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import '../common/app_popup_menu.dart';
 
 export '../../database/daos/bookmark_dao.dart' show RecycleBinSortMode;
 
@@ -160,21 +161,29 @@ class _SortButton extends StatelessWidget {
       initialValue: sortMode,
       onSelected: onSortChanged,
       itemBuilder: (context) => [
-        PopupMenuItem(
+        appPopupMenuItem(
+          context,
           value: RecycleBinSortMode.timeDesc,
-          child: Text(l10n.recycleBinSortTimeDesc),
+          label: l10n.recycleBinSortTimeDesc,
+          selected: sortMode == RecycleBinSortMode.timeDesc,
         ),
-        PopupMenuItem(
+        appPopupMenuItem(
+          context,
           value: RecycleBinSortMode.timeAsc,
-          child: Text(l10n.recycleBinSortTimeAsc),
+          label: l10n.recycleBinSortTimeAsc,
+          selected: sortMode == RecycleBinSortMode.timeAsc,
         ),
-        PopupMenuItem(
+        appPopupMenuItem(
+          context,
           value: RecycleBinSortMode.alphaAsc,
-          child: Text(l10n.flashcardSortAlphaAsc),
+          label: l10n.flashcardSortAlphaAsc,
+          selected: sortMode == RecycleBinSortMode.alphaAsc,
         ),
-        PopupMenuItem(
+        appPopupMenuItem(
+          context,
           value: RecycleBinSortMode.alphaDesc,
-          child: Text(l10n.flashcardSortAlphaDesc),
+          label: l10n.flashcardSortAlphaDesc,
+          selected: sortMode == RecycleBinSortMode.alphaDesc,
         ),
       ],
       child: Container(

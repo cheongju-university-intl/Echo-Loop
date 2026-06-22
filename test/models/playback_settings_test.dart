@@ -4,6 +4,24 @@ import 'package:echo_loop/models/playback_settings.dart';
 void main() {
   group('PlaybackSettings', () {
     group('默认值正确性', () {
+      test('Free Player 支持的速度档位符合预期', () {
+        expect(kFreePlayerPlaybackSpeeds, const [
+          0.4,
+          0.5,
+          0.6,
+          0.7,
+          0.8,
+          0.9,
+          1.0,
+          1.1,
+          1.2,
+          1.3,
+          1.4,
+          1.5,
+          2.0,
+        ]);
+      });
+
       test('所有默认值符合预期', () {
         const settings = PlaybackSettings();
 
@@ -18,6 +36,15 @@ void main() {
         expect(settings.showTranscript, isTrue);
         expect(settings.isInfiniteWhole, isFalse);
         expect(settings.isInfiniteSentence, isFalse);
+      });
+
+      test('收藏 tab 默认循环语义符合预期', () {
+        expect(kDefaultBookmarkPlaybackSettings.loopSentence, isTrue);
+        expect(kDefaultBookmarkPlaybackSettings.sentenceLoopCount, 1);
+        expect(
+          kDefaultBookmarkPlaybackSettings.sentenceInterval,
+          const Duration(seconds: 1),
+        );
       });
     });
 
@@ -147,6 +174,16 @@ void main() {
     });
 
     group('fromJson 范围校验', () {
+      test('旧持久化速度若不在新档位中则回退到 1x', () {
+        final settings = PlaybackSettings.fromJson({'playbackSpeed': 1.75});
+        expect(settings.playbackSpeed, 1.0);
+      });
+
+      test('新档位速度从 JSON 读取时保留原值', () {
+        final settings = PlaybackSettings.fromJson({'playbackSpeed': 1.4});
+        expect(settings.playbackSpeed, 1.4);
+      });
+
       test('次数 = 0 解析为 0（∞ 语义）', () {
         final settings = PlaybackSettings.fromJson({'sentenceLoopCount': 0});
         expect(settings.sentenceLoopCount, 0);
@@ -192,6 +229,26 @@ void main() {
         expect(copied.sentenceLoopCount, 3);
         expect(copied.loopWhole, isFalse);
         expect(copied.showTranscript, isTrue);
+      });
+
+      test('withBookmarkLoopDefaults 重置收藏循环并保留其他偏好', () {
+        const settings = PlaybackSettings(
+          loopWhole: true,
+          wholeLoopCount: 9,
+          playbackSpeed: 1.25,
+          showTranscript: false,
+          singleSentenceMode: true,
+        );
+        final copied = withBookmarkLoopDefaults(settings);
+
+        expect(copied.loopWhole, isFalse);
+        expect(copied.loopSentence, isTrue);
+        expect(copied.sentenceLoopCount, 1);
+        expect(copied.sentenceInterval, const Duration(seconds: 1));
+        expect(copied.wholeLoopCount, 9);
+        expect(copied.playbackSpeed, 1.25);
+        expect(copied.showTranscript, isFalse);
+        expect(copied.singleSentenceMode, isTrue);
       });
     });
   });

@@ -1,10 +1,21 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/playback_settings.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
+import '../theme/app_theme.dart';
+import 'common/anchored_bubble.dart';
 import 'settings_dialog.dart';
+
+String _formatPlaybackSpeedLabel(double speed) {
+  if (speed == speed.roundToDouble()) {
+    return '${speed.toStringAsFixed(1)}x';
+  }
+  if ((speed * 10).roundToDouble() == speed * 10) {
+    return '${speed.toStringAsFixed(1)}x';
+  }
+  return '${speed.toStringAsFixed(2)}x';
+}
 
 class PlaybackControls extends ConsumerWidget {
   const PlaybackControls({super.key});
@@ -71,7 +82,7 @@ class PlaybackControls extends ConsumerWidget {
                 },
               ),
               const SizedBox(width: 12),
-              _buildSpeedButton(context, playerState, controller),
+              const _SpeedButton(),
               const SizedBox(width: 12),
               _buildToggleButton(
                 context,
@@ -149,7 +160,7 @@ class PlaybackControls extends ConsumerWidget {
             },
           ),
           const SizedBox(width: 6),
-          _buildSpeedButton(context, playerState, controller),
+          const _SpeedButton(),
           const SizedBox(width: 16),
           IconButton(
             icon: const Icon(Icons.skip_previous),
@@ -237,55 +248,113 @@ class PlaybackControls extends ConsumerWidget {
       onPressed: onPressed,
     );
   }
+}
 
-  Widget _buildSpeedButton(
-    BuildContext context,
-    ListeningPracticeState playerState,
-    ListeningPractice controller,
-  ) {
-    return PopupMenuButton<double>(
-      icon: Text(
-        '${playerState.settings.playbackSpeed}x',
-        // 与未激活切换按钮一致的弱化灰，避免比图标更扎眼
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+/// 播放速度按钮：点击在按钮上方弹出速度选择气泡浮层（与循环设置浮层同一骨架）。
+///
+/// 锚点显示当前速度（弱化灰，与未激活切换按钮一致），用共享 [AnchoredBubble]（方向
+/// 向上）弹出离散速度档位，当前档加粗高亮 + 行尾打勾，点选即生效并收起浮层。
+class _SpeedButton extends ConsumerStatefulWidget {
+  const _SpeedButton();
+
+  @override
+  ConsumerState<_SpeedButton> createState() => _SpeedButtonState();
+}
+
+class _SpeedButtonState extends ConsumerState<_SpeedButton> {
+  final OverlayPortalController _portalController = OverlayPortalController();
+
+  @override
+  Widget build(BuildContext context) {
+    final speed = ref.watch(
+      listeningPracticeProvider.select((s) => s.settings.playbackSpeed),
+    );
+    final color = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.6);
+
+    return AnchoredBubble(
+      controller: _portalController,
+      direction: BubbleDirection.up,
+      width: 120,
+      contentBuilder: (_) => _SpeedPopup(onSelected: _portalController.hide),
+      child: TextButton(
+        onPressed: _portalController.toggle,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(40, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: color,
+        ),
+        child: Text(
+          _formatPlaybackSpeedLabel(speed),
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+          ),
         ),
       ),
-      itemBuilder: (context) {
-        return [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) {
-          return PopupMenuItem<double>(
-            value: speed,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('${speed}x'),
-                if (speed == playerState.settings.playbackSpeed)
-                  Icon(
-                    Icons.check,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-              ],
+    );
+  }
+}
+
+/// 速度选择气泡浮层内容（气泡卡片内部内容）。
+class _SpeedPopup extends ConsumerWidget {
+  const _SpeedPopup({required this.onSelected});
+
+  /// 选择后回调（用于收起浮层）。
+  final VoidCallback onSelected;
+
+  /// 可选速度档位。
+  static const List<double> _speeds = kFreePlayerPlaybackSpeeds;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final settings = ref.watch(
+      listeningPracticeProvider.select((s) => s.settings),
+    );
+    final controller = ref.read(listeningPracticeProvider.notifier);
+    final current = settings.playbackSpeed;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final speed in _speeds)
+            BubbleMenuRow(
+              label: _formatPlaybackSpeedLabel(speed),
+              selected: speed == current,
+              color: speed == current
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface,
+              trailing: speed == current
+                  ? Icon(
+                      Icons.check,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    )
+                  : null,
+              onTap: () {
+                controller.updateSettings(
+                  settings.copyWith(playbackSpeed: speed),
+                );
+                onSelected();
+              },
             ),
-          );
-        }).toList();
-      },
-      onSelected: (speed) {
-        controller.updateSettings(
-          playerState.settings.copyWith(playbackSpeed: speed),
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
 /// 循环设置按钮：点击在按钮上方弹出悬浮的循环设置浮层（[LoopSettingsPopup]）。
 ///
-/// 浮层在按钮**正上方居中**弹出、底部带指向按钮的向下箭头；浮层水平夹紧在屏幕内
-/// （左右各留 [_margin]），箭头随之平移始终对准按钮中心。浮层下方铺一层透明遮罩，
-/// 点击外部即关闭。任一循环开启时图标高亮；仅单句循环开时用 repeat_one，否则用 repeat。
+/// 用共享的 [AnchoredBubble]（方向向上）锚定到按钮：浮层在按钮正上方居中弹出、底部
+/// 带指向按钮的向下箭头，点击外部即关闭。任一循环开启时图标高亮；仅单句循环开时用
+/// repeat_one，否则用 repeat。
 class _LoopButton extends ConsumerStatefulWidget {
   const _LoopButton();
 
@@ -295,62 +364,6 @@ class _LoopButton extends ConsumerStatefulWidget {
 
 class _LoopButtonState extends ConsumerState<_LoopButton> {
   final OverlayPortalController _portalController = OverlayPortalController();
-  final GlobalKey _buttonKey = GlobalKey();
-
-  /// 浮层宽度与屏幕安全边距。
-  static const double _popupWidth = 280;
-  static const double _margin = 16;
-
-  /// 构建悬浮内容：依据按钮在屏幕中的位置定位浮层并对齐箭头。
-  Widget _buildOverlay(BuildContext overlayContext) {
-    final overlayBox =
-        Overlay.of(overlayContext).context.findRenderObject() as RenderBox?;
-    final buttonBox =
-        _buttonKey.currentContext?.findRenderObject() as RenderBox?;
-    if (overlayBox == null || buttonBox == null) {
-      return const SizedBox.shrink();
-    }
-
-    final screen = overlayBox.size;
-    final buttonTopLeft = buttonBox.localToGlobal(
-      Offset.zero,
-      ancestor: overlayBox,
-    );
-    final buttonCenterX = buttonTopLeft.dx + buttonBox.size.width / 2;
-
-    final width = math.min(_popupWidth, screen.width - _margin * 2);
-    // 居中对齐按钮，再夹紧到屏幕内
-    final left = (buttonCenterX - width / 2).clamp(
-      _margin,
-      screen.width - _margin - width,
-    );
-    final caretX = buttonCenterX - left;
-    // 浮层底边到屏幕底部的距离：贴在按钮上方留 8px 间隙
-    final bottom = screen.height - buttonTopLeft.dy + 8;
-
-    return Stack(
-      children: [
-        // 透明遮罩：点击浮层外部关闭
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _portalController.hide,
-          ),
-        ),
-        Positioned(
-          left: left,
-          bottom: bottom,
-          width: width,
-          // 吸收浮层范围内的点击，避免穿透到遮罩误关闭
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {},
-            child: LoopSettingsPopup(width: width, caretX: caretX),
-          ),
-        ),
-      ],
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -363,11 +376,12 @@ class _LoopButtonState extends ConsumerState<_LoopButton> {
         : Icons.repeat;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return OverlayPortal(
+    return AnchoredBubble(
       controller: _portalController,
-      overlayChildBuilder: _buildOverlay,
+      direction: BubbleDirection.up,
+      width: 280,
+      contentBuilder: (_) => const LoopSettingsPopup(),
       child: IconButton(
-        key: _buttonKey,
         icon: Icon(icon),
         iconSize: 22,
         // 与其它切换按钮一致：激活态浅色调底 + 主色图标，未激活态灰图标。

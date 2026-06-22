@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../common/app_dropdown.dart';
 
 import '../../database/enums.dart';
 import '../../l10n/app_localizations.dart';
@@ -170,12 +171,10 @@ class _ReviewBriefingSheetState extends State<_ReviewBriefingSheet> {
                 ),
                 SizedBox(
                   width: 80,
-                  child: DropdownButton<double>(
+                  child: AppDropdown<double>(
                     value: _pauseMultiplier,
                     isExpanded: true,
                     isDense: true,
-                    elevation: 0,
-                    underline: const SizedBox.shrink(),
                     items: _kPauseMultiplierOptions
                         .map(
                           (value) => DropdownMenuItem(
@@ -209,12 +208,10 @@ class _ReviewBriefingSheetState extends State<_ReviewBriefingSheet> {
               ),
               SizedBox(
                 width: 80,
-                child: DropdownButton<double>(
+                child: AppDropdown<double>(
                   value: _playbackSpeed,
                   isExpanded: true,
                   isDense: true,
-                  elevation: 0,
-                  underline: const SizedBox.shrink(),
                   items: DifficultPracticeSettings.briefingPlaybackSpeedOptions
                       .map(
                         (speed) => DropdownMenuItem(
