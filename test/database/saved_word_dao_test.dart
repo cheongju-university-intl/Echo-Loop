@@ -395,6 +395,49 @@ void main() {
       // sentenceText 保留（冗余存储）
       expect(words.first.sentenceText, 'Test sentence');
     });
+
+    test('getByAudioId 只返回指定音频的未删除单词，按句子索引升序', () async {
+      final now = DateTime.now();
+      for (final id in ['audio-1', 'audio-2']) {
+        await db.audioItemDao.upsert(
+          AudioItemsCompanion(
+            id: Value(id),
+            name: Value('Audio $id'),
+            audioPath: Value('$id.mp3'),
+            addedDate: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+
+      // audio-1 两个词（句子索引乱序插入）、audio-2 一个词、无来源一个词
+      await db.savedWordDao.saveWord(
+        word: 'banana',
+        audioItemId: 'audio-1',
+        sentenceIndex: 5,
+      );
+      await db.savedWordDao.saveWord(
+        word: 'apple',
+        audioItemId: 'audio-1',
+        sentenceIndex: 2,
+      );
+      await db.savedWordDao.saveWord(
+        word: 'cherry',
+        audioItemId: 'audio-2',
+        sentenceIndex: 0,
+      );
+      await db.savedWordDao.saveWord(word: 'orphan');
+      // audio-1 再插一个然后软删除，不应出现
+      await db.savedWordDao.saveWord(
+        word: 'deleted',
+        audioItemId: 'audio-1',
+        sentenceIndex: 1,
+      );
+      await db.savedWordDao.removeWord('deleted');
+
+      final words = await db.savedWordDao.getByAudioId('audio-1');
+      expect(words.map((w) => w.word).toList(), ['apple', 'banana']);
+    });
   });
 
   // ========== 练习统计更新 ==========

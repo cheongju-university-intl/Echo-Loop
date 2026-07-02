@@ -1343,6 +1343,14 @@
   "exportAudioFile": "Audio",
   "exportSubtitleFile": "Subtitle",
   "exportSelectFiles": "Select files to export",
+  "exportPdf": "Export PDF",
+  "pdfExporting": "Generating PDF…",
+  "pdfExportFailed": "Failed to export PDF: {error}",
+  "@pdfExportFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
 
   "exportData": "Export Data",
   "exportDataSubtitle": "Export all data to a ZIP file",

@@ -2409,6 +2409,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exportSelectFiles => '选择要导出的文件';
 
   @override
+  String get exportPdf => '导出 PDF';
+
+  @override
+  String get pdfExporting => '正在生成 PDF…';
+
+  @override
+  String pdfExportFailed(String error) {
+    return '导出 PDF 失败：$error';
+  }
+
+  @override
   String get exportData => '导出数据';
 
   @override

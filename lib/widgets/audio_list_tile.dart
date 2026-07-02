@@ -34,6 +34,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as p;
 import '../services/audio_export_service.dart';
 import 'dialogs/export_audio_dialog.dart';
+import 'dialogs/export_pdf_runner.dart';
 import 'dialogs/text_input_dialog.dart';
 import 'manage_subtitles_sheet.dart';
 import '../features/audio_import/audio_import_models.dart';
@@ -687,6 +688,14 @@ class AudioListTile extends ConsumerWidget {
               icon: const Icon(Icons.ios_share, size: 20),
               label: l10n.exportAudio,
             ),
+          // 学习材料导出 PDF：只读派生内容（字幕+笔记），官方音频也可用，仅要求有字幕
+          if (audioItem.hasTranscript)
+            appPopupMenuItem(
+              context,
+              value: 'exportPdf',
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+              label: l10n.exportPdf,
+            ),
           // 仅在已开始学习时显示「暂停 / 恢复」与「重置」
           if (hasProgress)
             appPopupMenuItem(
@@ -758,6 +767,8 @@ class AudioListTile extends ConsumerWidget {
             onManageTags?.call();
           } else if (value == 'export') {
             _handleExport(context, ref);
+          } else if (value == 'exportPdf') {
+            unawaited(runStudyPdfExport(context, ref, _latestAudioItem(ref)));
           } else if (value == 'togglePause') {
             _handleTogglePause(context, ref, isPausedForMenu);
           } else if (value == 'resetProgress') {

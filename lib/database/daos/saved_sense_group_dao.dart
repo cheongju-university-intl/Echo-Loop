@@ -24,6 +24,18 @@ class SavedSenseGroupDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
+  /// 获取指定音频关联的未删除收藏意群（按来源句子索引升序）
+  ///
+  /// 用于学习材料导出 PDF 时将收藏意群归到所属句子。
+  Future<List<SavedSenseGroup>> getByAudioId(String audioItemId) {
+    return (select(savedSenseGroups)
+          ..where(
+            (t) => t.audioItemId.equals(audioItemId) & t.deletedAt.isNull(),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.sentenceIndex)]))
+        .get();
+  }
+
   /// 保存意群（先到先得：已存在且未删除时只更新 updatedAt）
   ///
   /// [phraseText] 必须是归一化后的文本（小写 + trim + 去句末标点）。

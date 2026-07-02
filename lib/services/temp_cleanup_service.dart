@@ -45,11 +45,13 @@ Future<CleanupResult> cleanupRecordingTempFiles({
 ///
 /// 仅这些目录可在清缓存时删除，其余条目（系统 URLCache `Cache.db`、
 /// `app_network_images`、各框架缓存）一律跳过。
-/// 前缀来源：`audio_export_service.dart`、`backup_service.dart` 的 `_createTempDir`。
+/// 前缀来源：`audio_export_service.dart`、`backup_service.dart`、
+/// `study_pdf_export_service.dart` 的 `_createTempDir`。
 const _ownCacheTempPrefixes = <String>[
   'audio_export_',
   'echoloop_export_',
   'echoloop_import_',
+  'pdf_export_',
 ];
 
 /// 设置页「清除缓存」：清理 tmp/（全量）+ Library/Caches（仅 app 自建临时目录）。

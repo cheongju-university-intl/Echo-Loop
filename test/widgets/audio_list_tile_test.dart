@@ -185,6 +185,48 @@ void main() {
     });
   });
 
+  group('AudioListTile 导出 PDF 菜单项', () {
+    Widget buildTile(AudioItem item) {
+      return createTestApp(
+        Center(
+          child: SizedBox(width: 360, child: AudioListTile(audioItem: item)),
+        ),
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
+          ),
+        ],
+      );
+    }
+
+    testWidgets('有字幕时菜单包含「导出 PDF」', (tester) async {
+      final item = createTestAudioItem();
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('audio_list_tile_menu_hit_area')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Export PDF'), findsOneWidget);
+    });
+
+    testWidgets('无字幕时菜单不含「导出 PDF」', (tester) async {
+      final item = createTestAudioItem(
+        transcriptPath: null,
+        transcriptSource: null,
+      );
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('audio_list_tile_menu_hit_area')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Export PDF'), findsNothing);
+    });
+  });
+
   group('AudioListTile 内容异常警告', () {
     Widget buildTile(AudioItem item) {
       return createTestApp(

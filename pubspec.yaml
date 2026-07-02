@@ -96,6 +96,9 @@ dependencies:
   # （AbiDetect.getNativeCpuAbi 等），导致插件注册整体失败、App 卡在启动 splash。
   ffmpeg_kit_flutter_new_min: ^3.1.0
   xml: ^6.5.0
+  # PDF 导出：Dart 端生成结构化 PDF（学习材料导出 PDF，见 lib/services/pdf_export/）。
+  # 注意：3.13.0 起要求 Dart >=3.12，当前 SDK 下固定解析到 3.12.0
+  pdf: ^3.12.0
 
 dev_dependencies:
   flutter_test:
@@ -137,8 +140,13 @@ flutter:
     # 目录内其余文件（app-icon-1024-rounded 仅构建期生成 launcher icon、
     # ic_stat_logo 仅作 Android 通知图标源文件）不进包，避免 iOS 等平台白带。
     - assets/icon/app-icon-1024.png
+    # PDF 导出品牌角标（96px 小图，1024 原图 190KB 直接嵌会撑大每份 PDF）
+    - assets/icon/app-icon-96.png
     # 后台静音保活轨：停顿期间循环播放以保持 iOS 音频会话活跃（见 background_audio_handler）
     - assets/audio/silence_2s.m4a
+    # PDF 导出内嵌字体（TrueType 轮廓；pdf 包不支持 CFF/OTF，也无法读系统 CJK 字体）。
+    # 不注册进 fonts: 段——仅经 rootBundle 读原始字节喂 pw.Font.ttf，生成时自动子集化。
+    - assets/fonts/pdf/
     - test/fixtures/audio_transcode/
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -1,7 +1,38 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-02（收藏词汇下划线扩展到句子列表组件）
+> 最后更新：2026-07-02（PDF 导出样式重设计）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：PDF 导出样式重设计（学术论文风格，用户反馈第二轮）
+
+用户否决首版样式（整句黄底+下划线、彩色背景块、header 不专业、解析占正文空间），按 8 条反馈重设计为学术论文风格：简洁克制、无彩色底色块、收藏标记与 App 内视觉语言一致。
+
+- [x] **收藏标记**：收藏句取消整句底色/下划线，改句末小书签图标（内联 SVG，橙色）；收藏词/意群改橙色细下划线（`0xFFFFA726`＝App `savedTextMarkColor` 浅色值；pdf 包无 dotted，细实线近似）。命中区间由 loader 用 `SavedTextIndex.build` + `savedCharRanges`（复用 `sentence_word_selection.dart` 纯逻辑）逐句计算存入 `StudyPdfSentence.savedRanges`，builder 按 `charMaskFromRanges`/`splitByMask` 切 span 渲染——与 App 正文下划线语义完全一致。
+- [x] **解析移附录**：语法/词汇/听力从正文移到文末「附录 · 句子解析」（`pw.NewPage()` 另起一页），正文句末加尾注式标记 `[n]`（muted 小号），附录逐条 `[n] 句子原文` + 粗体标签字段，无底色。
+- [x] **翻译弱化**：淡蓝底色块 → 无底色灰色 9pt，并入句子行左栏 Column（若作独立顶层块会被右栏词汇列高度推下去产生大空隙）。
+- [x] **右栏过滤**：无任何词典结果（AI+本地皆未命中）的收藏词条不再显示（`_buildVocabNote` 返回 null）。
+- [x] **词性斜体**：新增 `assets/fonts/pdf/NotoSans-Italic.ttf`（notofonts.github.io，与 Regular/Bold 同族）；`StudyPdfGloss{pos,text}` 拆分词性与释义（AI 词典取 `partOfSpeech`；本地词典按正则 `^((?:[a-z]+\.\s*)+)` 剥行首词性），pos 斜体+muted 渲染。
+- [x] **版式**：左右栏 2:1 → 5:2（栏距 16）；段间距 14 / 句间距 4（段间明显大于行高）；首页标题+日期居中（标题块需 `width: double.infinity` 才真居中）；第 2 页起 running header（左品牌右标题 + hairline）；页码居中。
+- [x] **品牌角标（第三轮反馈）**：品牌由标题上方居中改为**右上角不显眼角标**（业界惯例），并加应用图标——新增 `assets/icon/app-icon-96.png`（sips 从 1024 原图缩，7.6KB；190KB 原图直接嵌会撑大每份 PDF）+ pubspec 登记；`StudyPdfBuildRequest.appIconPng`（可空，null 只渲染文字）经 `_brandMark` 渲染在首页右上角与次页 running header 左侧。
+- [x] **测试**：builder 6 例（新增附录另起页/收藏区间越界）+ loader 14 例（词条过滤 / savedRanges 单词+意群命中 / gloss pos 拆分两路）全过；样例 PDF 渲染 PNG 目检 8 条反馈逐项通过。
+- [ ] **真机验证待办**：真机导出一篇带收藏/翻译/解析的音频，检查排版与分享流程。
+
+  **完成时间**: 2026-07-02
+
+## 已完成：学习材料导出 PDF（文章 + 笔记左右分栏）
+
+用户需求：把一篇学习材料导出为可打印、可阅读的 PDF——左栏文章句子、右栏该句词汇笔记（收藏词/意群 + 音标 + 释义 bullet），句子翻译（淡蓝块）与 AI 解析（语法/词汇/听力，淡杏黄块）放句子下方，收藏句自动加下划线 + 淡黄底。技术选型：Dart `pdf` 包端上生成（^3.12.0，不为 3.13 升级 Dart；不引入 printing，走既有 `Share.shareXFiles` 分享流）；只导出已有缓存，不发起 AI 请求。
+
+- [x] **字体资产**：内置 `assets/fonts/pdf/`（NotoSans Regular/Bold + NotoSansSC Regular 实例化自变量字体，共 ~11.7MB + OFL）。pdf 包只支持 TrueType 轮廓（系统 CJK 字体是 CFF/TTC 不可用），生成时自动子集化——样例 PDF 仅 31KB。不注册 fonts: 段，rootBundle 直读喂 `pw.Font.ttf`。
+- [x] **DAO**：`SavedWordDao.getByAudioId` + `SavedSenseGroupDao.getByAudioId`（按 audioItemId 过滤未删除、句子索引升序）+ 各 1 例单测。
+- [x] **数据聚合** `study_pdf_loader.dart`：字幕（DB transcriptSrt → SubtitleParser）→ `groupSentencesIntoParagraphs(30s)` 分段；收藏句/词/意群按「索引+文本双重校验、文本兜底、双失败丢弃」归句；翻译/解析按 `hashText(句)` + `translation:<lang>`/`analysis:<lang>` 读缓存（坏 JSON 视作未命中）；词汇释义 AI 词典缓存（`hashText('词|<lang>')`）优先、注入的本地词典 lookup 兜底。构造函数注入 DAO + 查询函数，drift 内存库直测 12 例。
+- [x] **渲染** `study_pdf_builder.dart`：顶层函数 `buildStudyPdfBytes`（compute isolate 入口，请求含字体字节）；A4 + `maxPages: 400`（默认 20 超页抛异常）；「句子行（左句右词汇）/翻译块/解析三块」各自是 MultiPage 直接 child（单 widget 超页抛异常，块间才可断页）；控制字符清洗 + 单字段 3000 字符截断（左栏一页约 4800 字符容量）。测试 3 例（中英混排 `%PDF-`、500 句压力、超长字段/控制字符）。
+- [x] **门面** `study_pdf_export_service.dart`：rootBundle 读字体（static 缓存）→ compute 生成 → 写 `pdf_export_<ts>` 临时目录；前缀登记 `temp_cleanup_service.dart` 白名单。
+- [x] **UI**：`audio_list_tile.dart` 菜单加「导出 PDF」（仅 gating `hasTranscript`，官方音频也可用）；编排在新文件 `export_pdf_runner.dart`（进度弹窗 → 生成 → 移动端 Share / 桌面另存为 → 临时文件清理 → 失败 SnackBar）。l10n 三 key（exportPdf/pdfExporting/pdfExportFailed）。widget 测试 2 例（有/无字幕菜单项显隐）。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；样例 PDF 渲染 PNG 目检通过（中文/IPA 无豆腐块、收藏句下划线+底色、翻译/解析色块区分、右栏词汇对齐、页脚页码）。
+- [ ] **真机验证待办**：真机导出一篇带收藏/翻译/解析的音频 → 分享面板 → 打开 PDF 检查排版与体积。
+
+  **完成时间**: 2026-07-02
 
 ## 已完成：收藏词汇下划线扩展到句子列表组件（随心听/全文盲听/段落复述）+ 意群模式
 

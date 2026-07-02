@@ -359,6 +359,51 @@ void main() {
       final texts = await db.savedSenseGroupDao.watchSavedPhraseTexts().first;
       expect(texts, {'first of all', 'in conclusion'});
     });
+
+    test('getByAudioId 只返回指定音频的未删除意群，按句子索引升序', () async {
+      final now = DateTime.now();
+      await db.audioItemDao.upsert(
+        AudioItemsCompanion(
+          id: const Value('audio-1'),
+          name: const Value('Audio 1'),
+          audioPath: const Value('1.mp3'),
+          addedDate: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'as a result',
+        displayText: 'As a result',
+        audioItemId: 'audio-1',
+        sentenceIndex: 4,
+      );
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'first of all',
+        displayText: 'First of all',
+        audioItemId: 'audio-1',
+        sentenceIndex: 1,
+      );
+      // 无来源音频的意群不应出现
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'in conclusion',
+        displayText: 'In conclusion',
+      );
+      // 软删除的意群不应出现
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'to be deleted',
+        displayText: 'To be deleted',
+        audioItemId: 'audio-1',
+        sentenceIndex: 0,
+      );
+      await db.savedSenseGroupDao.removeSenseGroup('to be deleted');
+
+      final groups = await db.savedSenseGroupDao.getByAudioId('audio-1');
+      expect(groups.map((g) => g.phraseText).toList(), [
+        'first of all',
+        'as a result',
+      ]);
+    });
   });
 
   // ========== 练习统计更新 ==========

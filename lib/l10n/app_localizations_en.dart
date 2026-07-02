@@ -2499,6 +2499,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exportSelectFiles => 'Select files to export';
 
   @override
+  String get exportPdf => 'Export PDF';
+
+  @override
+  String get pdfExporting => 'Generating PDF…';
+
+  @override
+  String pdfExportFailed(String error) {
+    return 'Failed to export PDF: $error';
+  }
+
+  @override
   String get exportData => 'Export Data';
 
   @override

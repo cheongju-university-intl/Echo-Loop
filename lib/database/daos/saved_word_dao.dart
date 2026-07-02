@@ -31,6 +31,20 @@ class SavedWordDao extends DatabaseAccessor<AppDatabase>
         .get();
   }
 
+  /// 获取指定音频关联的未删除收藏单词（按来源句子索引升序）
+  ///
+  /// 用于学习材料导出 PDF 时将收藏词归到所属句子。
+  /// audioItemId 指向「最新一次收藏来源」（MVP 单来源设计），
+  /// 即导出的是当前归属该音频的收藏词。
+  Future<List<SavedWord>> getByAudioId(String audioItemId) {
+    return (select(savedWords)
+          ..where(
+            (t) => t.audioItemId.equals(audioItemId) & t.deletedAt.isNull(),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.sentenceIndex)]))
+        .get();
+  }
+
   /// 保存单词（冲突时更新来源信息和更新时间）
   ///
   /// [word] 必须是小写 lemmatized 形式。

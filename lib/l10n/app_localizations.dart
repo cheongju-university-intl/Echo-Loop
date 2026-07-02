@@ -4436,6 +4436,24 @@ abstract class AppLocalizations {
   /// **'Select files to export'**
   String get exportSelectFiles;
 
+  /// No description provided for @exportPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Export PDF'**
+  String get exportPdf;
+
+  /// No description provided for @pdfExporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating PDF…'**
+  String get pdfExporting;
+
+  /// No description provided for @pdfExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export PDF: {error}'**
+  String pdfExportFailed(String error);
+
   /// No description provided for @exportData.
   ///
   /// In en, this message translates to:

@@ -5,6 +5,19 @@
 
 ---
 
+## 已完成：学习材料导出 PDF
+
+**完成时间**: 2026-07-02
+
+把一篇学习材料（音频+字幕）导出为可打印的 PDF：左栏文章句子、右栏词汇笔记（收藏词/意群 + 音标 + 斜体词性 + 释义 bullet），翻译弱化为句下灰字，AI 解析集中在文末「附录 · 句子解析」（正文句末尾注标记 [n]）。学术论文风格（首版彩色底色块样式被用户否决后重设计）：无底色块、收藏句句末书签图标、收藏词橙色细下划线（与 App 内视觉语言一致）、首页标题居中 + ECHO LOOP 品牌、次页 running header。样式规则固定（自动样式），只导出已有缓存不发 AI 请求，入口在资源库/合集音频条目菜单。
+
+- **技术选型**：Dart `pdf` 包（^3.12.0）端上生成 + 既有 `Share.shareXFiles` 分享流；不引入 printing。字体必须内置 TrueType（系统 CJK 字体是 CFF/TTC，pdf 包解析不了），NotoSans Regular/Bold/Italic + NotoSansSC 共 ~12.3MB，生成时自动子集化
+- **分层**：`study_pdf_loader.dart`（数据聚合，DAO 注入可测）→ `study_pdf_data.dart`（纯模型，跨 isolate）→ `study_pdf_builder.dart`（compute isolate 渲染）→ `study_pdf_export_service.dart`（门面）→ `export_pdf_runner.dart`（UI 编排）
+- **关键约束**：MultiPage 只有顶层兄弟块之间可断页（句子行/附录字段必须拍平；翻译并入句子行左栏 Column，独立块会被右栏高度推出空隙）；`maxPages` 默认 20 需显式调大；收藏词/句按「索引+文本双重校验」归句防字幕重解析错位；收藏下划线区间复用 App 的 `SavedTextIndex`/`savedCharRanges` 纯逻辑保证语义一致
+- 测试：loader 14 + builder 6 + DAO 2 + widget 2；样例 PDF 渲染目检通过
+
+---
+
 ## 已完成：词典交互重设计——非 modal 常驻面板 + 词组选区手柄
 
 **完成时间**: 2026-07-02
