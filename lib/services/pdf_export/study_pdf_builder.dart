@@ -498,33 +498,26 @@ pw.Widget _sentenceText(StudyPdfSentence sentence, int? noteNumber) {
   for (final (start, end, saved) in splitByMask(0, text.length, mask)) {
     var cursor = start;
     if (saved) {
-      // 收藏段：词 → 自绘下划线单元（附本词范围内的标号），空白 → 普通 span
+      // 收藏段：逐词渲染为下划线单元，且把该词后紧跟的**段内**空白并入
+      // 同一单元，使意群/词组下划线连续贯穿词间空格（否则空格处断开，看
+      // 起来像收藏了一堆独立单词）。收藏区间两端已修边为非空白，故段内空白
+      // 必为词间空白、其右必有词——不会出现悬垂到段尾的下划线。
+      // 标号（takeMarkers 取本词范围末尾的标号）附在该词单元之后；意群标号
+      // 落在整段末词（无尾随空白），不受空白并入影响。
       while (cursor < end) {
-        if (text[cursor].trim().isEmpty) {
-          final spaceStart = cursor;
-          while (cursor < end && text[cursor].trim().isEmpty) {
-            cursor++;
-          }
-          spans.add(
-            pw.TextSpan(
-              text: text.substring(spaceStart, cursor),
-              style: baseStyle,
-            ),
-          );
-          continue;
-        }
         var wordEnd = cursor;
         while (wordEnd < end && text[wordEnd].trim().isNotEmpty) {
           wordEnd++;
         }
+        final numbers = takeMarkers(cursor, wordEnd);
+        var unitEnd = wordEnd;
+        while (unitEnd < end && text[unitEnd].trim().isEmpty) {
+          unitEnd++;
+        }
         spans.add(
-          _savedWordSpan(
-            text.substring(cursor, wordEnd),
-            baseStyle,
-            takeMarkers(cursor, wordEnd),
-          ),
+          _savedWordSpan(text.substring(cursor, unitEnd), baseStyle, numbers),
         );
-        cursor = wordEnd;
+        cursor = unitEnd;
       }
       continue;
     }
@@ -635,7 +628,9 @@ pw.Widget _vocabColumn(List<StudyPdfVocabNote> notes) {
                         ),
                         if (note.phonetic.isNotEmpty)
                           pw.TextSpan(
-                            text: '  /${_sanitize(note.phonetic)}/',
+                            // 音标可能已自带首尾斜杠（AI 词典 pronunciation
+                            // 常含 `/.../`），剥掉后统一补一层，避免双斜线
+                            text: '  /${_stripPhoneticSlashes(_sanitize(note.phonetic))}/',
                             style: pw.TextStyle(
                               fontSize: 8,
                               fontStyle: pw.FontStyle.italic,
@@ -915,6 +910,12 @@ List<pw.InlineSpan> _inlineHighlightSpans(String text) {
     spans.addAll(_textWithPhonetics(text.substring(cursor)));
   }
   return spans;
+}
+
+/// 剥去音标首尾的斜杠/方括号与空白：不同词典源音标形态不一
+/// （`/.../`、`[...]`、裸音标），统一后由渲染层补一层 `/.../`。
+String _stripPhoneticSlashes(String phonetic) {
+  return phonetic.replaceAll(RegExp(r'^[\s/\[\]]+|[\s/\[\]]+$'), '');
 }
 
 /// 文本清洗：剔除控制字符（如 SentenceAnalysis.fieldSeparator U+001F），

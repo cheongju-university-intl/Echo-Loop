@@ -281,6 +281,9 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
       final box = context.findRenderObject() as RenderBox?;
       await Share.shareXFiles(
         [XFile(pdfPath, mimeType: 'application/pdf')],
+        // subject 决定 iOS 分享面板 LinkPresentation 卡片的标题（不传则
+        // metadata.title 为 nil，卡片只剩「PDF · 71 KB」副标题、无文件名）
+        subject: document.title,
         sharePositionOrigin: box != null
             ? box.localToGlobal(Offset.zero) & box.size
             : Rect.zero,
