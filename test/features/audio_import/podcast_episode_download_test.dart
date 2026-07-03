@@ -39,7 +39,7 @@ class _FakeEpisodeDownloadService extends AudioImportService {
 }
 
 void main() {
-  group('AudioImportController.downloadPodcastEpisode', () {
+  group('PodcastDownloadController.downloadPodcastEpisode', () {
     AudioItem podcastItem() =>
         createTestAudioItem(id: 'ep-1', name: 'Episode 1').copyWith(
           audioPath: null,
@@ -69,7 +69,7 @@ void main() {
       addTearDown(container.dispose);
 
       final ok = await container
-          .read(audioImportControllerProvider.notifier)
+          .read(podcastDownloadControllerProvider.notifier)
           .downloadPodcastEpisode(item);
 
       expect(ok, isTrue);
@@ -86,7 +86,7 @@ void main() {
       expect(updated.podcastEpisodeGuid, 'guid-1');
       // 收尾回到 idle
       expect(
-        container.read(audioImportControllerProvider),
+        container.read(podcastDownloadControllerProvider),
         isA<AudioImportIdle>(),
       );
     });
@@ -100,14 +100,14 @@ void main() {
       addTearDown(container.dispose);
 
       final ok = await container
-          .read(audioImportControllerProvider.notifier)
+          .read(podcastDownloadControllerProvider.notifier)
           .downloadPodcastEpisode(item);
 
       expect(ok, isFalse);
       final items = container.read(audioLibraryProvider).audioItems;
       expect(items.single.audioPath, isNull);
       expect(
-        container.read(audioImportControllerProvider),
+        container.read(podcastDownloadControllerProvider),
         isA<AudioImportFailed>(),
       );
     });
@@ -121,10 +121,33 @@ void main() {
       addTearDown(container.dispose);
 
       final ok = await container
-          .read(audioImportControllerProvider.notifier)
+          .read(podcastDownloadControllerProvider.notifier)
           .downloadPodcastEpisode(item);
 
       expect(ok, isFalse);
+    });
+
+    test('播客下载失败不污染链接导入 controller 状态（两条流程独立）', () async {
+      final item = podcastItem();
+      final container = makeContainer(
+        _FakeEpisodeDownloadService(shouldThrow: true),
+        item,
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(podcastDownloadControllerProvider.notifier)
+          .downloadPodcastEpisode(item);
+
+      // 播客下载置 Failed，但链接导入 controller 仍为初始 idle。
+      expect(
+        container.read(podcastDownloadControllerProvider),
+        isA<AudioImportFailed>(),
+      );
+      expect(
+        container.read(audioImportControllerProvider),
+        isA<AudioImportIdle>(),
+      );
     });
   });
 }

@@ -40,7 +40,7 @@ class _AudioListTileWrapper extends ConsumerWidget {
   }
 }
 
-class _DownloadingAudioImportController extends AudioImportController {
+class _DownloadingAudioImportController extends PodcastDownloadController {
   @override
   AudioImportState build() => const AudioImportDownloading(
     displayName: 'https://example.com/episode.mp3',
@@ -65,7 +65,7 @@ class _DownloadingOfficial extends OfficialDownload {
   );
 }
 
-class _PendingAudioImportController extends AudioImportController {
+class _PendingAudioImportController extends PodcastDownloadController {
   final Completer<bool> _completer = Completer<bool>();
 
   @override
@@ -463,7 +463,7 @@ void main() {
             audioLibraryProvider.overrideWith(
               () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
             ),
-            audioImportControllerProvider.overrideWith(
+            podcastDownloadControllerProvider.overrideWith(
               _DownloadingAudioImportController.new,
             ),
           ],
@@ -501,7 +501,7 @@ void main() {
             audioLibraryProvider.overrideWith(
               () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
             ),
-            audioImportControllerProvider.overrideWith(() => controller),
+            podcastDownloadControllerProvider.overrideWith(() => controller),
           ],
         ),
       );
@@ -581,7 +581,7 @@ void main() {
             audioLibraryProvider.overrideWith(
               () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
             ),
-            audioImportControllerProvider.overrideWith(
+            podcastDownloadControllerProvider.overrideWith(
               _DownloadingAudioImportController.new,
             ),
           ],

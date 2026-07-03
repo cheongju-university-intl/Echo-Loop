@@ -6,7 +6,7 @@ part of 'official_download_notifier.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$officialDownloadHash() => r'2c257dead11853bb519cd990e9b7373410e0da38';
+String _$officialDownloadHash() => r'a6f1ef5716120c027ade4799d6188efdd5b82c87';
 
 /// 全局官方合集音频下载调度器。
 ///

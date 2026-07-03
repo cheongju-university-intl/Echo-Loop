@@ -6,7 +6,7 @@ part of 'dictionary_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$dictionaryHash() => r'175e73827c7582877fc7510f777943e756a1bb4c';
+String _$dictionaryHash() => r'27eeac25ea4d113d9b083f468d51d4279d71845c';
 
 /// 词典状态管理 Provider
 ///

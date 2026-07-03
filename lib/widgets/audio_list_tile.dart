@@ -112,7 +112,7 @@ class AudioListTile extends ConsumerWidget {
     // 本单项的下载进度（播客单集 / 官方合集音频共用同一套行内进度展示）。
     // double? 语义：null 表示未在下载本项；非 null（含 -1 不定态）表示正在下载。
     final podcastDownloadState = _podcastDownloadState(
-      ref.watch(audioImportControllerProvider),
+      ref.watch(podcastDownloadControllerProvider),
     );
     // 官方下载进度：仅对未就绪官方音频订阅，避免其它 tile 无谓重建。
     final officialDownloadProgress =
@@ -1057,7 +1057,7 @@ class AudioListTile extends ConsumerWidget {
     AudioItem currentItem,
   ) async {
     final ok = await ref
-        .read(audioImportControllerProvider.notifier)
+        .read(podcastDownloadControllerProvider.notifier)
         .downloadPodcastEpisode(currentItem);
 
     if (!context.mounted) return;
@@ -1068,7 +1068,7 @@ class AudioListTile extends ConsumerWidget {
     // 仅在确实失败时提示；并发占用（另一单集正在下载）静默忽略，
     // 不误报"下载失败"。
     final isFailed =
-        ref.read(audioImportControllerProvider) is AudioImportFailed;
+        ref.read(podcastDownloadControllerProvider) is AudioImportFailed;
     if (!isFailed) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

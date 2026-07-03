@@ -91,6 +91,35 @@ class AudioImportController extends _$AudioImportController {
     }
   }
 
+  Future<void> cancel() async {
+    _sessionId++;
+    _cancelToken?.cancel('user-cancelled');
+    _cancelToken = null;
+    state = const AudioImportIdle();
+  }
+
+  void reset() {
+    if (state is AudioImportDownloading || state is AudioImportSaving) return;
+    state = const AudioImportIdle();
+  }
+}
+
+/// Podcast 单集懒下载控制器。
+///
+/// 与 [AudioImportController]（从链接导入）**完全独立**：两条流程各自持有状态，
+/// 一方的下载失败不会污染另一方的 UI（避免播客下载失败后，打开「从链接导入」
+/// 误显下载失败提示）。复用同一套 [AudioImportState] 模型类。
+@riverpod
+class PodcastDownloadController extends _$PodcastDownloadController {
+  CancelToken? _cancelToken;
+  int _sessionId = 0;
+
+  @override
+  AudioImportState build() {
+    ref.onDispose(() => _cancelToken?.cancel('disposed'));
+    return const AudioImportIdle();
+  }
+
   /// Podcast 单集懒下载：下载 enclosure 到沙盒并**就地更新现有占位条目**，
   /// 不新建 [AudioItem]（避免资源库出现重复孤儿条目）。
   ///
@@ -172,13 +201,6 @@ class AudioImportController extends _$AudioImportController {
     } finally {
       if (sid == _sessionId) _cancelToken = null;
     }
-  }
-
-  Future<void> cancel() async {
-    _sessionId++;
-    _cancelToken?.cancel('user-cancelled');
-    _cancelToken = null;
-    state = const AudioImportIdle();
   }
 
   void reset() {
