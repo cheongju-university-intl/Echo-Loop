@@ -40,10 +40,17 @@ final RegExp _edgeNonAlnum = RegExp(r"^[^A-Za-z0-9]+|[^A-Za-z0-9']+$");
 /// → 一律转小写 → 折叠内部连续空白为单个空格（多词词组换行/多空格归一）。
 /// 全大写缩写（NASA / FBI 等）不做特殊保留，统一小写化。
 String normalizeWord(String word) {
+  return normalizeDictionaryQueryForPrompt(word).toLowerCase();
+}
+
+/// 归一化查词输入但保留大小写，供 AI 词典请求 / 后端 prompt 使用。
+///
+/// 处理步骤：去首尾空白 → 弯撇号归一为直撇号 → 剥离首尾标点（右侧直撇号除外）
+/// → 折叠内部连续空白为单个空格。缓存和收藏仍使用 [normalizeWord]。
+String normalizeDictionaryQueryForPrompt(String word) {
   return word
       .trim()
       .replaceAll(_smartApostrophes, "'")
       .replaceAll(_edgeNonAlnum, '')
-      .toLowerCase()
       .replaceAll(RegExp(r'\s+'), ' ');
 }

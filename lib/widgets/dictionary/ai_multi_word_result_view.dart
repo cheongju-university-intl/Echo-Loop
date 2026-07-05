@@ -41,8 +41,8 @@ class AiMultiWordResultView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < entry.keyPoints.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppSpacing.xs),
-                _TipItem(text: entry.keyPoints[i]),
+                if (i > 0) const SizedBox(height: AppSpacing.s),
+                _KeyPointItem(item: entry.keyPoints[i]),
               ],
             ],
           ),
@@ -392,6 +392,31 @@ class _SimilarExpressionItem extends StatelessWidget {
             ),
           ),
         _ExampleView(sentence: item.sentence, translation: item.translation),
+      ],
+    );
+  }
+}
+
+/// 核心要点单条（项目符号 + 要点文本 + 自带例句）
+class _KeyPointItem extends StatelessWidget {
+  final KeyPoint item;
+  const _KeyPointItem({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (item.point.isNotEmpty) _TipItem(text: item.point),
+        if (item.sentence.isNotEmpty || item.translation.isNotEmpty)
+          Padding(
+            // 例句缩进对齐要点文本（项目符号 5 + 间距 8 = 13）
+            padding: const EdgeInsets.only(left: 13),
+            child: _ExampleView(
+              sentence: item.sentence,
+              translation: item.translation,
+            ),
+          ),
       ],
     );
   }

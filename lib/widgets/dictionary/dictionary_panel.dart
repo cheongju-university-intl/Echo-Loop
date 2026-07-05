@@ -185,10 +185,16 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
     }
   }
 
-  /// 归一化后的词形（单词或词组），用于查询（family key）与展示，
-  /// 与各词典源、后端共用同一 [normalizeWord]
-  /// （trim + 剥首尾标点[右撇号除外] + 小写 + 内部空白折叠）
+  /// 归一化后的表面词形（单词或词组），用于展示、TTS 与收藏。
+  ///
+  /// 这里一律小写，保持既有正文下划线、收藏 key、本地词典匹配语义不变。
   String get _normalizedWord => normalizeWord(widget.query.word);
+
+  /// 保留大小写的查词 query，用作 controller family key 与 AI 请求输入。
+  ///
+  /// 展示、TTS、收藏仍使用 [_normalizedWord]，缓存/落库由 AI 源和后端再转小写。
+  String get _lookupQuery =>
+      normalizeDictionaryQueryForPrompt(widget.query.word);
 
   Future<void> _toggleSave(String surfaceWord, bool currentlySaved) async {
     final notifier = ref.read(savedWordListProvider.notifier);
@@ -224,7 +230,8 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final word = _normalizedWord;
-    final controllerProvider = dictionaryLookupControllerProvider(word);
+    final lookupQuery = _lookupQuery;
+    final controllerProvider = dictionaryLookupControllerProvider(lookupQuery);
     final state = ref.watch(controllerProvider);
     final notifier = ref.read(controllerProvider.notifier);
 
@@ -281,13 +288,27 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // header（指示条 + 数据源行 + 标题行）：可拉伸源时整块可上下拖拽调整高度
-                // 标题、发音、收藏跨源恒用归一化表面词形 word（不用各源词形还原/
-                // headword 后的原形），保证正文所选词与展示/收藏一致。
-                _buildHeader(theme, state, notifier, word, isResizable),
+                // 标题跨源恒用清洗后的原查询文本（保留大小写，不用各源词形还原/
+                // headword 后的原形）；收藏仍用归一化小写词形，保证正文匹配一致。
+                _buildHeader(
+                  theme,
+                  state,
+                  notifier,
+                  word,
+                  lookupQuery,
+                  isResizable,
+                ),
                 const SizedBox(height: AppSpacing.s),
 
                 // 内容区：按选中源渲染。
-                _buildResultArea(state, word, notifier, isWeb, isResizable),
+                _buildResultArea(
+                  state,
+                  word,
+                  lookupQuery,
+                  notifier,
+                  isWeb,
+                  isResizable,
+                ),
               ],
             ),
           ),
@@ -303,6 +324,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
   Widget _buildResultArea(
     DictionaryLookupState state,
     String word,
+    String lookupQuery,
     DictionaryLookupController notifier,
     bool isWeb,
     bool isResizable,
@@ -312,7 +334,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
       state: state.current,
       word: word,
       onRetry: notifier.retry,
-      onSignIn: () => _handleSignIn(word),
+      onSignIn: () => _handleSignIn(lookupQuery),
     );
     if (isWeb) {
       // 填满剩余高度且占满宽度，交由 WebView 自身渲染滚动
@@ -350,7 +372,8 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
     ThemeData theme,
     DictionaryLookupState state,
     DictionaryLookupController notifier,
-    String word,
+    String savedWord,
+    String displayWord,
     bool resizable,
   ) {
     final header = Column(
@@ -382,7 +405,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
         const SizedBox(height: 8),
 
         // 标题行：单词 + 发音 + 收藏 + 关闭（跨源恒定）
-        _buildTitleRow(theme, word),
+        _buildTitleRow(theme, displayWord, savedWord),
       ],
     );
     if (!resizable) return header;
@@ -435,22 +458,22 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
 
   /// 标题行：单词（可长按复制）+ TTS + 收藏 + 关闭
   ///
-  /// [word] 为归一化后的**表面词形**（用户所选词），标题展示、发音、收藏、
-  /// 「是否已收藏」判定跨源统一用它——各源的词形还原/headword 原形仅用于检索与
-  /// 内容展示，不占据标题，也不改变收藏内容（收藏的始终是表面词形，正文下划线
-  /// 才能匹配，见 [SavedTextIndex]）。
-  Widget _buildTitleRow(ThemeData theme, String word) {
-    final isSaved = ref.watch(isWordSavedProvider(word)).valueOrNull ?? false;
+  /// [displayWord] 为保留大小写的清洗 query，用于标题展示与标题发音；
+  /// [savedWord] 为小写归一化词形，用于收藏状态和保存内容。各源的词形还原/
+  /// headword 原形仅用于内容展示，不占据标题，也不改变收藏内容。
+  Widget _buildTitleRow(ThemeData theme, String displayWord, String savedWord) {
+    final isSaved =
+        ref.watch(isWordSavedProvider(savedWord)).valueOrNull ?? false;
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
             onLongPressStart: (d) =>
-                TextContextMenu.show(context, d.globalPosition, word),
+                TextContextMenu.show(context, d.globalPosition, displayWord),
             onSecondaryTapDown: (d) =>
-                TextContextMenu.show(context, d.globalPosition, word),
+                TextContextMenu.show(context, d.globalPosition, displayWord),
             child: Text(
-              word,
+              displayWord,
               softWrap: true,
               overflow: TextOverflow.visible,
               style: theme.textTheme.titleLarge?.copyWith(
@@ -463,10 +486,10 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
             ),
           ),
         ),
-        SpeakButton(text: word),
+        SpeakButton(text: displayWord),
         AnimatedBookmarkIcon(
           isSaved: isSaved,
-          onPressed: () => _toggleSave(word, isSaved),
+          onPressed: () => _toggleSave(savedWord, isSaved),
         ),
         IconButton(
           key: const Key('dict_panel_close'),

@@ -199,8 +199,8 @@ void main() {
     testWidgets('标题保留右侧撇号（dogs\' 不被截断）', (tester) async {
       await _openSheet(tester, '"Dogs\'"');
 
-      // normalizeWord：剥首尾引号、小写，但保留右撇号
-      expect(find.text("dogs'"), findsOneWidget);
+      // 标题剥首尾引号、保留原大小写与右撇号
+      expect(find.text("Dogs'"), findsOneWidget);
       expect(find.text('Word not found in dictionary'), findsOneWidget);
     });
 
@@ -223,10 +223,10 @@ void main() {
       expect(find.textContaining('base form'), findsOneWidget);
     });
 
-    testWidgets('大小写不敏感（Abandon → abandon）', (tester) async {
+    testWidgets('标题保留大小写，本地查询仍大小写不敏感（Abandon）', (tester) async {
       await _openSheet(tester, 'Abandon');
 
-      expect(find.text('abandon'), findsOneWidget);
+      expect(find.text('Abandon'), findsOneWidget);
       expect(find.text('/əbændən/'), findsOneWidget);
     });
 

@@ -97,6 +97,29 @@ void main() {
     });
   });
 
+  group('normalizeDictionaryQueryForPrompt', () {
+    test('保留大小写', () {
+      expect(normalizeDictionaryQueryForPrompt('NASA'), 'NASA');
+      expect(normalizeDictionaryQueryForPrompt('COVID-19'), 'COVID-19');
+    });
+
+    test('剥离首尾标点并折叠空白', () {
+      expect(
+        normalizeDictionaryQueryForPrompt('  "Look   Forward  To."  '),
+        'Look Forward To',
+      );
+    });
+
+    test('弯撇号统一为直撇号但不转小写', () {
+      expect(normalizeDictionaryQueryForPrompt('I’d'), "I'd");
+      expect(normalizeDictionaryQueryForPrompt('dogs’.'), "dogs'");
+    });
+
+    test('空字符串', () {
+      expect(normalizeDictionaryQueryForPrompt(''), '');
+    });
+  });
+
   group('hashText', () {
     test('相同文本生成相同哈希', () {
       final hash1 = hashText('Hello World');

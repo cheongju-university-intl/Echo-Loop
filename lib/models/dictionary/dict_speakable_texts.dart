@@ -35,6 +35,9 @@ List<String> dictionarySpeakableTexts(DictionaryLookupResult result) {
           texts.add(item.example.sentence);
         }
       case final MultiWordDictionaryEntry entry:
+        for (final kp in entry.keyPoints) {
+          texts.add(kp.sentence);
+        }
         for (final meaning in entry.meanings) {
           for (final ex in meaning.examples) {
             texts.add(ex.sentence);

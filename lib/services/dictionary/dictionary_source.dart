@@ -31,7 +31,9 @@ class DictionaryPhraseTooLongException implements Exception {
 
 /// 查词请求参数（聚合，避免接口参数膨胀）
 class DictionaryLookupRequest {
-  /// 已清洗的查询词形
+  /// 已清洗的查询文本。
+  ///
+  /// 调用方已完成剥首尾标点、弯撇号归一和空白折叠；是否转小写由具体源决定。
   final String word;
 
   /// 语境句（部分源用于释义消歧，其余源忽略）

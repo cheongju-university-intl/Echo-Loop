@@ -80,10 +80,11 @@ class AiDictionarySource implements DictionarySource {
       throw const DictionaryAuthRequiredException();
     }
     final language = request.targetLanguage ?? _defaultLanguage;
-    // request.word 已由 controller 归一化（见 DictionaryLookupRequest.word 契约），
-    // 缓存键、发往后端的词、LLM 输入三者共用同一清洗结果
+    // request.word 已由 controller 清洗但保留大小写；API 使用它进入后端 prompt。
+    // 缓存键继续使用小写词形，确保 NASA/nasa 复用同一 L1/L2/L3 缓存。
     final word = request.word;
-    final key = hashText('$word|$language');
+    final cacheWord = normalizeWord(word);
+    final key = hashText('$cacheWord|$language');
 
     // L1 内存
     final mem = _memCache[key];

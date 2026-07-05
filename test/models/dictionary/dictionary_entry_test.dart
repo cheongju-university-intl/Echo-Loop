@@ -198,7 +198,13 @@ void main() {
         'naturalness': '',
         'category': '搭配',
         'pronunciationTips': ['pretty 可弱读。'],
-        'keyPoints': ['pretty 是程度副词，不是“漂亮”。'],
+        'keyPoints': [
+          {
+            'point': 'pretty 是程度副词，不是“漂亮”。',
+            'sentence': 'It’s pretty cold today.',
+            'translation': '今天挺冷的。',
+          },
+        ],
         'meanings': [
           {
             'translation': ['挺忙的'],
@@ -227,7 +233,9 @@ void main() {
       expect(multi.headword, 'pretty busy');
       expect(multi.category, '搭配');
       expect(multi.pronunciationTips, ['pretty 可弱读。']);
-      expect(multi.keyPoints, ['pretty 是程度副词，不是“漂亮”。']);
+      expect(multi.keyPoints.first.point, 'pretty 是程度副词，不是“漂亮”。');
+      expect(multi.keyPoints.first.sentence, 'It’s pretty cold today.');
+      expect(multi.keyPoints.first.translation, '今天挺冷的。');
       expect(multi.meanings.first.translation, ['挺忙的']);
       expect(
         multi.meanings.first.examples.first.sentence,

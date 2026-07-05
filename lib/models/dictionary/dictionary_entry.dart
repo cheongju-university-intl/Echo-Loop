@@ -368,8 +368,8 @@ class MultiWordDictionaryEntry implements AiDictionaryEntry {
   /// 发音提示（连读、弱读、重音等），每条一项，无明显提示时为空列表。
   final List<String> pronunciationTips;
 
-  /// 核心要点：学习者最该掌握的信息，每条一项，最重要在前。
-  final List<String> keyPoints;
+  /// 核心要点：学习者最该掌握的信息，每条一项，最重要在前，每条自带例句。
+  final List<KeyPoint> keyPoints;
 
   /// 各含义与对应场景用法。
   final List<MultiWordMeaning> meanings;
@@ -404,7 +404,12 @@ class MultiWordDictionaryEntry implements AiDictionaryEntry {
       naturalness: _str(json['naturalness']),
       category: _str(json['category']),
       pronunciationTips: _strList(json['pronunciationTips']),
-      keyPoints: _strList(json['keyPoints']),
+      keyPoints: json['keyPoints'] is List
+          ? (json['keyPoints'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map(KeyPoint.fromJson)
+                .toList(growable: false)
+          : const [],
       meanings: meanings is List
           ? meanings
                 .whereType<Map<String, dynamic>>()
@@ -428,7 +433,7 @@ class MultiWordDictionaryEntry implements AiDictionaryEntry {
     'naturalness': naturalness,
     'category': category,
     'pronunciationTips': pronunciationTips,
-    'keyPoints': keyPoints,
+    'keyPoints': keyPoints.map((k) => k.toJson()).toList(),
     'meanings': meanings.map((m) => m.toJson()).toList(),
     'similarExpressions': similarExpressions.map((e) => e.toJson()).toList(),
     'background': background,
@@ -443,6 +448,36 @@ class MultiWordDictionaryEntry implements AiDictionaryEntry {
       meanings.isEmpty &&
       similarExpressions.isEmpty &&
       background.isEmpty;
+}
+
+/// 多词表达核心要点（要点说明 + 自带例句）
+class KeyPoint {
+  /// 要点说明（目标语言）
+  final String point;
+
+  /// 英文例句（可空串）
+  final String sentence;
+
+  /// 例句译文（无例句时为空串）
+  final String translation;
+
+  const KeyPoint({
+    required this.point,
+    required this.sentence,
+    required this.translation,
+  });
+
+  factory KeyPoint.fromJson(Map<String, dynamic> json) => KeyPoint(
+    point: _str(json['point']),
+    sentence: _str(json['sentence']),
+    translation: _str(json['translation']),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'point': point,
+    'sentence': sentence,
+    'translation': translation,
+  };
 }
 
 /// 多词表达义项

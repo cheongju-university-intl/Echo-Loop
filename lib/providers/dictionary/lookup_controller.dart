@@ -237,9 +237,8 @@ class DictionaryLookupController extends _$DictionaryLookupController {
   bool _isStale(String id, int seq) => _seq[id] != seq;
 
   DictionaryLookupRequest _buildRequest(DictionarySource source) {
-    // word（= family key）已由调用方归一化一次（见 DictionaryLookupRequest.word
-    // 「已清洗」契约 + dictionary_panel._normalizedWord）。此处及各源均不再归一，
-    // 保证「查一次词只归一化一次」，各端共用同一清洗结果。
+    // word（= family key）已由调用方清洗一次（剥首尾标点、弯撇号归一、
+    // 空白折叠）。此处不再改写；需要小写缓存键的源自行派生。
     if (!source.requiresNetwork) {
       return DictionaryLookupRequest(word: word);
     }

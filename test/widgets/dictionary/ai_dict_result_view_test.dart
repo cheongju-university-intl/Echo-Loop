@@ -61,7 +61,13 @@ MultiWordDictionaryEntry _multiEntry() => MultiWordDictionaryEntry(
   naturalness: '这是自然表达。',
   category: '术语',
   pronunciationTips: const ['重音通常落在 learning。'],
-  keyPoints: const ['machine learning 是固定术语，不可拆开理解。'],
+  keyPoints: const [
+    KeyPoint(
+      point: 'machine learning 是固定术语，不可拆开理解。',
+      sentence: 'Machine learning powers modern search.',
+      translation: '机器学习驱动了现代搜索。',
+    ),
+  ],
   meanings: const [
     MultiWordMeaning(
       translation: ['机器学习'],

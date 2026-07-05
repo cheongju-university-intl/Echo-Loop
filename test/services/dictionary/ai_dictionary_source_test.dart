@@ -34,10 +34,7 @@ MultiWordDictionaryEntry _multiEntry(String headword) =>
       pronunciationTips: const [],
       keyPoints: const [],
       meanings: const [
-        MultiWordMeaning(
-          translation: ['机器学习'],
-          examples: [],
-        ),
+        MultiWordMeaning(translation: ['机器学习'], examples: []),
       ],
       similarExpressions: const [],
       background: '',
@@ -97,8 +94,7 @@ void main() {
     verify(() => dao.upsert(any(), 'ai_dictionary_v2', any())).called(1);
   });
 
-  test('request.word（已归一化）原样发往后端', () async {
-    // 归一化由 controller 统一完成；源拿到的已是清洗结果，原样透传
+  test('request.word（已清洗但保留大小写）原样发往后端', () async {
     when(
       () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
@@ -114,11 +110,58 @@ void main() {
       () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
-    await source.lookup(tokenReq);
+    await source.lookup(
+      const DictionaryLookupRequest(
+        word: 'NASA',
+        accessToken: 'tok',
+        targetLanguage: 'zh-CN',
+      ),
+    );
 
     verify(
       () => api.lookupDictionary(
-        'run',
+        'NASA',
+        accessToken: any(named: 'accessToken'),
+        targetLanguage: any(named: 'targetLanguage'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
+  });
+
+  test('缓存 key 仍按小写词形复用，NASA 与 nasa 只调一次 API', () async {
+    when(
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
+    ).thenAnswer((_) async => null);
+    when(
+      () => api.lookupDictionary(
+        'NASA',
+        accessToken: any(named: 'accessToken'),
+        targetLanguage: any(named: 'targetLanguage'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => _entry('NASA'));
+    when(
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
+    ).thenAnswer((_) async {});
+
+    await source.lookup(
+      const DictionaryLookupRequest(
+        word: 'NASA',
+        accessToken: 'tok',
+        targetLanguage: 'zh-CN',
+      ),
+    );
+    await source.lookup(
+      const DictionaryLookupRequest(
+        word: 'nasa',
+        accessToken: 'tok',
+        targetLanguage: 'zh-CN',
+      ),
+    );
+
+    verify(
+      () => api.lookupDictionary(
+        'NASA',
         accessToken: any(named: 'accessToken'),
         targetLanguage: any(named: 'targetLanguage'),
         cancelToken: any(named: 'cancelToken'),
