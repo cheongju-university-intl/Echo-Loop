@@ -1,6 +1,74 @@
 {
   "@@locale": "en",
   "appTitle": "Echo Loop",
+  "premiumTitle": "Echo Loop Membership",
+  "premiumTagline": "Unlock unlimited AI-powered learning",
+  "aiQuotaExceededTitle": "You've used up this month's free credits",
+  "aiQuotaExceededMessage": "Upgrade to Premium for unlimited AI dictionary, translation, and analysis.",
+  "aiQuotaExceededCta": "Upgrade to Premium",
+  "premiumEntryTitle": "Subscription",
+  "premiumUnavailableOnPlatform": "Subscriptions are not yet available on this platform",
+  "premiumEntryBadgeActive": "Member",
+  "premiumEntryBadgeUpgrade": "Upgrade",
+  "premiumActive": "You're a member",
+  "premiumBenefitTranslation": "Unlimited AI translation",
+  "premiumBenefitAnalysis": "Unlimited AI sentence analysis",
+  "premiumBenefitWordAnalysis": "Unlimited AI word analysis",
+  "premiumBenefitTranscription": "More AI subtitle transcription",
+  "premiumSubscribe": "Subscribe",
+  "premiumStartTrial": "Start {days}-day free trial",
+  "@premiumStartTrial": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "premiumRestore": "Restore Purchases",
+  "premiumManage": "Manage Subscription",
+  "premiumCurrentPlan": "Current plan",
+  "premiumPlanMonthly": "Monthly membership",
+  "premiumPlanYearly": "Annual membership",
+  "premiumPlanLifetime": "Lifetime membership",
+  "premiumPlanGeneric": "Membership",
+  "premiumStatusActive": "Active",
+  "premiumStatusExpiring": "Expiring",
+  "premiumStatusLifetime": "Lifetime",
+  "premiumRenewsOn": "Renews on {date}",
+  "@premiumRenewsOn": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "premiumExpiresOn": "Expires on {date}",
+  "@premiumExpiresOn": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "premiumLifetimeAccessNote": "Lifetime access, no renewal needed",
+  "premiumAutoRenewNotice": "Subscriptions auto-renew unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account.",
+  "premiumNoPlans": "No plans available right now. Please try again later.",
+  "premiumLoginRequired": "Please sign in before subscribing.",
+  "premiumPurchaseFailed": "Purchase failed. Please try again.",
+  "premiumRestoreNone": "No purchases found to restore.",
+  "premiumRestored": "Purchases restored.",
+  "premiumPeriodMonthly": "Monthly",
+  "premiumPeriodYearly": "Yearly",
+  "premiumPeriodLifetime": "Lifetime",
+  "premiumPriceSuffixMonth": "/mo",
+  "premiumPriceSuffixYear": "/yr",
+  "premiumPriceSuffixLifetime": "One-time",
+  "premiumSavePercent": "Save {percent}%",
+  "@premiumSavePercent": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "premiumPerMonthEquivalent": "≈ {price}/mo",
+  "@premiumPerMonthEquivalent": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
   "practiceControlModeAuto": "Auto",
   "practiceControlModeManual": "Manual",
   "player": "Player",

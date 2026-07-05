@@ -89,6 +89,18 @@ abstract class Events {
   /// 请求意群拆分
   static const senseGroupRequested = 'sense_group_requested';
 
+  /// 翻译成功返回（区别于点击请求，用于成功次数统计）
+  static const translationSucceeded = 'translation_succeeded';
+
+  /// 语法解析成功返回
+  static const analysisSucceeded = 'analysis_succeeded';
+
+  /// 意群拆分成功返回
+  static const senseGroupSucceeded = 'sense_group_succeeded';
+
+  /// 单词释义成功返回
+  static const wordAnalysisSucceeded = 'word_analysis_succeeded';
+
   // ── 字幕 ──
   /// 本地上传字幕成功
   static const subtitleUploaded = 'subtitle_uploaded';

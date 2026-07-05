@@ -371,6 +371,7 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       }
     } catch (error) {
       if (error is AiFeatureAuthRequiredException) rethrow;
+      if (error is AiFeatureQuotaExceededException) rethrow;
       if (mounted) {
         setState(() {
           _translationExpanded = false;
@@ -413,6 +414,7 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       }
     } catch (error) {
       if (error is AiFeatureAuthRequiredException) rethrow;
+      if (error is AiFeatureQuotaExceededException) rethrow;
       if (mounted) {
         setState(() {
           _analysisExpanded = false;

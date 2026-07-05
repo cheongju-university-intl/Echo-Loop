@@ -14,6 +14,10 @@ class UsageCounters {
     this.translationTapCount = 0,
     this.analysisTapCount = 0,
     this.senseGroupTapCount = 0,
+    this.translationSuccessCount = 0,
+    this.analysisSuccessCount = 0,
+    this.senseGroupSuccessCount = 0,
+    this.aiWordAnalysisSuccessCount = 0,
     this.bookmarkSentenceReviewCompleteCount = 0,
     this.flashcardReviewCompleteCount = 0,
     this.bookmarkSentenceSaveCount = 0,
@@ -33,6 +37,13 @@ class UsageCounters {
   final int translationTapCount;
   final int analysisTapCount;
   final int senseGroupTapCount;
+
+  /// AI 功能「成功次数」（区别于上面的点击次数）：仅在 API 成功返回可用结果时累加，
+  /// 用于评价/付费提醒等 UX 触达判断。失败/额度不足不计。
+  final int translationSuccessCount;
+  final int analysisSuccessCount;
+  final int senseGroupSuccessCount;
+  final int aiWordAnalysisSuccessCount;
   final int bookmarkSentenceReviewCompleteCount;
   final int flashcardReviewCompleteCount;
   final int bookmarkSentenceSaveCount;
@@ -68,6 +79,18 @@ class UsageCounters {
       ),
       UsageEvent.senseGroupTapped => copyWith(
         senseGroupTapCount: senseGroupTapCount + 1,
+      ),
+      UsageEvent.translationSucceeded => copyWith(
+        translationSuccessCount: translationSuccessCount + 1,
+      ),
+      UsageEvent.analysisSucceeded => copyWith(
+        analysisSuccessCount: analysisSuccessCount + 1,
+      ),
+      UsageEvent.senseGroupSucceeded => copyWith(
+        senseGroupSuccessCount: senseGroupSuccessCount + 1,
+      ),
+      UsageEvent.aiWordAnalysisSucceeded => copyWith(
+        aiWordAnalysisSuccessCount: aiWordAnalysisSuccessCount + 1,
       ),
       UsageEvent.bookmarkSentenceReviewCompleted => copyWith(
         bookmarkSentenceReviewCompleteCount:
@@ -107,6 +130,10 @@ class UsageCounters {
     int? translationTapCount,
     int? analysisTapCount,
     int? senseGroupTapCount,
+    int? translationSuccessCount,
+    int? analysisSuccessCount,
+    int? senseGroupSuccessCount,
+    int? aiWordAnalysisSuccessCount,
     int? bookmarkSentenceReviewCompleteCount,
     int? flashcardReviewCompleteCount,
     int? bookmarkSentenceSaveCount,
@@ -129,6 +156,14 @@ class UsageCounters {
       translationTapCount: translationTapCount ?? this.translationTapCount,
       analysisTapCount: analysisTapCount ?? this.analysisTapCount,
       senseGroupTapCount: senseGroupTapCount ?? this.senseGroupTapCount,
+      translationSuccessCount:
+          translationSuccessCount ?? this.translationSuccessCount,
+      analysisSuccessCount:
+          analysisSuccessCount ?? this.analysisSuccessCount,
+      senseGroupSuccessCount:
+          senseGroupSuccessCount ?? this.senseGroupSuccessCount,
+      aiWordAnalysisSuccessCount:
+          aiWordAnalysisSuccessCount ?? this.aiWordAnalysisSuccessCount,
       bookmarkSentenceReviewCompleteCount:
           bookmarkSentenceReviewCompleteCount ??
           this.bookmarkSentenceReviewCompleteCount,
@@ -159,6 +194,10 @@ class UsageCounters {
       'translationTapCount': translationTapCount,
       'analysisTapCount': analysisTapCount,
       'senseGroupTapCount': senseGroupTapCount,
+      'translationSuccessCount': translationSuccessCount,
+      'analysisSuccessCount': analysisSuccessCount,
+      'senseGroupSuccessCount': senseGroupSuccessCount,
+      'aiWordAnalysisSuccessCount': aiWordAnalysisSuccessCount,
       'bookmarkSentenceReviewCompleteCount':
           bookmarkSentenceReviewCompleteCount,
       'flashcardReviewCompleteCount': flashcardReviewCompleteCount,
@@ -188,6 +227,10 @@ class UsageCounters {
       translationTapCount: _readInt(json, 'translationTapCount'),
       analysisTapCount: _readInt(json, 'analysisTapCount'),
       senseGroupTapCount: _readInt(json, 'senseGroupTapCount'),
+      translationSuccessCount: _readInt(json, 'translationSuccessCount'),
+      analysisSuccessCount: _readInt(json, 'analysisSuccessCount'),
+      senseGroupSuccessCount: _readInt(json, 'senseGroupSuccessCount'),
+      aiWordAnalysisSuccessCount: _readInt(json, 'aiWordAnalysisSuccessCount'),
       bookmarkSentenceReviewCompleteCount: _readInt(
         json,
         'bookmarkSentenceReviewCompleteCount',

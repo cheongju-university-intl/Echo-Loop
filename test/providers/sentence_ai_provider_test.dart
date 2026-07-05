@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:echo_loop/database/daos/sentence_ai_cache_dao.dart';
+import 'package:echo_loop/features/subscription/models/premium_feature.dart';
 import 'package:echo_loop/models/sense_group_result.dart';
 import 'package:echo_loop/models/sentence_ai_result.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
@@ -31,6 +33,60 @@ void main() {
 
   group('getTranslation', () {
     const text = 'Hello world';
+
+    DioException dioError(int status) => DioException(
+      requestOptions: RequestOptions(path: '/api/v2/ai/translate'),
+      response: Response(
+        requestOptions: RequestOptions(path: '/api/v2/ai/translate'),
+        statusCode: status,
+      ),
+    );
+
+    test('后端 402（本月额度用尽）→ 抛 AiFeatureQuotaExceededException', () async {
+      when(
+        () => mockDao.getByHash(any(), l2TranslationType),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          accessToken: 'token',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenThrow(dioError(402));
+
+      await expectLater(
+        () => notifier.getTranslation(
+          text,
+          targetLanguage: lang,
+          accessToken: 'token',
+        ),
+        throwsA(isA<AiFeatureQuotaExceededException>()),
+      );
+    });
+
+    test('非 402 的 Dio 错误原样抛出（不误判为额度超限）', () async {
+      when(
+        () => mockDao.getByHash(any(), l2TranslationType),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          accessToken: 'token',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenThrow(dioError(500));
+
+      await expectLater(
+        () => notifier.getTranslation(
+          text,
+          targetLanguage: lang,
+          accessToken: 'token',
+        ),
+        throwsA(isA<DioException>()),
+      );
+    });
 
     test('L1 内存缓存命中', () async {
       // 预填充 L1
@@ -581,6 +637,97 @@ void main() {
       // L1 缓存应命中
       final cached = notifier.getCachedTranslation('  HELLO   WORLD.  ');
       expect(cached?.translation, 'x');
+    });
+  });
+
+  group('额度闸（guard / consume）', () {
+    const text = 'Hello world';
+    const lang = 'zh-CN';
+    const l2TranslationType = 'translation:$lang';
+
+    test('已登录但未解锁 → guard 抛 QuotaExceeded，不调用 API、不消耗试用', () async {
+      final consumed = <PremiumFeature>[];
+      final gated = SentenceAiNotifier(
+        cacheDao: mockDao,
+        apiClient: mockApi,
+        guardFeature: (_) => throw const AiFeatureQuotaExceededException(),
+        onConsumeTrial: consumed.add,
+      );
+      when(
+        () => mockDao.getByHash(any(), l2TranslationType),
+      ).thenAnswer((_) async => null);
+
+      await expectLater(
+        () => gated.getTranslation(
+          text,
+          targetLanguage: lang,
+          accessToken: 'token',
+        ),
+        throwsA(isA<AiFeatureQuotaExceededException>()),
+      );
+
+      verifyNever(
+        () => mockApi.translate(
+          any(),
+          targetLanguage: any(named: 'targetLanguage'),
+          accessToken: any(named: 'accessToken'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      );
+      expect(consumed, isEmpty);
+    });
+
+    test('已解锁（guard 放行）→ L3 成功后消耗一次试用', () async {
+      final consumed = <PremiumFeature>[];
+      final gated = SentenceAiNotifier(
+        cacheDao: mockDao,
+        apiClient: mockApi,
+        guardFeature: (_) {}, // 放行
+        onConsumeTrial: consumed.add,
+      );
+      when(
+        () => mockDao.getByHash(any(), l2TranslationType),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockApi.translate(
+          text,
+          targetLanguage: lang,
+          accessToken: 'token',
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async => const SentenceTranslation(translation: '你好世界'));
+      when(
+        () => mockDao.upsert(any(), l2TranslationType, any()),
+      ).thenAnswer((_) async {});
+
+      await gated.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
+
+      expect(consumed, [PremiumFeature.aiTranslation]);
+    });
+
+    test('缓存命中不经过额度闸（不抛、不消耗）', () async {
+      final consumed = <PremiumFeature>[];
+      final gated = SentenceAiNotifier(
+        cacheDao: mockDao,
+        apiClient: mockApi,
+        guardFeature: (_) => throw const AiFeatureQuotaExceededException(),
+        onConsumeTrial: consumed.add,
+      );
+      when(
+        () => mockDao.getByHash(any(), l2TranslationType),
+      ).thenAnswer((_) async => '{"translation":"你好世界"}');
+
+      final result = await gated.getTranslation(
+        text,
+        targetLanguage: lang,
+        accessToken: 'token',
+      );
+      expect(result.translation, '你好世界');
+      expect(consumed, isEmpty);
     });
   });
 

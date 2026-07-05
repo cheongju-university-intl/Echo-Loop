@@ -935,6 +935,8 @@ void main() {
             supabaseSessionProvider.overrideWith(
               (ref) => Stream<Session?>.value(signedInSession()),
             ),
+            // 已登录用户视为已解锁（Pro），转录机制测试不被额度闸拦截。
+            subscriptionEntitlementOverride(),
           ],
           child: MaterialApp.router(
             locale: const Locale('en'),

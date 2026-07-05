@@ -56,6 +56,67 @@ class AppTheme {
   /// 语义色：成功/完成的浅色容器底（完成对话框英雄区色带，浅绿）
   static const Color successContainer = Color(0xFFE3F4E9);
 
+  /// 会员/订阅专用强调色（业界标准做法：品牌色主导 + 少量金色点缀）。
+  ///
+  /// 经设计评审：大面积金色铺底显廉价发脏。改为「品牌蓝做主色」（CTA、选中态、
+  /// 单选钮、勾选图标），金色压缩到「皇冠图标 + 推荐徽标」两处小点缀保留尊贵语义。
+  /// 仅用于会员入口卡与 Paywall，不进全局主题。按 [Brightness] 取浅色/深色档值。
+  static const Color _premiumAccentLight = Color(0xFF1976D2);
+  static const Color _premiumAccentDark = Color(0xFF3AA0FF);
+  static const Color _onPremiumAccentLight = Color(0xFFFFFFFF);
+  static const Color _onPremiumAccentDark = Color(0xFF06223D);
+  static const Color _premiumSelectedFillLight = Color(0xFFEAF3FC);
+  static const Color _premiumSelectedFillDark = Color(0xFF0E1B26);
+  static const Color _premiumGoldLight = Color(0xFFC8941A);
+  static const Color _premiumGoldDark = Color(0xFFE8B84B);
+
+  /// 会员态 hero 卡金色渐变两端（深→浅古铜金），配白字尊贵不发脏。按 [Brightness] 微调。
+  static const Color _premiumHeroTopLight = Color(0xFFB8841A);
+  static const Color _premiumHeroBottomLight = Color(0xFF8A6218);
+  static const Color _premiumHeroTopDark = Color(0xFF8C6A22);
+  static const Color _premiumHeroBottomDark = Color(0xFF5E4712);
+
+  /// 状态胶囊色：有效（绿）/ 即将到期（琥珀）。含浅深两档，保证对比度。
+  static const Color _premiumStatusActiveLight = Color(0xFF2E7D32);
+  static const Color _premiumStatusActiveDark = Color(0xFF66BB6A);
+  static const Color _premiumStatusExpiringLight = Color(0xFFB26A00);
+  static const Color _premiumStatusExpiringDark = Color(0xFFE0A030);
+
+  /// 「立省」徽标专用深古铜金底（配白字，对比清晰；点缀金太浅时白字/深字都糊）。
+  static const Color premiumBadge = Color(0xFF8A6A1F);
+
+  /// 会员强调主色（CTA 填充、选中边框、选中单选钮、勾选图标）。
+  static Color premiumAccent(Brightness b) =>
+      b == Brightness.dark ? _premiumAccentDark : _premiumAccentLight;
+
+  /// 强调主色填充上的文字色。
+  static Color onPremiumAccent(Brightness b) =>
+      b == Brightness.dark ? _onPremiumAccentDark : _onPremiumAccentLight;
+
+  /// 选中套餐卡的极淡蓝染底。
+  static Color premiumSelectedFill(Brightness b) => b == Brightness.dark
+      ? _premiumSelectedFillDark
+      : _premiumSelectedFillLight;
+
+  /// 金色点缀（仅皇冠图标 + 推荐徽标填充）。
+  static Color premiumGold(Brightness b) =>
+      b == Brightness.dark ? _premiumGoldDark : _premiumGoldLight;
+
+  /// 会员态 hero 卡金色渐变（上→下），配白字。
+  static List<Color> premiumHeroGradient(Brightness b) => b == Brightness.dark
+      ? const [_premiumHeroTopDark, _premiumHeroBottomDark]
+      : const [_premiumHeroTopLight, _premiumHeroBottomLight];
+
+  /// 状态色：有效（绿）。
+  static Color premiumStatusActiveColor(Brightness b) => b == Brightness.dark
+      ? _premiumStatusActiveDark
+      : _premiumStatusActiveLight;
+
+  /// 状态色：即将到期（琥珀）。
+  static Color premiumStatusExpiringColor(Brightness b) => b == Brightness.dark
+      ? _premiumStatusExpiringDark
+      : _premiumStatusExpiringLight;
+
   /// 语义色：官方合集角标（深橙金色，对应"认证/精选"的通用视觉）
   /// 选 Material Orange 800：白字对比足够，区别于品牌蓝、不会与封面同色系混淆
   static const Color officialBadgeColor = Color(0xFFEF6C00);

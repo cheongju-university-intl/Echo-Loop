@@ -11,6 +11,11 @@ import 'package:universal_io/io.dart';
 import '../analytics/models/event_names.dart';
 import '../features/auth/providers/auth_providers.dart';
 import '../features/auth/sign_in_required_dialog.dart';
+import '../features/subscription/models/premium_feature.dart';
+import '../features/subscription/providers/ai_trial_usage_provider.dart';
+import '../features/subscription/providers/feature_access_provider.dart';
+import '../features/subscription/providers/subscription_controller.dart';
+import '../features/subscription/widgets/feature_gate.dart';
 import '../features/usage/usage_event.dart';
 import '../features/usage/usage_providers.dart';
 import '../models/audio_item.dart';
@@ -210,6 +215,14 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                 .clearState(audioItem.id);
             Navigator.pop(context);
           });
+        } else if (next is TranscriptionQuotaExceeded) {
+          // 本月免费额度用尽 → 清状态并引导订阅升级。
+          ref
+              .read(transcriptionTaskManagerProvider.notifier)
+              .clearState(audioItem.id);
+          if (mounted && context.mounted) {
+            openPaywall(context, ref);
+          }
         }
       },
     );
@@ -1733,6 +1746,11 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       await _showTranscriptionSignInDialog(context);
       return;
     }
+    // 已登录但未解锁（非会员且 AI 转录试用用尽）→ 引导订阅升级。
+    if (!ref.read(featureAccessProvider(PremiumFeature.aiTranscription))) {
+      await openPaywall(context, ref);
+      return;
+    }
 
     // 检查时长限制
     if (audioItem.totalDuration > _maxDurationSeconds) {
@@ -1810,6 +1828,13 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         ),
       );
       if (confirmed != true) return;
+    }
+
+    // 消耗一次免费试用（会员无限不计数）。转录为后台任务，于发起时计数。
+    if (!ref.read(subscriptionControllerProvider).isActive) {
+      ref
+          .read(aiTrialUsageProvider.notifier)
+          .consume(PremiumFeature.aiTranscription);
     }
 
     // 启动后台转录任务

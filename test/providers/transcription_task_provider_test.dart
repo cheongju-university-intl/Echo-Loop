@@ -478,6 +478,73 @@ void main() {
       container.dispose();
     });
 
+    test('后端 402（本月额度用尽）→ 进入 TranscriptionQuotaExceeded 状态', () async {
+      final audioItem = _testAudioItem(audioSha256: 'abc123');
+
+      when(
+        () => mockFileOps.computeSha256(any()),
+      ).thenAnswer((_) async => 'abc123');
+      when(() => mockFileOps.getFileSize(any())).thenAnswer((_) async => 1024);
+      when(
+        () => mockApi.getUploadUrl(
+          sha256: any(named: 'sha256'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+          accessToken: any(named: 'accessToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const UploadUrlResponse(
+          audioExists: true,
+          objectName: 'user-audio/abc123.mp3',
+          publicUrl: 'https://example.com/abc123.mp3',
+        ),
+      );
+      // 提交时后端判定额度超限 → 402
+      when(
+        () => mockApi.submitTranscription(
+          sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
+          objectName: any(named: 'objectName'),
+          publicUrl: any(named: 'publicUrl'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+          language: any(named: 'language'),
+          accessToken: any(named: 'accessToken'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(
+            path: '/api/v2/user-audio/submit-transcription',
+          ),
+          response: Response(
+            requestOptions: RequestOptions(
+              path: '/api/v2/user-audio/submit-transcription',
+            ),
+            statusCode: 402,
+          ),
+        ),
+      );
+
+      final container = _createContainer(
+        mockApi: mockApi,
+        mockFileOps: mockFileOps,
+        database: database,
+        audioItems: [audioItem],
+      );
+      await _seedAudioRows(database, [audioItem]);
+      final notifier = container.read(
+        transcriptionTaskManagerProvider.notifier,
+      );
+
+      await notifier.startTranscription(audioItem, 'en', accessToken: 'token');
+
+      expect(
+        notifier.getTaskState('test-audio-1'),
+        isA<TranscriptionQuotaExceeded>(),
+      );
+      container.dispose();
+    });
+
     test('提交转录时使用 AudioItem.name 作为后端文件名', () async {
       final audioItem = _testAudioItem(
         name: 'Original Lecture.mp3',

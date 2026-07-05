@@ -104,6 +104,264 @@ abstract class AppLocalizations {
   /// **'Echo Loop'**
   String get appTitle;
 
+  /// No description provided for @premiumTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Echo Loop Membership'**
+  String get premiumTitle;
+
+  /// No description provided for @premiumTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock unlimited AI-powered learning'**
+  String get premiumTagline;
+
+  /// No description provided for @aiQuotaExceededTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve used up this month\'s free credits'**
+  String get aiQuotaExceededTitle;
+
+  /// No description provided for @aiQuotaExceededMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Premium for unlimited AI dictionary, translation, and analysis.'**
+  String get aiQuotaExceededMessage;
+
+  /// No description provided for @aiQuotaExceededCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Premium'**
+  String get aiQuotaExceededCta;
+
+  /// No description provided for @premiumEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription'**
+  String get premiumEntryTitle;
+
+  /// No description provided for @premiumUnavailableOnPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscriptions are not yet available on this platform'**
+  String get premiumUnavailableOnPlatform;
+
+  /// No description provided for @premiumEntryBadgeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get premiumEntryBadgeActive;
+
+  /// No description provided for @premiumEntryBadgeUpgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade'**
+  String get premiumEntryBadgeUpgrade;
+
+  /// No description provided for @premiumActive.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re a member'**
+  String get premiumActive;
+
+  /// No description provided for @premiumBenefitTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited AI translation'**
+  String get premiumBenefitTranslation;
+
+  /// No description provided for @premiumBenefitAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited AI sentence analysis'**
+  String get premiumBenefitAnalysis;
+
+  /// No description provided for @premiumBenefitWordAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited AI word analysis'**
+  String get premiumBenefitWordAnalysis;
+
+  /// No description provided for @premiumBenefitTranscription.
+  ///
+  /// In en, this message translates to:
+  /// **'More AI subtitle transcription'**
+  String get premiumBenefitTranscription;
+
+  /// No description provided for @premiumSubscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe'**
+  String get premiumSubscribe;
+
+  /// No description provided for @premiumStartTrial.
+  ///
+  /// In en, this message translates to:
+  /// **'Start {days}-day free trial'**
+  String premiumStartTrial(int days);
+
+  /// No description provided for @premiumRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Purchases'**
+  String get premiumRestore;
+
+  /// No description provided for @premiumManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Subscription'**
+  String get premiumManage;
+
+  /// No description provided for @premiumCurrentPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Current plan'**
+  String get premiumCurrentPlan;
+
+  /// No description provided for @premiumPlanMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly membership'**
+  String get premiumPlanMonthly;
+
+  /// No description provided for @premiumPlanYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual membership'**
+  String get premiumPlanYearly;
+
+  /// No description provided for @premiumPlanLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime membership'**
+  String get premiumPlanLifetime;
+
+  /// No description provided for @premiumPlanGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership'**
+  String get premiumPlanGeneric;
+
+  /// No description provided for @premiumStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get premiumStatusActive;
+
+  /// No description provided for @premiumStatusExpiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiring'**
+  String get premiumStatusExpiring;
+
+  /// No description provided for @premiumStatusLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime'**
+  String get premiumStatusLifetime;
+
+  /// No description provided for @premiumRenewsOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Renews on {date}'**
+  String premiumRenewsOn(String date);
+
+  /// No description provided for @premiumExpiresOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires on {date}'**
+  String premiumExpiresOn(String date);
+
+  /// No description provided for @premiumLifetimeAccessNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime access, no renewal needed'**
+  String get premiumLifetimeAccessNote;
+
+  /// No description provided for @premiumAutoRenewNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscriptions auto-renew unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account.'**
+  String get premiumAutoRenewNotice;
+
+  /// No description provided for @premiumNoPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'No plans available right now. Please try again later.'**
+  String get premiumNoPlans;
+
+  /// No description provided for @premiumLoginRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please sign in before subscribing.'**
+  String get premiumLoginRequired;
+
+  /// No description provided for @premiumPurchaseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase failed. Please try again.'**
+  String get premiumPurchaseFailed;
+
+  /// No description provided for @premiumRestoreNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No purchases found to restore.'**
+  String get premiumRestoreNone;
+
+  /// No description provided for @premiumRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases restored.'**
+  String get premiumRestored;
+
+  /// No description provided for @premiumPeriodMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get premiumPeriodMonthly;
+
+  /// No description provided for @premiumPeriodYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get premiumPeriodYearly;
+
+  /// No description provided for @premiumPeriodLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime'**
+  String get premiumPeriodLifetime;
+
+  /// No description provided for @premiumPriceSuffixMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'/mo'**
+  String get premiumPriceSuffixMonth;
+
+  /// No description provided for @premiumPriceSuffixYear.
+  ///
+  /// In en, this message translates to:
+  /// **'/yr'**
+  String get premiumPriceSuffixYear;
+
+  /// No description provided for @premiumPriceSuffixLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time'**
+  String get premiumPriceSuffixLifetime;
+
+  /// No description provided for @premiumSavePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {percent}%'**
+  String premiumSavePercent(int percent);
+
+  /// No description provided for @premiumPerMonthEquivalent.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {price}/mo'**
+  String premiumPerMonthEquivalent(String price);
+
   /// No description provided for @practiceControlModeAuto.
   ///
   /// In en, this message translates to:

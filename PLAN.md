@@ -702,3 +702,52 @@ EchoLoopApp (main.dart)
 - 错误处理与边界情况完善
 - 多平台适配优化（macOS / iOS / Android / Web）
 - 新材料推荐控制（每周 2-3 篇，超限提醒）
+
+### 🚧 Milestone 5: 支付订阅（Echo Loop Premium）
+
+业界标准 IAP 订阅变现。IAP 选型 **RevenueCat**（用接口隔离 RC 类型以便迁移）；
+权益真相在后端（绑定 Supabase user_id），客户端只读；付费墙仅挡消耗后端算力的
+AI 功能（翻译/句解/词解/转录），核心学习闭环全免费；月订+年订（主推，7天试用）单一
+Premium 等级。设计经 pm/architect/critic 三方评审。
+
+- ✅ **Phase 0（已完成 2026-06-22）**：`lib/features/subscription/` 解耦骨架 +
+  全单测。Entitlement 状态机 + 三源对账纯函数（C4）+ generation 防竞态 +
+  secure_storage 缓存 + `featureAccessProvider` 付费墙查询 API + `FeatureGate`。
+  纯 Dart 零平台依赖，所有 feature 暂放行不阻断现有流程。33 例单测全绿。
+- 📋 **Phase 1 — 后端（Next.js 仓库）**：统一 AI 端点鉴权化（C2：词解端点
+  `/api/v1/ai/word-analyze` 当前匿名，须加 accessToken）；`user_entitlements` 表 +
+  RLS；`GET /api/entitlements`；RC webhook 落库（续费/退款/试用，幂等）；
+  后端配额按 user_id + 时间窗口裁决（C1/C3）。
+  - 🟡 **用量记录部分（2026-07-01）**：`api_usage` 表（user_id + feature + 自然月周期）
+    + `recordApiUsage` 助手已落地，5 个 v2 AI 端点成功即权威计数（服务端缓存命中也算），
+    同时可导出「当月/累计」两种口径。客户端另加了 AI「成功次数」本地累计（评价/付费提醒用，未接 UI）。
+  - 🟡 **额度裁决部分（2026-07-01）**：后端按「用户+功能+自然月」裁决免费额度（`kFreeMonthlyLimits`
+    各 5，`isFreeQuotaExceeded`），4 个 AI 端点超额返回 402；客户端 `freeAllowancePolicy` 改
+    AlwaysAllow（不本地预判）、把 402 映射为 `AiFeatureQuotaExceededException`/`TranscriptionQuotaExceeded`
+    → 弹订阅。**当前暂当所有用户免费**——后端尚无订阅状态。
+  - ✅ **订阅豁免（2026-07-01，`fluency-frontend`）**：`user_entitlements` 表（迁移 0037）+
+    RC webhook `POST /api/revenuecat/webhook`（Authorization 共享密钥、按事件 upsert、乱序丢弃）
+    落库订阅状态；`hasActiveEntitlement` 在 `isFreeQuotaExceeded` 开头放行订阅用户（5 端点零改动）。
+    单测 21 例全绿（entitlements/webhook/usage 豁免）。**待用户上线操作**：注入
+    `REVENUECAT_WEBHOOK_AUTH`、`pnpm db:migrate` 应用到线上 Supabase、RC 后台配置 webhook URL+Auth 头
+    （见 `docs/subscription-setup.md` §7）。
+  - ✅ **平台灰度（2026-07-03）**：订阅先只在 iOS 上线（Google Play 未配置、macOS IAP 未验证）。
+    「平台是否启用订阅」= 编译期是否注入该平台 RC key（macOS 在 `revenueCatApiKey` 显式排除）；
+    UI 统一经 `subscriptionAvailabilityProvider` 门控（设置页入口隐藏 / `openPaywall` 拦截提示 /
+    Paywall 占位页）。「平台是否限额」= 后端 env `AI_QUOTA_ENFORCED_PLATFORMS`（逗号列表，默认空
+    =全放行，改 env 即时生效）；客户端 AI 请求恒带 `x-app-platform`（+`x-app-version`）header，
+    缺 header 的老客户端 fail-open 放行。见 `docs/subscription-setup.md` §4/§7。
+  - 📋 **可选后续**：`GET /api/entitlements`（客户端改读后端权威，当前直接读 RC CustomerInfo 已够）。
+- ✅ **Phase 2 — RC 接入（代码侧已完成 2026-06-22）**：`purchases_flutter` 集成、
+  `RevenueCatPurchaseService`（CustomerInfo 为在线权威源 + Offerings→套餐映射 +
+  purchase/restore/logIn）、`PaywallScreen`（权益/本地化价格/试用/自动续费披露/恢复购买/
+  条款隐私/管理订阅，购买前强制登录）、订阅入口（设置页「升级 Premium」+ FeatureGate
+  撞墙跳 Paywall）、`main.dart` 配置 SDK。**待用户完成**：App Store Connect / Google Play /
+  RevenueCat 后台配置 + 注入 API Key + Sandbox 验证（见 `docs/subscription-setup.md`）。
+  - ✅ **调试设施（2026-06-23）**：开发者选项「订阅调试」面板——权益只读视图、
+    RC 原始 CustomerInfo 诊断、清本地缓存+失效 RC 缓存+强刷、手动覆盖 Pro/Free
+    （debug-only）。解决多层缓存导致「后台删订阅仍显示已订阅」的 Sandbox 调试痛点。
+- 📋 **Phase 3 — 挂付费墙**：4 个 AI 付费点 `featureAccessProvider` 改真实判定 +
+  后端免费额度；灰度上墙。
+- 📋 **Phase 4 — 加固**：退款/撤销反向降级、账号-平台错配薅羊毛防护、恢复购买、
+  多设备/换机/重装、macOS 验证。

@@ -12,6 +12,146 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appTitle => 'Echo Loop';
 
   @override
+  String get premiumTitle => 'Echo Loop 会员';
+
+  @override
+  String get premiumTagline => '解锁无限 AI 学习能力';
+
+  @override
+  String get aiQuotaExceededTitle => '本月免费额度已用完';
+
+  @override
+  String get aiQuotaExceededMessage => '升级会员，畅享无限 AI 查词、翻译与句子解析。';
+
+  @override
+  String get aiQuotaExceededCta => '升级会员';
+
+  @override
+  String get premiumEntryTitle => '会员与订阅';
+
+  @override
+  String get premiumUnavailableOnPlatform => '当前平台暂不支持订阅';
+
+  @override
+  String get premiumEntryBadgeActive => '会员';
+
+  @override
+  String get premiumEntryBadgeUpgrade => '升级';
+
+  @override
+  String get premiumActive => '你已是会员';
+
+  @override
+  String get premiumBenefitTranslation => '无限 AI 翻译';
+
+  @override
+  String get premiumBenefitAnalysis => '无限 AI 句子解析';
+
+  @override
+  String get premiumBenefitWordAnalysis => '无限 AI 单词解析';
+
+  @override
+  String get premiumBenefitTranscription => '更多 AI 字幕转录额度';
+
+  @override
+  String get premiumSubscribe => '订阅';
+
+  @override
+  String premiumStartTrial(int days) {
+    return '开始 $days 天免费试用';
+  }
+
+  @override
+  String get premiumRestore => '恢复购买';
+
+  @override
+  String get premiumManage => '管理订阅';
+
+  @override
+  String get premiumCurrentPlan => '当前套餐';
+
+  @override
+  String get premiumPlanMonthly => '月度会员';
+
+  @override
+  String get premiumPlanYearly => '年度会员';
+
+  @override
+  String get premiumPlanLifetime => '终身会员';
+
+  @override
+  String get premiumPlanGeneric => '会员';
+
+  @override
+  String get premiumStatusActive => '有效';
+
+  @override
+  String get premiumStatusExpiring => '即将到期';
+
+  @override
+  String get premiumStatusLifetime => '永久';
+
+  @override
+  String premiumRenewsOn(String date) {
+    return '$date 自动续订';
+  }
+
+  @override
+  String premiumExpiresOn(String date) {
+    return '$date 到期';
+  }
+
+  @override
+  String get premiumLifetimeAccessNote => '永久有效，无需续订';
+
+  @override
+  String get premiumAutoRenewNotice =>
+      '订阅到期前 24 小时内若未取消将自动续费。你可随时在商店账户中管理或取消订阅。';
+
+  @override
+  String get premiumNoPlans => '暂无可用套餐，请稍后再试。';
+
+  @override
+  String get premiumLoginRequired => '订阅前请先登录。';
+
+  @override
+  String get premiumPurchaseFailed => '购买失败，请重试。';
+
+  @override
+  String get premiumRestoreNone => '未找到可恢复的购买。';
+
+  @override
+  String get premiumRestored => '已恢复购买。';
+
+  @override
+  String get premiumPeriodMonthly => '月付';
+
+  @override
+  String get premiumPeriodYearly => '年付';
+
+  @override
+  String get premiumPeriodLifetime => '终身';
+
+  @override
+  String get premiumPriceSuffixMonth => '/月';
+
+  @override
+  String get premiumPriceSuffixYear => '/年';
+
+  @override
+  String get premiumPriceSuffixLifetime => '一次性';
+
+  @override
+  String premiumSavePercent(int percent) {
+    return '立省 $percent%';
+  }
+
+  @override
+  String premiumPerMonthEquivalent(String price) {
+    return '≈ $price/月';
+  }
+
+  @override
   String get practiceControlModeAuto => '自动';
 
   @override

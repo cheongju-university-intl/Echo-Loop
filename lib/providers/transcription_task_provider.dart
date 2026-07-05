@@ -102,6 +102,11 @@ class TranscriptionEmptyResult extends TranscriptionTaskState {
   const TranscriptionEmptyResult();
 }
 
+/// 本月免费额度用尽（后端返回 402）——由 UI 引导订阅升级。
+class TranscriptionQuotaExceeded extends TranscriptionTaskState {
+  const TranscriptionQuotaExceeded();
+}
+
 // ─── Provider ──────────────────────────────────────────────
 
 /// 转录任务管理器
@@ -261,6 +266,11 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
         '❌ 转录失败(Dio) | type=${e.type} status=${e.response?.statusCode} '
             'msg=${e.message ?? e.error} body=${e.response?.data}',
       );
+      // 后端本月免费额度用尽 → 交由 UI 引导订阅（区别于普通失败的重试提示）。
+      if (e.response?.statusCode == 402) {
+        _updateState(audioId, const TranscriptionQuotaExceeded());
+        return;
+      }
       _updateState(
         audioId,
         TranscriptionFailed(message: _userFriendlyError(e)),

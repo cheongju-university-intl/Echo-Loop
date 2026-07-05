@@ -19,6 +19,10 @@ import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
 import 'package:echo_loop/features/auth/providers/auth_providers.dart';
+import 'package:echo_loop/features/subscription/models/entitlement.dart';
+import 'package:echo_loop/features/subscription/providers/subscription_availability.dart';
+import 'package:echo_loop/features/subscription/providers/subscription_controller.dart';
+import 'package:echo_loop/features/subscription/state/entitlement_state.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/package_info_provider.dart';
@@ -50,6 +54,8 @@ void main() {
     OfflineAsrSettingsState? offlineAsrState,
     TtsSettings ttsSettings = const TtsSettings(),
     PackageInfo? packageInfo,
+    // 测试宿主（macOS/无 key）默认不支持订阅，这里默认置 true 以覆盖订阅入口 UI。
+    bool subscriptionAvailable = true,
   }) {
     const recommendedModel = AsrModelInfo(
       id: 'whisper-base-en-int8',
@@ -75,6 +81,7 @@ void main() {
       audioEngineProvider.overrideWith(() => TestAudioEngine()),
       packageInfoProvider.overrideWithValue(packageInfo ?? testPackageInfo),
       appUpdateProvider.overrideWith(() => TestAppUpdate()),
+      subscriptionAvailabilityProvider.overrideWithValue(subscriptionAvailable),
       analyticsOverride(),
     ];
   }
@@ -329,6 +336,96 @@ void main() {
         expect(find.text('mbfpw8sd...@ay.appleid.com'), findsOneWidget);
       });
 
+      testWidgets('未订阅：账户分组内显示订阅入口与「升级」徽章，无顶部金卡', (tester) async {
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(),
+              subscriptionControllerProvider.overrideWith(
+                () =>
+                    _TestSubscriptionController(const EntitlementState.free()),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 订阅行标题（沿用 premiumEntryTitle）+ 未订阅高亮「升级」徽章
+        expect(find.text('Subscription'), findsOneWidget);
+        expect(find.text('Upgrade'), findsOneWidget);
+        // 顶部不再有大金卡的「会员」状态徽章
+        expect(find.text('Member'), findsNothing);
+      });
+
+      testWidgets('已订阅：显示「会员」徽章与套餐摘要', (tester) async {
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(),
+              subscriptionControllerProvider.overrideWith(
+                () => _TestSubscriptionController(
+                  const EntitlementState(
+                    status: EntitlementStatus.premium,
+                    entitlement: Entitlement(
+                      isPremium: true,
+                      productId: 'pro_yearly',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 保持简洁：只有标题 + 「会员」徽章，无副标题详情
+        expect(find.text('Subscription'), findsOneWidget);
+        expect(find.text('Member'), findsOneWidget);
+        expect(find.text('Upgrade'), findsNothing);
+      });
+
+      testWidgets('点击订阅入口跳转 Paywall', (tester) async {
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(),
+              subscriptionControllerProvider.overrideWith(
+                () =>
+                    _TestSubscriptionController(const EntitlementState.free()),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Subscription'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Paywall'), findsOneWidget);
+      });
+
+      testWidgets('平台未启用订阅：不显示订阅入口', (tester) async {
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(subscriptionAvailable: false),
+              subscriptionControllerProvider.overrideWith(
+                () =>
+                    _TestSubscriptionController(const EntitlementState.free()),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Subscription'), findsNothing);
+        expect(find.text('Upgrade'), findsNothing);
+      });
+
       testWidgets('显示外观标题', (tester) async {
         await tester.pumpWidget(
           createTestScreen(const SettingsScreen(), overrides: buildOverrides()),
@@ -534,6 +631,16 @@ String _jwtWithAuthenticationMethod(String method) {
     utf8.encode('{"amr":[{"method":"$method","timestamp":0}]}'),
   );
   return '$header.$payload.';
+}
+
+/// 测试用 SubscriptionController，固定返回指定权益状态，
+/// 跳过真实对账（避免依赖 RevenueCat / 缓存 / 后端）。
+class _TestSubscriptionController extends SubscriptionController {
+  _TestSubscriptionController(this._state);
+  final EntitlementState _state;
+
+  @override
+  EntitlementState build() => _state;
 }
 
 /// 测试用 DeveloperOptions Notifier，固定返回指定值。

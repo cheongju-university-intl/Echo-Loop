@@ -1,0 +1,78 @@
+/// 订阅可用性门控测试。
+///
+/// 覆盖 [openPaywall] 的平台门控：平台未启用订阅时不导航、弹提示；
+/// 启用时正常跳转 Paywall 路由。
+library;
+
+import 'package:echo_loop/features/subscription/providers/subscription_availability.dart';
+import 'package:echo_loop/features/subscription/widgets/feature_gate.dart';
+import 'package:echo_loop/l10n/app_localizations.dart';
+import 'package:echo_loop/router/app_router.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+
+/// 带路由的测试壳：首页一个按钮调用 [openPaywall]，`/paywall` 为占位页。
+Widget _harness({required bool available}) {
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => Scaffold(
+          body: Consumer(
+            builder: (context, ref, _) => TextButton(
+              onPressed: () => openPaywall(context, ref),
+              child: const Text('go'),
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.paywall,
+        builder: (context, state) =>
+            const Scaffold(body: Text('Paywall Route')),
+      ),
+    ],
+  );
+  return ProviderScope(
+    overrides: [subscriptionAvailabilityProvider.overrideWithValue(available)],
+    child: MaterialApp.router(
+      routerConfig: router,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en'), Locale('zh')],
+    ),
+  );
+}
+
+void main() {
+  testWidgets('平台未启用订阅：openPaywall 不导航，弹平台不支持提示', (tester) async {
+    await tester.pumpWidget(_harness(available: false));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paywall Route'), findsNothing);
+    expect(
+      find.text('Subscriptions are not yet available on this platform'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('平台已启用订阅：openPaywall 正常跳转 Paywall', (tester) async {
+    await tester.pumpWidget(_harness(available: true));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paywall Route'), findsOneWidget);
+  });
+}

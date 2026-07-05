@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,8 +21,10 @@ import 'router/app_router.dart';
 import 'services/bundled_example_installer.dart';
 import 'services/temp_cleanup_service.dart';
 import 'theme/app_theme.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import 'config/api_config.dart';
 import 'config/auth_config.dart' as auth_config;
+import 'config/revenuecat_config.dart' as revenuecat_config;
 import 'providers/review_reminder_provider.dart';
 import 'services/notification_tap_router_bridge.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -59,6 +61,7 @@ import 'features/official_collections/download/official_download_notifier.dart';
 import 'features/onboarding_survey/data/onboarding_survey_storage.dart';
 import 'features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import 'features/auth/providers/auth_providers.dart';
+import 'features/subscription/providers/subscription_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -185,6 +188,32 @@ void main() async {
       'App',
       'Supabase 未配置（缺 SUPABASE_URL/SUPABASE_PUBLISHABLE_KEY），跳过初始化',
     );
+  }
+
+  // 初始化 RevenueCat（IAP 订阅）
+  //
+  // 仅在 --dart-define 注入了当前平台的 REVENUECAT_API_KEY_* 时才初始化；
+  // 未配置时跳过，订阅功能不可用但 app 仍可匿名运行。
+  // 用户身份绑定（Purchases.logIn）由 SubscriptionController 监听登录态后处理，
+  // 这里只做 SDK 配置。
+  if (revenuecat_config.useLocalStoreKit) {
+    // 本地 StoreKit 测试模式：**不初始化 RevenueCat**，购买走 in_app_purchase
+    // 直连 .storekit，避免本地交易被 RC SDK 捕获上报（不污染 RC Sandbox）。
+    AppLogger.log('App', '本地 StoreKit 测试模式：跳过 RevenueCat 初始化');
+  } else if (revenuecat_config.isRevenueCatConfigured) {
+    try {
+      // Debug 构建打开 RevenueCat 详细日志，便于定位 Offerings 为空等问题。
+      if (kDebugMode) {
+        await Purchases.setLogLevel(LogLevel.debug);
+      }
+      await Purchases.configure(
+        PurchasesConfiguration(revenuecat_config.revenueCatApiKey),
+      );
+    } catch (e) {
+      AppLogger.log('App', 'RevenueCat 初始化失败，订阅功能不可用: $e');
+    }
+  } else {
+    AppLogger.log('App', 'RevenueCat 未配置（缺平台 API Key），跳过初始化');
   }
 
   // 初始化用户 ID（SecureStorage 持久化，卸载重装可恢复）
@@ -427,6 +456,11 @@ class _EchoLoopAppState extends ConsumerState<EchoLoopApp>
     switch (state) {
       case AppLifecycleState.resumed:
         _triggerCatalogSync();
+        // 回前台时重对账订阅权益：用户可能刚在系统订阅页退订 / 换 plan / 续费，
+        // 或退款生效。RevenueCat 有约 5 分钟缓存，频繁切前台基本命中缓存、近零成本。
+        unawaited(
+          ref.read(subscriptionControllerProvider.notifier).refresh(),
+        );
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
         // 立即刷新 PostHog 埋点队列，避免 Application Backgrounded 等事件

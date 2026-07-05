@@ -12,6 +12,150 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Echo Loop';
 
   @override
+  String get premiumTitle => 'Echo Loop Membership';
+
+  @override
+  String get premiumTagline => 'Unlock unlimited AI-powered learning';
+
+  @override
+  String get aiQuotaExceededTitle =>
+      'You\'ve used up this month\'s free credits';
+
+  @override
+  String get aiQuotaExceededMessage =>
+      'Upgrade to Premium for unlimited AI dictionary, translation, and analysis.';
+
+  @override
+  String get aiQuotaExceededCta => 'Upgrade to Premium';
+
+  @override
+  String get premiumEntryTitle => 'Subscription';
+
+  @override
+  String get premiumUnavailableOnPlatform =>
+      'Subscriptions are not yet available on this platform';
+
+  @override
+  String get premiumEntryBadgeActive => 'Member';
+
+  @override
+  String get premiumEntryBadgeUpgrade => 'Upgrade';
+
+  @override
+  String get premiumActive => 'You\'re a member';
+
+  @override
+  String get premiumBenefitTranslation => 'Unlimited AI translation';
+
+  @override
+  String get premiumBenefitAnalysis => 'Unlimited AI sentence analysis';
+
+  @override
+  String get premiumBenefitWordAnalysis => 'Unlimited AI word analysis';
+
+  @override
+  String get premiumBenefitTranscription => 'More AI subtitle transcription';
+
+  @override
+  String get premiumSubscribe => 'Subscribe';
+
+  @override
+  String premiumStartTrial(int days) {
+    return 'Start $days-day free trial';
+  }
+
+  @override
+  String get premiumRestore => 'Restore Purchases';
+
+  @override
+  String get premiumManage => 'Manage Subscription';
+
+  @override
+  String get premiumCurrentPlan => 'Current plan';
+
+  @override
+  String get premiumPlanMonthly => 'Monthly membership';
+
+  @override
+  String get premiumPlanYearly => 'Annual membership';
+
+  @override
+  String get premiumPlanLifetime => 'Lifetime membership';
+
+  @override
+  String get premiumPlanGeneric => 'Membership';
+
+  @override
+  String get premiumStatusActive => 'Active';
+
+  @override
+  String get premiumStatusExpiring => 'Expiring';
+
+  @override
+  String get premiumStatusLifetime => 'Lifetime';
+
+  @override
+  String premiumRenewsOn(String date) {
+    return 'Renews on $date';
+  }
+
+  @override
+  String premiumExpiresOn(String date) {
+    return 'Expires on $date';
+  }
+
+  @override
+  String get premiumLifetimeAccessNote => 'Lifetime access, no renewal needed';
+
+  @override
+  String get premiumAutoRenewNotice =>
+      'Subscriptions auto-renew unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account.';
+
+  @override
+  String get premiumNoPlans =>
+      'No plans available right now. Please try again later.';
+
+  @override
+  String get premiumLoginRequired => 'Please sign in before subscribing.';
+
+  @override
+  String get premiumPurchaseFailed => 'Purchase failed. Please try again.';
+
+  @override
+  String get premiumRestoreNone => 'No purchases found to restore.';
+
+  @override
+  String get premiumRestored => 'Purchases restored.';
+
+  @override
+  String get premiumPeriodMonthly => 'Monthly';
+
+  @override
+  String get premiumPeriodYearly => 'Yearly';
+
+  @override
+  String get premiumPeriodLifetime => 'Lifetime';
+
+  @override
+  String get premiumPriceSuffixMonth => '/mo';
+
+  @override
+  String get premiumPriceSuffixYear => '/yr';
+
+  @override
+  String get premiumPriceSuffixLifetime => 'One-time';
+
+  @override
+  String premiumSavePercent(int percent) {
+    return 'Save $percent%';
+  }
+
+  @override
+  String premiumPerMonthEquivalent(String price) {
+    return '≈ $price/mo';
+  }
+
+  @override
   String get practiceControlModeAuto => 'Auto';
 
   @override

@@ -61,6 +61,42 @@ void main() {
       expect(counters.analysisTapCount, 0);
     });
 
+    test('increment 更新 AI 成功计数（独立于点击计数）', () {
+      final counters = const UsageCounters()
+          .increment(UsageEvent.translationSucceeded)
+          .increment(UsageEvent.translationSucceeded)
+          .increment(UsageEvent.analysisSucceeded)
+          .increment(UsageEvent.senseGroupSucceeded)
+          .increment(UsageEvent.aiWordAnalysisSucceeded)
+          .increment(UsageEvent.aiWordAnalysisSucceeded);
+
+      expect(counters.translationSuccessCount, 2);
+      expect(counters.analysisSuccessCount, 1);
+      expect(counters.senseGroupSuccessCount, 1);
+      expect(counters.aiWordAnalysisSuccessCount, 2);
+      // 成功计数不影响点击计数
+      expect(counters.translationTapCount, 0);
+      expect(counters.analysisTapCount, 0);
+      expect(counters.senseGroupTapCount, 0);
+    });
+
+    test('旧存档缺少新成功计数字段时回落为 0', () {
+      // 模拟新增字段前写入的 JSON（不含 *SuccessCount）
+      final legacyJson = <String, Object?>{
+        'translationTapCount': 3,
+        'analysisTapCount': 2,
+      };
+
+      final restored = UsageCounters.fromJson(legacyJson);
+
+      expect(restored.translationTapCount, 3);
+      expect(restored.analysisTapCount, 2);
+      expect(restored.translationSuccessCount, 0);
+      expect(restored.analysisSuccessCount, 0);
+      expect(restored.senseGroupSuccessCount, 0);
+      expect(restored.aiWordAnalysisSuccessCount, 0);
+    });
+
     test('JSON roundtrip 保留所有计数', () {
       final counters = const UsageCounters(
         audioUploadCount: 2,
@@ -71,6 +107,10 @@ void main() {
         translationTapCount: 7,
         analysisTapCount: 8,
         senseGroupTapCount: 9,
+        translationSuccessCount: 19,
+        analysisSuccessCount: 20,
+        senseGroupSuccessCount: 21,
+        aiWordAnalysisSuccessCount: 22,
         bookmarkSentenceReviewCompleteCount: 10,
         flashcardReviewCompleteCount: 11,
         bookmarkSentenceSaveCount: 12,

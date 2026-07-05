@@ -361,6 +361,10 @@ GoRouter createTestRouter(Widget screen) {
         builder: (context, state) => const Scaffold(body: Text('Settings')),
       ),
       GoRoute(
+        path: '/paywall',
+        builder: (context, state) => const Scaffold(body: Text('Paywall')),
+      ),
+      GoRoute(
         path: '/sentence-detail',
         builder: (context, state) =>
             const Scaffold(body: Text('Sentence Detail')),

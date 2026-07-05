@@ -31,6 +31,9 @@ class DictionaryResultView extends ConsumerWidget {
   /// 去登录回调
   final VoidCallback onSignIn;
 
+  /// 升级订阅回调（AI 源本月额度用尽态）
+  final VoidCallback onUpgrade;
+
   const DictionaryResultView({
     super.key,
     required this.sourceId,
@@ -38,6 +41,7 @@ class DictionaryResultView extends ConsumerWidget {
     required this.word,
     required this.onRetry,
     required this.onSignIn,
+    required this.onUpgrade,
   });
 
   @override
@@ -50,6 +54,7 @@ class DictionaryResultView extends ConsumerWidget {
           state: state,
           onRetry: onRetry,
           onSignIn: onSignIn,
+          onUpgrade: onUpgrade,
         );
       default:
         // 其余源（含全部网页词典 cambridge/oxford/... ）走结果子类穷尽 switch
@@ -68,6 +73,7 @@ class DictionaryResultView extends ConsumerWidget {
       state: state,
       onRetry: onRetry,
       onSignIn: onSignIn,
+      onUpgrade: onUpgrade,
     ),
     // key by sourceId：切源时重建为全新 native view，杜绝旧页残留（标准做法）
     WebDictResult(:final sourceId, :final url) => WebDictionaryView(

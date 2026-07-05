@@ -5,13 +5,16 @@
 library;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
+import '../providers/package_info_provider.dart';
 import 'api_log_interceptor.dart';
+import 'client_info.dart';
 import '../models/sentence_ai_result.dart';
 import '../models/sense_group_result.dart';
 import '../models/dictionary/dictionary_entry.dart';
@@ -22,12 +25,15 @@ part 'sentence_ai_api_client.g.dart';
 class SentenceAiApiClient {
   final Dio _dio;
 
-  SentenceAiApiClient({required String baseUrl})
+  /// [appVersion] 随请求以 `x-app-version` 上报（版本灰度预留），可为 null。
+  /// 平台标识 `x-app-platform` 恒定携带——后端据此按平台决定是否限额。
+  SentenceAiApiClient({required String baseUrl, String? appVersion})
     : _dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 15),
           receiveTimeout: const Duration(seconds: 60),
+          headers: clientInfoHeaders(appVersion: appVersion),
         ),
       ) {
     // 异步添加 GeoInterceptor（SharedPreferences 在 main() 中已初始化，几乎同步返回）
@@ -39,6 +45,10 @@ class SentenceAiApiClient {
 
   /// 用于测试的构造函数，允许注入 Dio 实例
   SentenceAiApiClient.withDio(this._dio);
+
+  /// 请求公共 headers（仅测试用，验证平台/版本标识已随请求携带）。
+  @visibleForTesting
+  Map<String, dynamic> get defaultHeaders => _dio.options.headers;
 
   /// 翻译句子
   ///
@@ -133,7 +143,20 @@ class SentenceAiApiClient {
 /// AI API 客户端单例 Provider
 @Riverpod(keepAlive: true)
 SentenceAiApiClient sentenceAiApiClient(Ref ref) {
-  final client = SentenceAiApiClient(baseUrl: apiBaseUrl);
+  final client = SentenceAiApiClient(
+    baseUrl: apiBaseUrl,
+    appVersion: _readAppVersion(ref),
+  );
   ref.onDispose(client.dispose);
   return client;
+}
+
+/// 读取 app 版本号；packageInfoProvider 未 override（如部分测试环境）时降级为
+/// null（省略版本 header），不让辅助信息阻断客户端构建（同 §7.18 惰性降级原则）。
+String? _readAppVersion(Ref ref) {
+  try {
+    return ref.read(packageInfoProvider).version;
+  } catch (_) {
+    return null;
+  }
 }

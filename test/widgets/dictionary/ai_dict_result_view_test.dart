@@ -91,8 +91,25 @@ MultiWordDictionaryEntry _multiEntry() => MultiWordDictionaryEntry(
 );
 
 void main() {
-  AiDictResultView view(SourceLookupState state) =>
-      AiDictResultView(state: state, onRetry: () {}, onSignIn: () {});
+  AiDictResultView view(SourceLookupState state, {VoidCallback? onUpgrade}) =>
+      AiDictResultView(
+        state: state,
+        onRetry: () {},
+        onSignIn: () {},
+        onUpgrade: onUpgrade ?? () {},
+      );
+
+  testWidgets('额度用尽态渲染升级引导卡并回调 onUpgrade', (tester) async {
+    var upgraded = false;
+    await tester.pumpWidget(
+      _wrap(view(const LookupQuotaExceeded(), onUpgrade: () => upgraded = true)),
+    );
+    // 高亮升级按钮 + premium 图标（locale 无关）
+    expect(find.byType(FilledButton), findsOneWidget);
+    expect(find.byIcon(Icons.workspace_premium), findsOneWidget);
+    await tester.tap(find.byType(FilledButton));
+    expect(upgraded, isTrue);
+  });
 
   testWidgets('Loaded 渲染词性/对应词/英文释义/例句/近义词 chip', (tester) async {
     await tester.pumpWidget(_wrap(view(LookupLoaded(AiDictResult(_entry())))));

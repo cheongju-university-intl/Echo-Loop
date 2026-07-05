@@ -7,7 +7,7 @@ part of 'sentence_ai_api_client.dart';
 // **************************************************************************
 
 String _$sentenceAiApiClientHash() =>
-    r'812db1e447992a632e63e16a08f22e827f565a89';
+    r'b4d77838e77ec3f9dcfd8d8cbc30ca5ef8a600b7';
 
 /// AI API 客户端单例 Provider
 ///

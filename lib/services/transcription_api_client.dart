@@ -3,6 +3,7 @@
 // 封装与后端的所有 HTTP API 通信，用于 AI 转录流程。
 // 基于 Dio，支持 CancelToken、上传进度回调和错误处理。
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +11,9 @@ import 'package:universal_io/io.dart';
 import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
 import '../models/word_timestamp.dart';
+import '../providers/package_info_provider.dart';
 import 'api_log_interceptor.dart';
+import 'client_info.dart';
 import '../utils/srt_generator.dart';
 
 part 'transcription_api_client.g.dart';
@@ -142,12 +145,15 @@ class TranscriptResult {
 class TranscriptionApiClient {
   final Dio _dio;
 
-  TranscriptionApiClient({required String baseUrl})
+  /// [appVersion] 随请求以 `x-app-version` 上报（版本灰度预留），可为 null。
+  /// 平台标识 `x-app-platform` 恒定携带——后端据此按平台决定是否限额。
+  TranscriptionApiClient({required String baseUrl, String? appVersion})
     : _dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 15),
           receiveTimeout: const Duration(seconds: 30),
+          headers: clientInfoHeaders(appVersion: appVersion),
         ),
       ) {
     SharedPreferences.getInstance().then(
@@ -158,6 +164,10 @@ class TranscriptionApiClient {
 
   /// 用于测试的构造函数，允许注入 Dio 实例
   TranscriptionApiClient.withDio(this._dio);
+
+  /// 请求公共 headers（仅测试用，验证平台/版本标识已随请求携带）。
+  @visibleForTesting
+  Map<String, dynamic> get defaultHeaders => _dio.options.headers;
 
   /// 获取 R2 上传预签名 URL
   ///
@@ -283,7 +293,20 @@ class TranscriptionApiClient {
 /// 转录 API 客户端单例 Provider
 @Riverpod(keepAlive: true)
 TranscriptionApiClient transcriptionApiClient(Ref ref) {
-  final client = TranscriptionApiClient(baseUrl: apiBaseUrl);
+  final client = TranscriptionApiClient(
+    baseUrl: apiBaseUrl,
+    appVersion: _readAppVersion(ref),
+  );
   ref.onDispose(client.dispose);
   return client;
+}
+
+/// 读取 app 版本号；packageInfoProvider 未 override（如部分测试环境）时降级为
+/// null（省略版本 header），不让辅助信息阻断客户端构建（同 §7.18 惰性降级原则）。
+String? _readAppVersion(Ref ref) {
+  try {
+    return ref.read(packageInfoProvider).version;
+  } catch (_) {
+    return null;
+  }
 }

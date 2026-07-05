@@ -12,6 +12,10 @@ import '../services/app_logger.dart';
 
 import '../database/daos/sentence_ai_cache_dao.dart';
 import '../database/providers.dart';
+import '../features/subscription/models/premium_feature.dart';
+import '../features/subscription/providers/ai_trial_usage_provider.dart';
+import '../features/subscription/providers/feature_access_provider.dart';
+import '../features/subscription/providers/subscription_controller.dart';
 import '../models/sense_group_result.dart';
 import '../models/sentence_ai_result.dart';
 import '../services/sentence_ai_api_client.dart';
@@ -25,6 +29,17 @@ class AiFeatureAuthRequiredException implements Exception {
   String toString() => 'AiFeatureAuthRequiredException';
 }
 
+/// 已登录但未解锁该 AI 功能（非会员且免费试用已用尽）。
+///
+/// 由额度闸在发起 L3 请求前抛出，UI 捕获后引导订阅升级（Paywall）。
+/// 仅在缓存未命中、确需消耗后端算力时触发，已缓存结果不受影响。
+class AiFeatureQuotaExceededException implements Exception {
+  const AiFeatureQuotaExceededException();
+
+  @override
+  String toString() => 'AiFeatureQuotaExceededException';
+}
+
 /// AI 句子翻译/解析服务
 ///
 /// 通过三级缓存（内存 → SQLite → API）获取句子的翻译和解析结果。
@@ -32,6 +47,14 @@ class AiFeatureAuthRequiredException implements Exception {
 class SentenceAiNotifier {
   final SentenceAiCacheDao _cacheDao;
   final SentenceAiApiClient _apiClient;
+
+  /// 额度闸：发起 L3 请求前调用。已登录但未解锁（非会员且免费试用用尽）时
+  /// 抛 [AiFeatureQuotaExceededException]；会员或仍有试用额度则放行。
+  /// 注入而非内联订阅依赖，保持数据层与订阅状态解耦（通过 [PremiumFeature] 中性枚举）。
+  final void Function(PremiumFeature feature)? _guardFeature;
+
+  /// L3 成功后调用：消耗一次免费试用（实现内部对会员不计数）。
+  final void Function(PremiumFeature feature)? _onConsumeTrial;
 
   /// L1 内存缓存
   final Map<String, SentenceTranslation> _translationCache = {};
@@ -46,8 +69,28 @@ class SentenceAiNotifier {
   SentenceAiNotifier({
     required SentenceAiCacheDao cacheDao,
     required SentenceAiApiClient apiClient,
+    void Function(PremiumFeature feature)? guardFeature,
+    void Function(PremiumFeature feature)? onConsumeTrial,
   }) : _cacheDao = cacheDao,
-       _apiClient = apiClient;
+       _apiClient = apiClient,
+       _guardFeature = guardFeature,
+       _onConsumeTrial = onConsumeTrial;
+
+  /// 执行一次 AI API 调用，把后端「本月免费额度用尽」的 402 统一映射为
+  /// [AiFeatureQuotaExceededException]，交由上层弹订阅。其余异常原样抛出。
+  ///
+  /// 额度裁决在后端（按用户+功能+自然月计数），客户端只负责把 402 翻成领域异常，
+  /// 不做本地预判（见 free_allowance_policy 的 AlwaysAllow）。
+  Future<T> _callWithQuotaMapping<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 402) {
+        throw const AiFeatureQuotaExceededException();
+      }
+      rethrow;
+    }
+  }
 
   /// 获取翻译（三级缓存查找）
   ///
@@ -318,11 +361,15 @@ class SentenceAiNotifier {
       AppLogger.log('SentenceAI', '翻译 L3 需要登录，未发现 Supabase access token');
       throw const AiFeatureAuthRequiredException();
     }
-    final translation = await _apiClient.translate(
-      text,
-      targetLanguage: targetLanguage,
-      accessToken: accessToken,
-      cancelToken: cancelToken,
+    // 已登录前提下做额度闸：未解锁则抛配额超限，引导升级。
+    _guardFeature?.call(PremiumFeature.aiTranslation);
+    final translation = await _callWithQuotaMapping(
+      () => _apiClient.translate(
+        text,
+        targetLanguage: targetLanguage,
+        accessToken: accessToken,
+        cancelToken: cancelToken,
+      ),
     );
     // 写入 L1 + L2
     _translationCache[cacheKey] = translation;
@@ -331,6 +378,7 @@ class SentenceAiNotifier {
       l2Type,
       jsonEncode({'translation': translation.translation}),
     );
+    _onConsumeTrial?.call(PremiumFeature.aiTranslation);
     return translation;
   }
 
@@ -364,11 +412,14 @@ class SentenceAiNotifier {
       AppLogger.log('SentenceAI', '解析 L3 需要登录，未发现 Supabase access token');
       throw const AiFeatureAuthRequiredException();
     }
-    final analysis = await _apiClient.analyze(
-      text,
-      targetLanguage: targetLanguage,
-      accessToken: accessToken,
-      cancelToken: cancelToken,
+    _guardFeature?.call(PremiumFeature.aiAnalysis);
+    final analysis = await _callWithQuotaMapping(
+      () => _apiClient.analyze(
+        text,
+        targetLanguage: targetLanguage,
+        accessToken: accessToken,
+        cancelToken: cancelToken,
+      ),
     );
     // 写入 L1 + L2
     _analysisCache[cacheKey] = analysis;
@@ -383,6 +434,7 @@ class SentenceAiNotifier {
         },
       }),
     );
+    _onConsumeTrial?.call(PremiumFeature.aiAnalysis);
     return analysis;
   }
 
@@ -424,12 +476,15 @@ class SentenceAiNotifier {
       AppLogger.log('SenseGroup', 'L3 需要登录，未发现 Supabase access token');
       throw const AiFeatureAuthRequiredException();
     }
+    _guardFeature?.call(PremiumFeature.aiSenseGroup);
     AppLogger.log('SenseGroup', 'L3 调用 API...');
     final sw = Stopwatch()..start();
-    final result = await _apiClient.splitSenseGroups(
-      text,
-      accessToken: accessToken,
-      cancelToken: cancelToken,
+    final result = await _callWithQuotaMapping(
+      () => _apiClient.splitSenseGroups(
+        text,
+        accessToken: accessToken,
+        cancelToken: cancelToken,
+      ),
     );
     sw.stop();
     AppLogger.log(
@@ -451,6 +506,7 @@ class SentenceAiNotifier {
     // 写入 L1 + L2
     _senseGroupCache[hash] = result;
     await _cacheDao.upsert(hash, 'sense_groups', jsonEncode(result.toJson()));
+    _onConsumeTrial?.call(PremiumFeature.aiSenseGroup);
     return result;
   }
 }
@@ -460,5 +516,16 @@ final sentenceAiNotifierProvider = Provider<SentenceAiNotifier>((ref) {
   return SentenceAiNotifier(
     cacheDao: ref.watch(sentenceAiCacheDaoProvider),
     apiClient: ref.watch(sentenceAiApiClientProvider),
+    // 额度闸：已登录前提下未解锁（非会员且试用用尽）→ 抛配额超限。
+    guardFeature: (feature) {
+      if (!ref.read(featureAccessProvider(feature))) {
+        throw const AiFeatureQuotaExceededException();
+      }
+    },
+    // 消耗一次免费试用；会员无限不计数。
+    onConsumeTrial: (feature) {
+      if (ref.read(subscriptionControllerProvider).isActive) return;
+      ref.read(aiTrialUsageProvider.notifier).consume(feature);
+    },
   );
 });

@@ -30,11 +30,15 @@ class AiDictResultView extends StatelessWidget {
   /// 去登录回调（未登录态）
   final VoidCallback onSignIn;
 
+  /// 升级订阅回调（本月免费额度用尽态）
+  final VoidCallback onUpgrade;
+
   const AiDictResultView({
     super.key,
     required this.state,
     required this.onRetry,
     required this.onSignIn,
+    required this.onUpgrade,
   });
 
   @override
@@ -51,6 +55,7 @@ class AiDictResultView extends StatelessWidget {
     }
     if (s is LookupAuthRequired) return _authRequired(context);
     if (s is LookupPhraseTooLong) return _phraseTooLong(context);
+    if (s is LookupQuotaExceeded) return _quotaExceeded(context);
     if (s is LookupError) return _error(context);
     if (s is LookupNotFound) return _empty(context);
     return const Padding(
@@ -118,6 +123,60 @@ class AiDictResultView extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 本月免费额度用尽：业界标准内联升级引导卡（说明额度用尽 + 高亮升级按钮）。
+  ///
+  /// 用户点击「升级」按钮才进入订阅页（不自动跳转）。
+  Widget _quotaExceeded(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.m),
+        decoration: BoxDecoration(
+          color: cs.primaryContainer.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.workspace_premium, size: 20, color: cs.primary),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    l10n.aiQuotaExceededTitle,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              l10n.aiQuotaExceededMessage,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.m),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onUpgrade,
+                child: Text(l10n.aiQuotaExceededCta),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

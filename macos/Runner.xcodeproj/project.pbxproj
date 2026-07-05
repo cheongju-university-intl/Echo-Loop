@@ -29,6 +29,7 @@
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		64A8CFF4A779B20674977433 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06460A42932B1EAAE83B39C9 /* Pods_Runner.framework */; };
+		B2E63C0C2FE985F600D83DA7 /* EchoLoop.storekit in Resources */ = {isa = PBXBuildFile; fileRef = B2E63C0B2FE985F600D83DA7 /* EchoLoop.storekit */; };
 		B3E06EA7562C42894B58B0B7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = DB2852EF44C1F13072EFC52B /* GoogleService-Info.plist */; };
 		DF01A2B3C4D5E6F7A8B90002 /* NotificationPermissionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF01A2B3C4D5E6F7A8B90001 /* NotificationPermissionHandler.swift */; };
 		DF01A2B3C4D5E6F7A8B90004 /* MacosTtsSynthHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF01A2B3C4D5E6F7A8B90003 /* MacosTtsSynthHandler.swift */; };
@@ -95,6 +96,7 @@
 		8C4120E57DC4D0F2E9C7253C /* Pods-RunnerTests.debug-prod.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug-prod.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug-prod.xcconfig"; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		9C1A8DDC9986F251AB0CAC9D /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
+		B2E63C0B2FE985F600D83DA7 /* EchoLoop.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = EchoLoop.storekit; sourceTree = "<group>"; };
 		D707EE21A876AAC4587311EA /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		DB2852EF44C1F13072EFC52B /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "Runner/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		DF01A2B3C4D5E6F7A8B90001 /* NotificationPermissionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPermissionHandler.swift; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 		33CC10E42044A3C60003C045 = {
 			isa = PBXGroup;
 			children = (
+				B2E63C0B2FE985F600D83DA7 /* EchoLoop.storekit */,
 				33FAB671232836740065AC1E /* Runner */,
 				33CEB47122A05771004F2AC0 /* Flutter */,
 				331C80D6294CF71000263BE5 /* RunnerTests */,
@@ -341,6 +344,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
+				B2E63C0C2FE985F600D83DA7 /* EchoLoop.storekit in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
 				B3E06EA7562C42894B58B0B7 /* GoogleService-Info.plist in Resources */,
 			);

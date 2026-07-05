@@ -1,14 +1,60 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:echo_loop/features/usage/usage_counters.dart';
+import 'package:echo_loop/features/usage/usage_event.dart';
+import 'package:echo_loop/features/usage/usage_providers.dart';
+import 'package:echo_loop/features/usage/usage_tracker.dart';
 import 'package:echo_loop/models/dictionary/dictionary_lookup_result.dart';
 import 'package:echo_loop/providers/dictionary/dictionary_registry.dart';
 import 'package:echo_loop/providers/dictionary/lookup_controller.dart';
 import 'package:echo_loop/providers/dictionary/visible_sources_provider.dart';
+import 'package:echo_loop/services/dictionary/ai_dictionary_source.dart';
 import 'package:echo_loop/services/dictionary/dictionary_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// 记录 record 事件的 tracker 桩，用于断言成功计数是否被触发
+class _RecordingUsageTracker implements UsageTracker {
+  final List<UsageEvent> events = [];
+
+  @override
+  Future<void> record(
+    UsageEvent event, {
+    Map<String, Object>? analyticsParams,
+  }) async {
+    events.add(event);
+  }
+
+  @override
+  UsageCounters loadCounters() => const UsageCounters();
+
+  @override
+  Future<void> resetForTests() async {}
+}
+
+/// 假 AI 源：满足 `is AiDictionarySource`，lookup 返回可控结果/异常。
+/// 结果类型不影响 controller 的成功计数判定（只看 result != null + 源类型）。
+class _FakeAiSource extends AiDictionarySource {
+  _FakeAiSource({this.result, this.error})
+    : super(
+        cacheDao: () => throw UnimplementedError(),
+        apiClient: () => throw UnimplementedError(),
+      );
+
+  final DictionaryLookupResult? result;
+  final Object? error;
+
+  @override
+  Future<DictionaryLookupResult?> lookup(
+    DictionaryLookupRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    if (error != null) throw error!;
+    return result;
+  }
+}
 
 /// 可控源：每次 lookup 返回一个手动完成的 Future，用于编排竞态时序
 class ControllableSource implements DictionarySource {
@@ -190,6 +236,27 @@ void main() {
     expect(
       c.read(dictionaryLookupControllerProvider('run')).current,
       isA<LookupLoaded>(),
+    );
+  });
+
+  test('后端 402（本月额度用尽）→ LookupQuotaExceeded', () async {
+    final a = ControllableSource('a');
+    final c = makeContainer({'a': a});
+    start(c, 'run');
+    await pump();
+    a.calls.single.completeError(
+      DioException(
+        requestOptions: RequestOptions(path: '/api/v2/ai/dictionary'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/api/v2/ai/dictionary'),
+          statusCode: 402,
+        ),
+      ),
+    );
+    await pump();
+    expect(
+      c.read(dictionaryLookupControllerProvider('run')).current,
+      isA<LookupQuotaExceeded>(),
     );
   });
 
@@ -387,6 +454,70 @@ void main() {
       c.read(dictionaryLookupControllerProvider('run')).selectedSourceId,
       'a',
     );
+  });
+
+  ProviderContainer makeAiContainer(
+    Map<String, DictionarySource> sources,
+    _RecordingUsageTracker tracker, {
+    required String defaultId,
+  }) {
+    final c = ProviderContainer(
+      overrides: [
+        dictionarySourcesByIdProvider.overrideWithValue(sources),
+        resolvedDefaultSourceIdProvider.overrideWithValue(defaultId),
+        dictionaryLookupContextProvider.overrideWithValue(
+          const DictionaryLookupContext(
+            accessToken: 'tok',
+            targetLanguage: 'zh-CN',
+          ),
+        ),
+        usageTrackerProvider.overrideWithValue(tracker),
+      ],
+    );
+    addTearDown(c.dispose);
+    return c;
+  }
+
+  test('AI 源成功返回结果 → 记录一次 aiWordAnalysisSucceeded', () async {
+    final tracker = _RecordingUsageTracker();
+    final ai = _FakeAiSource(result: _result('run'));
+    final c = makeAiContainer({'ai': ai}, tracker, defaultId: 'ai');
+    start(c, 'run');
+    await pump();
+
+    expect(tracker.events, [UsageEvent.aiWordAnalysisSucceeded]);
+  });
+
+  test('AI 源未收录(null) → 不记录成功次数', () async {
+    final tracker = _RecordingUsageTracker();
+    final ai = _FakeAiSource(result: null);
+    final c = makeAiContainer({'ai': ai}, tracker, defaultId: 'ai');
+    start(c, 'run');
+    await pump();
+
+    expect(tracker.events, isEmpty);
+  });
+
+  test('AI 源抛异常 → 不记录成功次数', () async {
+    final tracker = _RecordingUsageTracker();
+    final ai = _FakeAiSource(error: const DictionaryAuthRequiredException());
+    final c = makeAiContainer({'ai': ai}, tracker, defaultId: 'ai');
+    start(c, 'run');
+    await pump();
+
+    expect(tracker.events, isEmpty);
+  });
+
+  test('非 AI 源成功返回 → 不记录 AI 成功次数', () async {
+    final tracker = _RecordingUsageTracker();
+    final a = ControllableSource('a');
+    final c = makeAiContainer({'a': a}, tracker, defaultId: 'a');
+    start(c, 'run');
+    await pump();
+    a.calls.single.complete(_result('run'));
+    await pump();
+
+    expect(tracker.events, isEmpty);
   });
 
   test('不需联网的源不读取上下文也能查', () async {

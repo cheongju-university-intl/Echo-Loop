@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/providers/auth_providers.dart';
 import '../../features/auth/sign_in_required_dialog.dart';
+import '../../features/subscription/widgets/feature_gate.dart';
 import '../../features/usage/usage_event.dart';
 import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
@@ -284,10 +285,16 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
         _senseGroupTimings = timings;
         _activeChunks = result.medium;
       });
+      // 拿到非空可用结果才算一次成功（空结果分支已在上方 return）
+      ref.read(usageTrackerProvider).record(UsageEvent.senseGroupSucceeded);
       widget.onTimingsChanged?.call(timings);
     } on AiFeatureAuthRequiredException {
       if (mounted) {
         await _showAiFeatureSignInDialog();
+      }
+    } on AiFeatureQuotaExceededException {
+      if (mounted) {
+        await _openUpgradePaywall();
       }
     } catch (e) {
       AppLogger.log('SenseGroup', '请求意群失败: $e');
@@ -321,6 +328,11 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
           l10n?.senseGroupSignInRequiredMessage ??
           'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.',
     );
+  }
+
+  /// 已登录但未解锁 AI 功能时引导订阅升级（登录优先逻辑见 openPaywall）。
+  Future<void> _openUpgradePaywall() async {
+    await openPaywall(context, ref);
   }
 
   /// 意群粒度切换回调
@@ -664,10 +676,18 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                               targetLanguage: nativeLanguage,
                               accessToken: accessToken,
                             );
+                            ref
+                                .read(usageTrackerProvider)
+                                .record(UsageEvent.translationSucceeded);
                             return result.translation;
                           } on AiFeatureAuthRequiredException {
                             if (mounted) {
                               await _showAiFeatureSignInDialog();
+                            }
+                            rethrow;
+                          } on AiFeatureQuotaExceededException {
+                            if (mounted) {
+                              await _openUpgradePaywall();
                             }
                             rethrow;
                           }
@@ -684,10 +704,18 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                               targetLanguage: nativeLanguage,
                               accessToken: accessToken,
                             );
+                            ref
+                                .read(usageTrackerProvider)
+                                .record(UsageEvent.analysisSucceeded);
                             return result.toDisplayString();
                           } on AiFeatureAuthRequiredException {
                             if (mounted) {
                               await _showAiFeatureSignInDialog();
+                            }
+                            rethrow;
+                          } on AiFeatureQuotaExceededException {
+                            if (mounted) {
+                              await _openUpgradePaywall();
                             }
                             rethrow;
                           }
