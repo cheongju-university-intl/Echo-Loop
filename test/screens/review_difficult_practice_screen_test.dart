@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/models/sentence.dart';
+import 'package:echo_loop/models/speech_practice_models.dart';
 import 'package:echo_loop/screens/review_difficult_practice_screen.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
@@ -28,6 +29,7 @@ import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/providers/speech/speech_recording_controller.dart';
 import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
+import 'package:echo_loop/services/speech_permission_service.dart';
 import 'package:echo_loop/services/transcription_api_client.dart';
 import 'package:echo_loop/theme/app_theme.dart';
 import 'package:echo_loop/widgets/practice/sentence_annotation_card.dart';
@@ -42,6 +44,27 @@ class _MockNotificationPermissionService extends Mock
     implements NotificationPermissionService {}
 
 class _MockAudioItemDao extends Mock implements AudioItemDao {}
+
+class _ReadySpeechPermissionService implements SpeechPermissionService {
+  const _ReadySpeechPermissionService();
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  Future<SpeechPracticePermissionState> getStatus() async =>
+      const SpeechPracticePermissionState(
+        microphone: SpeechPracticePermissionStatus.granted,
+        speech: SpeechPracticePermissionStatus.granted,
+      );
+
+  @override
+  Future<SpeechPracticePermissionState> request({required bool onlyMic}) =>
+      getStatus();
+
+  @override
+  Future<void> openAppSettings() async {}
+}
 
 class _WaitingSpyRepeatEngine extends RepeatFlowEngine {
   bool enteredWaitingForUser = false;
@@ -269,6 +292,9 @@ void main() {
         bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
         speechRecordingControllerProvider.overrideWith(
           () => TestSpeechRecordingController(initialPhase: turnPhase),
+        ),
+        speechPermissionServiceProvider.overrideWithValue(
+          const _ReadySpeechPermissionService(),
         ),
         audioItemDaoProvider.overrideWithValue(audioItemDao),
         transcriptionApiClientProvider.overrideWithValue(

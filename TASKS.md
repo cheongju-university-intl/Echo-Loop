@@ -1,7 +1,17 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-06（macOS 订阅入口统一走 Apple 平台开关）
+> 最后更新：2026-07-06（修复 GitHub CI Linux 测试失败 run 28764287226）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：修复 GitHub CI Linux 测试失败 run 28764287226
+
+最新 GitHub Actions `CI` run `28764287226` 中 `analyze` job 通过，`test` job 失败：`3850 tests passed, 3 failed, 13 skipped`。失败仍集中在 Ubuntu runner 的平台差异和录音权限 gate 测试隔离不足，不是业务实现回归。
+
+- [x] **TTS 平台摘要断言收敛**：`settings_screen_test` 不再用 `debugDefaultTargetPlatformOverride` 模拟 iOS 后硬断 `Apple AI`；改为按 `dart:io Platform` 真实宿主分支断言 Apple 平台显示 `Apple AI`，Linux/Android 等显示 `System Speech`，同时继续确认不显示口音 `American`。
+- [x] **完成返回测试隔离权限服务**：`bookmark_review_screen_test` 与 `review_difficult_practice_screen_test` 注入 `_ReadySpeechPermissionService`，让测试在 Linux CI 上也稳定通过麦克风/语音权限前置检查，避免默认 `PermissionHandlerSpeechPermissionService.isSupported=false` 直接阻断进入播放器/完成弹窗路径。
+- [x] **验证**：`flutter analyze test/screens/settings_screen_test.dart test/screens/bookmark_review_screen_test.dart test/screens/review_difficult_practice_screen_test.dart` 0 问题；`flutter test test/screens/settings_screen_test.dart test/screens/bookmark_review_screen_test.dart test/screens/review_difficult_practice_screen_test.dart` 全过（83 例，7 skipped）。
+
+  **完成时间**: 2026-07-06
 
 ## 已完成：macOS 订阅入口统一走 Apple 平台开关
 
