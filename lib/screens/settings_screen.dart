@@ -38,6 +38,7 @@ import '../features/auth/providers/auth_providers.dart';
 import '../features/auth/screens/account_screen.dart';
 import '../features/subscription/providers/subscription_availability.dart';
 import '../features/subscription/providers/subscription_controller.dart';
+import '../services/app_update_launcher.dart';
 import '../features/subscription/screens/subscription_debug_screen.dart';
 import '../router/app_router.dart';
 import '../features/onboarding_survey/providers/onboarding_survey_provider.dart';
@@ -713,11 +714,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } else {
       final isForce = result.type == AppUpdateType.forceUpdate;
       final downloadUrl = AppUpdate.getDownloadUrl(result.info!);
+      final launcher = AppUpdateLauncher();
       showAppUpdateDialog(
         context: context,
         info: result.info!,
         isForceUpdate: isForce,
         downloadUrl: downloadUrl,
+        onUpdate: () => launcher.launch(
+          info: result.info!,
+          primaryUrl: downloadUrl,
+        ),
         onDismiss: () => ref.read(appUpdateProvider.notifier).dismiss(),
       );
     }

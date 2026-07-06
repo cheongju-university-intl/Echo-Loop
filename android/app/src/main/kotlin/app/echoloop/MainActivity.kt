@@ -1,5 +1,6 @@
 package app.echoloop
 
+import android.os.Build
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import android.util.Log
@@ -9,6 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
     private var googleServicesChannel: MethodChannel? = null
+    private var appUpdateChannel: MethodChannel? = null
     private var speechPracticeHandler: AndroidSpeechPracticeHandler? = null
     private var audioDecodeHandler: AndroidAudioDecodeHandler? = null
 
@@ -26,6 +28,17 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
         }
+        appUpdateChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "top.echo-loop/app_update",
+        ).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getInstallerPackageName" -> result.success(installerPackageName())
+                    else -> result.notImplemented()
+                }
+            }
+        }
         speechPracticeHandler = AndroidSpeechPracticeHandler(
             this, flutterEngine.dartExecutor.binaryMessenger,
         )
@@ -37,6 +50,8 @@ class MainActivity : AudioServiceActivity() {
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         googleServicesChannel?.setMethodCallHandler(null)
         googleServicesChannel = null
+        appUpdateChannel?.setMethodCallHandler(null)
+        appUpdateChannel = null
         speechPracticeHandler?.dispose()
         speechPracticeHandler = null
         audioDecodeHandler?.dispose()
@@ -66,6 +81,22 @@ class MainActivity : AudioServiceActivity() {
             ConnectionResult.SERVICE_DISABLED -> "SERVICE_DISABLED"
             ConnectionResult.SERVICE_INVALID -> "SERVICE_INVALID"
             else -> "UNKNOWN"
+        }
+    }
+
+    private fun installerPackageName(): String? {
+        return try {
+            val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                packageManager.getInstallSourceInfo(packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getInstallerPackageName(packageName)
+            }
+            Log.i("AppUpdate", "installerPackageName=${installer ?: "(null)"}")
+            installer
+        } catch (e: Exception) {
+            Log.w("AppUpdate", "installer source failed", e)
+            null
         }
     }
 }

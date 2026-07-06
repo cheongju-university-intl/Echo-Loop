@@ -29,6 +29,7 @@ import '../providers/study_task_provider.dart';
 import '../providers/tag_provider.dart';
 import '../providers/time_provider.dart';
 import '../services/app_logger.dart';
+import '../services/app_update_launcher.dart';
 import '../services/review_reminder_service.dart';
 import '../services/review_reminder_time_calculator.dart';
 import '../providers/new_user_guide_provider.dart';
@@ -325,11 +326,16 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (!mounted || result.info == null) return;
     final isForce = result.type == AppUpdateType.forceUpdate;
     final downloadUrl = AppUpdate.getDownloadUrl(result.info!);
+    final launcher = AppUpdateLauncher();
     showAppUpdateDialog(
       context: context,
       info: result.info!,
       isForceUpdate: isForce,
       downloadUrl: downloadUrl,
+      onUpdate: () => launcher.launch(
+        info: result.info!,
+        primaryUrl: downloadUrl,
+      ),
       onDismiss: () => ref.read(appUpdateProvider.notifier).dismiss(),
     );
   }

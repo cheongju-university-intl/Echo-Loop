@@ -34,6 +34,7 @@ class RevenueCatPurchaseService implements PurchaseService {
   @override
   Future<List<SubscriptionPlan>> fetchPlans() async {
     try {
+      await _logStorefront('fetchPlans:beforeOfferings');
       final offerings = await Purchases.getOfferings();
       final current = offerings.current;
       AppLogger.log(
@@ -59,10 +60,17 @@ class RevenueCatPurchaseService implements PurchaseService {
       for (final p in current.availablePackages) {
         AppLogger.log(
           'Subscription',
-          'package=${p.identifier} type=${p.packageType} '
+          'offering package=${p.identifier} type=${p.packageType} '
               'product=${p.storeProduct.identifier} price=${p.storeProduct.priceString}',
         );
       }
+      await _logDirectProductsForDiagnostics(
+        current.availablePackages
+            .map((p) => p.storeProduct.identifier)
+            .toSet()
+            .toList(),
+        stage: 'fetchPlans:directProducts',
+      );
       return current.availablePackages.map(_packageToPlan).toList();
     } catch (e) {
       AppLogger.log('Subscription', 'getOfferings 异常: $e');
@@ -104,6 +112,10 @@ class RevenueCatPurchaseService implements PurchaseService {
           'product=${package.storeProduct.identifier} '
           'price=${package.storeProduct.priceString}',
     );
+    await _logStorefront('purchase:beforeSheet');
+    await _logDirectProductsForDiagnostics([
+      package.storeProduct.identifier,
+    ], stage: 'purchase:directProductBeforeSheet');
     try {
       final result = await Purchases.purchase(PurchaseParams.package(package));
       AppLogger.log('Subscription', 'RC purchase 完成: 交易成功，开始映射权益');
@@ -208,6 +220,56 @@ class RevenueCatPurchaseService implements PurchaseService {
       PeriodUnit.year => units * 365,
       PeriodUnit.unknown => units,
     };
+  }
+
+  /// 记录当前 Apple/Google 商店账号所在 storefront。
+  ///
+  /// 该值决定平台本地化价格。诊断时用它对齐 Offering 商品价、direct product
+  /// 查询价与系统付款弹窗价格，判断是否存在 SDK/商店商品详情缓存不一致。
+  Future<void> _logStorefront(String stage) async {
+    try {
+      final storefront = await Purchases.storefront;
+      AppLogger.log(
+        'Subscription',
+        'storefront[$stage]=${storefront?.countryCode ?? "null"}',
+      );
+    } catch (e) {
+      AppLogger.log('Subscription', 'storefront[$stage] 获取失败: $e');
+    }
+  }
+
+  /// 直接向 RevenueCat/商店查询商品详情并记录价格。
+  ///
+  /// Offering 的 package 内也带 [StoreProduct]，但本问题需要确认它是否与
+  /// 当前 storefront 下的 direct product 查询结果一致。这里只做诊断日志，
+  /// 不参与业务决策，避免改变现有购买路径。
+  Future<void> _logDirectProductsForDiagnostics(
+    List<String> productIds, {
+    required String stage,
+  }) async {
+    if (productIds.isEmpty) return;
+    try {
+      final products = await Purchases.getProducts(productIds);
+      final foundIds = <String>{};
+      for (final product in products) {
+        foundIds.add(product.identifier);
+        AppLogger.log(
+          'Subscription',
+          'direct product[$stage] product=${product.identifier} '
+              'price=${product.priceString} currency=${product.currencyCode} '
+              'rawPrice=${product.price}',
+        );
+      }
+      final missingIds = productIds.where((id) => !foundIds.contains(id));
+      if (missingIds.isNotEmpty) {
+        AppLogger.log(
+          'Subscription',
+          'direct product[$stage] 未返回商品: ${missingIds.toList()}',
+        );
+      }
+    } catch (e) {
+      AppLogger.log('Subscription', 'direct product[$stage] 查询失败: $e');
+    }
   }
 
   Entitlement _entitlementFrom(CustomerInfo info) {

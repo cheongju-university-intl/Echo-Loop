@@ -22,6 +22,7 @@ Future<void> showAppUpdateDialog({
   required AppUpdateInfo info,
   required bool isForceUpdate,
   required String? downloadUrl,
+  Future<void> Function()? onUpdate,
   VoidCallback? onDismiss,
 }) {
   return showDialog(
@@ -33,6 +34,7 @@ Future<void> showAppUpdateDialog({
         info: info,
         isForceUpdate: isForceUpdate,
         downloadUrl: downloadUrl,
+        onUpdate: onUpdate,
         onDismiss: onDismiss,
       ),
     ),
@@ -43,12 +45,14 @@ class _AppUpdateDialogContent extends StatelessWidget {
   final AppUpdateInfo info;
   final bool isForceUpdate;
   final String? downloadUrl;
+  final Future<void> Function()? onUpdate;
   final VoidCallback? onDismiss;
 
   const _AppUpdateDialogContent({
     required this.info,
     required this.isForceUpdate,
     required this.downloadUrl,
+    this.onUpdate,
     this.onDismiss,
   });
 
@@ -121,19 +125,24 @@ class _AppUpdateDialogContent extends StatelessWidget {
           ),
         // 立即更新
         FilledButton(
-          onPressed: () => _launchUpdate(context),
+          onPressed: () async => _launchUpdate(context),
           child: Text(l10n.updateNow),
         ),
       ],
     );
   }
 
-  void _launchUpdate(BuildContext context) {
-    if (downloadUrl != null) {
-      launchUrl(Uri.parse(downloadUrl!), mode: LaunchMode.externalApplication);
+  Future<void> _launchUpdate(BuildContext context) async {
+    if (onUpdate != null) {
+      await onUpdate!();
+    } else if (downloadUrl != null) {
+      await launchUrl(
+        Uri.parse(downloadUrl!),
+        mode: LaunchMode.externalApplication,
+      );
     }
     // soft update 时关闭对话框
-    if (!isForceUpdate) {
+    if (!isForceUpdate && context.mounted) {
       Navigator.of(context).pop();
     }
   }

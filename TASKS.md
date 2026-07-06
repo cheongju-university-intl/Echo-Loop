@@ -1,7 +1,63 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-06（修复 Release iOS RevenueCat Apple key 变量来源）
+> 最后更新：2026-07-06（订阅页自动续费说明弱化）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：订阅页自动续费说明弱化
+
+用户反馈订阅页「到期前 24 小时」提醒语气偏重且信息冗余，后续又反馈说明文字视觉仍太黑。保留自动续费与账户管理/取消的核心披露，去掉 24 小时细节，并降低辅助说明文字对比度，让它退到 CTA 下方的次要信息层级。
+
+- [x] **中文文案收敛**：`premiumAutoRenewNotice` 改为「自动续费，可在 App Store 账户中管理或取消。」。
+- [x] **英文文案同步**：英文改为 `Auto-renews. Manage or cancel in your App Store account.`。
+- [x] **视觉层级弱化**：自动续费说明使用更低透明度的 `onSurfaceVariant`，浅色模式更淡，深色模式保留可读性。
+- [x] **本地化同步**：更新 ARB 与生成的 `app_localizations*.dart` 文件，避免运行时文案分叉。
+- [x] **验证**：`flutter analyze lib/features/subscription/screens/paywall_screen.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart test/features/subscription/paywall_screen_test.dart` 0 问题；`flutter test test/features/subscription/paywall_screen_test.dart` 全过。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：订阅页条款链接改为随内容滚动
+
+用户反馈会员页底部「服务条款 / 隐私政策」固定在安全区底部，视觉上挤压甚至遮挡订阅按钮。订阅页应按购买信息阅读顺序，把法律链接放在 CTA 与自动续费说明之后，并随页面一起滚动。
+
+- [x] **布局收敛**：`PaywallScreen` 去掉固定底部 footer，改为单一 `ListView` 承载权益、套餐、CTA、自动续费说明与法律链接。
+- [x] **法律链接位置**：`_LegalFooter` 移到购买区域末尾，仅购买态展示；会员管理态继续不展示。
+- [x] **回归测试**：补充 paywall widget 断言，锁定 `Terms of Service` 属于 `ListView` 滚动内容，并确认会员态不显示条款/隐私链接。
+- [x] **验证**：`flutter analyze lib/features/subscription/screens/paywall_screen.dart test/features/subscription/paywall_screen_test.dart` 0 问题；`flutter test test/features/subscription/paywall_screen_test.dart` 全过。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：订阅价格链路诊断日志
+
+用户反馈会员页 UI 显示人民币价格，但 Apple 付款弹窗显示美区账号价格。先补齐 RevenueCat / StoreKit 价格来源日志，用于确认 `getOfferings()` 的 package price、当前 storefront、direct `getProducts()` 价格与购买前价格是否一致。
+
+- [x] **storefront 记录**：`RevenueCatPurchaseService.fetchPlans()` 与购买前分别记录 `Purchases.storefront.countryCode`。
+- [x] **Offering 价格记录**：套餐列表拉取时记录 current offering 的 package id、package type、product id 与 `storeProduct.priceString`。
+- [x] **Direct product 价格记录**：套餐列表拉取与购买前额外调用 `Purchases.getProducts(productIds)`，记录 direct product 的 `priceString`、`currencyCode` 与 raw price；查询失败只写日志，不影响现有流程。
+- [x] **验证**：`dart format lib/features/subscription/services/revenuecat_purchase_service.dart`；`flutter analyze lib/features/subscription/services/revenuecat_purchase_service.dart` 0 问题。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：更新模块渠道化改造
+
+用户反馈现有更新模块存在三类风险：iOS 无法强制更新；Google Play 用户依赖后端 `version.json` 可能出现“提示更新但 Play 未上架”；Android 无法区分 Google Play 与官网/GitHub APK 安装，导致中国用户被错误导向 Google Play，甚至诱导卸载重装丢数据。
+
+- [x] **远端配置向前兼容升级**：`../fluency-frontend/apps/app/public/version.json` 保留旧顶层字段，新增 `schemaVersion=2` 与 `platforms.ios / platforms.android.googlePlay / platforms.android.apk` 渠道配置；旧客户端继续读顶层字段，新客户端优先读渠道字段。
+- [x] **iOS 强制更新补齐**：iOS 仍用 App Store Lookup 获取真实可下载 `latestVersion` 和商店链接，同时从 `version.json` 读取 iOS `minimumVersion`；若最低版本高于 App Store 当前版本则不强制，避免审核中版本锁死用户。
+- [x] **Android 渠道分流**：新增 `top.echo-loop/app_update` MethodChannel，Android 原生层只读取安装来源；Google Play 安装包主按钮打开 `market://details?id=app.echoloop`，失败回退 HTTPS 商店页；非 Play/未知来源走 APK 直链。
+- [x] **更新弹窗兜底**：APK 渠道主按钮直接下载 APK；删除 Play Core / In-App Update 逻辑，避免柔性更新完成链路、恢复状态等特殊分支。
+- [x] **验证**：`flutter analyze` 更新模块相关文件 0 问题；`flutter test test/models/app_update_info_test.dart test/services/app_update_checker_test.dart test/services/app_update_launcher_test.dart test/widgets/app_update_dialog_test.dart test/providers/app_update_provider_test.dart` 全过；`./gradlew :app:compileProdDebugKotlin -x compileFlutterBuildProdDebug` 构建成功。
+
+  **完成时间**: 2026-07-06
+
+### 收尾审查 + 加固（2026-07-06）
+
+对上述改造做可靠性审查，收敛 3 处问题：
+
+- [x] **`minimumVersion` 全平台只认 `platforms.*`**：iOS/Android GP/Android APK 三处去掉 `?? manifest.minimumVersion` 兜底，缺省回落 `'0.0.0'`。顶层 `minimumVersion` 仅供不识别 `platforms` schema 的**旧版本 App**兼容，新版本一律忽略——避免为旧版而设的顶层 min 误触发（尤其 iOS 的不可关闭强更）。`latestVersion` 不变（GP 无 per-channel latest，soft update 无阻断风险）。
+- [x] **Google Play 隐藏「直接下载 APK」逃生按钮**：贴合「统一走商店更新」并规避 Play 政策风险。移除 `secondaryDownloadUrl` 后该机制无路径再填充，一并清理死代码（model 字段、dialog 按钮/方法、传参、l10n `downloadApkDirectly`、对应测试）。
+- [x] **Launcher 回退链补齐**：GP 商店链接打不开时回退改为 `platforms.android.googlePlay.fallbackUrl ?? downloadUrl['fallback']`，使 `_googlePlayDownloadUrl` 写入的默认 Play 网页链接生效。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；更新相关 4 个测试文件（含新增「顶层 min 不波及各平台」「GP 无渠道 fallback 回退顶层」用例）全过；`flutter test` 全量 3864 通过。
+- ⚠️ **发布前需确认**：生产 `version.json` 已按各平台补齐 `platforms.*.minimumVersion`（否则该平台永不强更），顶层字段保留给旧版。
 
 ## 已完成：修复 Release iOS RevenueCat Apple key 变量来源
 

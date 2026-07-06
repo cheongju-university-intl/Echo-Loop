@@ -17,11 +17,19 @@ class AppUpdateInfo {
   /// 下载链接（platform -> url）
   final Map<String, String> downloadUrl;
 
+  /// v2 平台/渠道配置，缺失时使用顶层字段兜底
+  final AppUpdatePlatforms platforms;
+
+  /// 当前检查结果对应的更新渠道
+  final AppUpdateChannel channel;
+
   const AppUpdateInfo({
     required this.latestVersion,
     required this.minimumVersion,
     this.releaseNotes = const {},
     this.downloadUrl = const {},
+    this.platforms = const AppUpdatePlatforms(),
+    this.channel = AppUpdateChannel.generic,
   });
 
   /// 从 JSON 解析
@@ -48,6 +56,7 @@ class AppUpdateInfo {
       minimumVersion: minimumVersion,
       releaseNotes: _parseStringMap(json['releaseNotes']),
       downloadUrl: _parseStringMap(json['downloadUrl']),
+      platforms: AppUpdatePlatforms.fromJson(json['platforms']),
     );
   }
 
@@ -57,6 +66,122 @@ class AppUpdateInfo {
       (key, val) => MapEntry(key.toString(), val?.toString() ?? ''),
     );
   }
+}
+
+/// 更新渠道
+enum AppUpdateChannel {
+  /// 未区分平台/渠道的旧版配置
+  generic,
+
+  /// iOS App Store
+  iosAppStore,
+
+  /// Android Google Play
+  androidGooglePlay,
+
+  /// Android 官网/GitHub APK
+  androidApk,
+}
+
+/// v2 平台配置
+class AppUpdatePlatforms {
+  final IosUpdateConfig ios;
+  final AndroidUpdateConfig android;
+
+  const AppUpdatePlatforms({
+    this.ios = const IosUpdateConfig(),
+    this.android = const AndroidUpdateConfig(),
+  });
+
+  factory AppUpdatePlatforms.fromJson(dynamic value) {
+    if (value is! Map) return const AppUpdatePlatforms();
+    return AppUpdatePlatforms(
+      ios: IosUpdateConfig.fromJson(value['ios']),
+      android: AndroidUpdateConfig.fromJson(value['android']),
+    );
+  }
+}
+
+/// iOS App Store 更新配置
+class IosUpdateConfig {
+  final String? minimumVersion;
+
+  const IosUpdateConfig({this.minimumVersion});
+
+  factory IosUpdateConfig.fromJson(dynamic value) {
+    if (value is! Map) return const IosUpdateConfig();
+    return IosUpdateConfig(
+      minimumVersion: _stringOrNull(value['minimumVersion']),
+    );
+  }
+}
+
+/// Android 更新配置
+class AndroidUpdateConfig {
+  final AndroidGooglePlayUpdateConfig googlePlay;
+  final AndroidApkUpdateConfig apk;
+
+  const AndroidUpdateConfig({
+    this.googlePlay = const AndroidGooglePlayUpdateConfig(),
+    this.apk = const AndroidApkUpdateConfig(),
+  });
+
+  factory AndroidUpdateConfig.fromJson(dynamic value) {
+    if (value is! Map) return const AndroidUpdateConfig();
+    return AndroidUpdateConfig(
+      googlePlay: AndroidGooglePlayUpdateConfig.fromJson(value['googlePlay']),
+      apk: AndroidApkUpdateConfig.fromJson(value['apk']),
+    );
+  }
+}
+
+/// Google Play 更新配置
+class AndroidGooglePlayUpdateConfig {
+  final String? minimumVersion;
+  final String? storeUrl;
+  final String? fallbackUrl;
+
+  const AndroidGooglePlayUpdateConfig({
+    this.minimumVersion,
+    this.storeUrl,
+    this.fallbackUrl,
+  });
+
+  factory AndroidGooglePlayUpdateConfig.fromJson(dynamic value) {
+    if (value is! Map) return const AndroidGooglePlayUpdateConfig();
+    return AndroidGooglePlayUpdateConfig(
+      minimumVersion: _stringOrNull(value['minimumVersion']),
+      storeUrl: _stringOrNull(value['storeUrl']),
+      fallbackUrl: _stringOrNull(value['fallbackUrl']),
+    );
+  }
+}
+
+/// Android APK 更新配置
+class AndroidApkUpdateConfig {
+  final String? latestVersion;
+  final String? minimumVersion;
+  final String? downloadUrl;
+
+  const AndroidApkUpdateConfig({
+    this.latestVersion,
+    this.minimumVersion,
+    this.downloadUrl,
+  });
+
+  factory AndroidApkUpdateConfig.fromJson(dynamic value) {
+    if (value is! Map) return const AndroidApkUpdateConfig();
+    return AndroidApkUpdateConfig(
+      latestVersion: _stringOrNull(value['latestVersion']),
+      minimumVersion: _stringOrNull(value['minimumVersion']),
+      downloadUrl: _stringOrNull(value['downloadUrl']),
+    );
+  }
+}
+
+String? _stringOrNull(dynamic value) {
+  if (value is! String || value.isEmpty) return null;
+  return value;
 }
 
 /// 更新类型

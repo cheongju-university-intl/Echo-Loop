@@ -81,30 +81,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                    children: isPremium
-                        ? _buildMemberBody(l10n)
-                        : [
-                            _Header(l10n: l10n),
-                            const SizedBox(height: 24),
-                            _BenefitCard(l10n: l10n),
-                            const SizedBox(height: 24),
-                            _buildPurchaseArea(l10n),
-                          ],
-                  ),
-                ),
-                // 条款/隐私固定在页面底部（类登录页）；仅在展示购买选项时显示，
-                // 会员管理态无购买行为，不显示。
-                if (!isPremium)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                    child: _LegalFooter(l10n: l10n),
-                  ),
-              ],
+            ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              children: isPremium
+                  ? _buildMemberBody(l10n)
+                  : [
+                      _Header(l10n: l10n),
+                      const SizedBox(height: 24),
+                      _BenefitCard(l10n: l10n),
+                      const SizedBox(height: 24),
+                      _buildPurchaseArea(l10n),
+                    ],
             ),
             if (_busy)
               const ColoredBox(
@@ -206,10 +193,18 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
             Text(
               l10n.premiumAutoRenewNotice,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: Theme.of(context).colorScheme.onSurfaceVariant
+                    .withValues(
+                      alpha: Theme.of(context).brightness == Brightness.dark
+                          ? 0.72
+                          : 0.58,
+                    ),
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 8),
+            // 购买相关法律链接跟随订阅按钮一起滚动，避免小屏底部固定区挤压 CTA。
+            _LegalFooter(l10n: l10n),
           ],
         );
       },

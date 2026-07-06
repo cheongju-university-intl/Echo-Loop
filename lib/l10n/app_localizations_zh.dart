@@ -105,8 +105,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumLifetimeAccessNote => '永久有效，无需续订';
 
   @override
-  String get premiumAutoRenewNotice =>
-      '订阅到期前 24 小时内若未取消将自动续费。你可随时在商店账户中管理或取消订阅。';
+  String get premiumAutoRenewNotice => '自动续费，可在 App Store 账户中管理或取消。';
 
   @override
   String get premiumNoPlans => '暂无可用套餐，请稍后再试。';

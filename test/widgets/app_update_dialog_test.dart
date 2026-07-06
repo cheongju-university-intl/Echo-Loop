@@ -82,6 +82,37 @@ void main() {
 
       expect(dismissed, isTrue);
     });
+
+    testWidgets('点击主按钮调用 onUpdate 并关闭对话框', (tester) async {
+      var updateCalls = 0;
+
+      await tester.pumpWidget(
+        buildApp(
+          child: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => showAppUpdateDialog(
+                context: context,
+                info: info,
+                isForceUpdate: false,
+                downloadUrl: 'market://details?id=app.echoloop',
+                onUpdate: () async => updateCalls++,
+              ),
+              child: const Text('Show'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Update Now'));
+      await tester.pumpAndSettle();
+
+      expect(updateCalls, 1);
+      // soft update：点击后对话框关闭
+      expect(find.text('Update Now'), findsNothing);
+    });
   });
 
   group('Force update 对话框', () {

@@ -2,10 +2,19 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:echo_loop/models/app_update_info.dart';
+import 'package:echo_loop/services/android_update_bridge.dart';
 import 'package:echo_loop/services/app_update_checker.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockDio extends Mock implements Dio {}
+
+class FakeAndroidUpdateBridge implements AndroidUpdateBridge {
+  String? installer;
+
+  @override
+  Future<String?> installerPackageName() async => installer;
+}
 
 void main() {
   late MockDio mockDio;
@@ -125,13 +134,26 @@ void main() {
           },
         ],
       });
+      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(),
+          data: {
+            'latestVersion': '1.0.12',
+            'minimumVersion': '1.0.0',
+            'platforms': {
+              'ios': {'minimumVersion': '1.0.0'},
+            },
+          },
+        ),
+      );
 
       final result = await iosChecker.check();
 
       expect(result, isNotNull);
       expect(result!.latestVersion, '1.0.12');
-      // Lookup API 不提供 minimumVersion，回退为 0.0.0
-      expect(result.minimumVersion, '0.0.0');
+      // 只认 platforms.ios.minimumVersion
+      expect(result.minimumVersion, '1.0.0');
+      expect(result.channel, AppUpdateChannel.iosAppStore);
       // trackViewUrl 同时作为 ios 和 fallback
       expect(
         result.downloadUrl['ios'],
@@ -206,6 +228,9 @@ void main() {
           {'version': '1.0.12', 'trackViewUrl': 'https://apps.apple.com/x'},
         ],
       });
+      when(
+        () => mockDio.get<Map<String, dynamic>>(any()),
+      ).thenThrow(DioException(requestOptions: RequestOptions()));
 
       final result = await iosChecker.check();
       expect(result, isNotNull);
@@ -218,6 +243,9 @@ void main() {
           {'version': '1.0.12'},
         ],
       });
+      when(
+        () => mockDio.get<Map<String, dynamic>>(any()),
+      ).thenThrow(DioException(requestOptions: RequestOptions()));
 
       final result = await iosChecker.check();
       expect(result, isNotNull);
@@ -327,6 +355,152 @@ void main() {
 
       final result = await iosChecker.check();
       expect(result, isNull);
+    });
+
+    test('minimumVersion 高于 App Store 可下载版本时不触发强制更新', () async {
+      stubLookup({
+        'results': [
+          {'version': '1.0.12', 'trackViewUrl': 'https://apps.apple.com/x'},
+        ],
+      });
+      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(),
+          data: {
+            'latestVersion': '1.0.99',
+            'minimumVersion': '1.0.99',
+            'platforms': {
+              'ios': {'minimumVersion': '1.0.99'},
+            },
+          },
+        ),
+      );
+
+      final result = await iosChecker.check();
+
+      expect(result, isNotNull);
+      expect(result!.latestVersion, '1.0.12');
+      expect(result.minimumVersion, '0.0.0');
+    });
+
+    test('仅顶层 minimumVersion 不波及 iOS（新版本忽略顶层）', () async {
+      stubLookup({
+        'results': [
+          {'version': '1.0.12', 'trackViewUrl': 'https://apps.apple.com/x'},
+        ],
+      });
+      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(),
+          // 只有顶层 minimumVersion，无 platforms.ios
+          data: {'latestVersion': '1.0.12', 'minimumVersion': '1.0.10'},
+        ),
+      );
+
+      final result = await iosChecker.check();
+
+      expect(result, isNotNull);
+      expect(result!.minimumVersion, '0.0.0');
+    });
+  });
+
+  group('AppUpdateChecker.check Android channels', () {
+    late FakeAndroidUpdateBridge bridge;
+    late AppUpdateChecker androidChecker;
+
+    setUp(() {
+      bridge = FakeAndroidUpdateBridge();
+      androidChecker = AppUpdateChecker.withDio(
+        mockDio,
+        platform: AppUpdateRuntimePlatform.android,
+        androidBridge: bridge,
+      );
+    });
+
+    void stubManifest() {
+      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(),
+          data: {
+            'latestVersion': '2.0.0',
+            'minimumVersion': '1.5.0',
+            'releaseNotes': {'en': 'Bug fixes'},
+            'downloadUrl': {
+              'android': 'https://cdn.example.com/legacy.apk',
+              'androidApk': 'https://cdn.example.com/app.apk',
+              'fallback': 'https://example.com',
+            },
+            'platforms': {
+              'android': {
+                'googlePlay': {
+                  'minimumVersion': '1.6.0',
+                  'storeUrl': 'market://details?id=app.echoloop',
+                  'fallbackUrl':
+                      'https://play.google.com/store/apps/details?id=app.echoloop',
+                },
+                'apk': {
+                  'latestVersion': '2.0.1',
+                  'minimumVersion': '1.7.0',
+                  'downloadUrl': 'https://cdn.example.com/app-2.0.1.apk',
+                },
+              },
+            },
+          },
+        ),
+      );
+    }
+
+    test('Google Play 安装来源使用商店渠道配置', () async {
+      stubManifest();
+      bridge.installer = 'com.android.vending';
+
+      final result = await androidChecker.check();
+
+      expect(result, isNotNull);
+      expect(result!.channel, AppUpdateChannel.androidGooglePlay);
+      expect(result.latestVersion, '2.0.0');
+      expect(result.minimumVersion, '1.6.0');
+      expect(result.downloadUrl['android'], 'market://details?id=app.echoloop');
+    });
+
+    test('非 Google Play 安装来源使用 APK 渠道配置', () async {
+      stubManifest();
+      bridge.installer = null;
+
+      final result = await androidChecker.check();
+
+      expect(result, isNotNull);
+      expect(result!.channel, AppUpdateChannel.androidApk);
+      expect(result.latestVersion, '2.0.1');
+      expect(result.minimumVersion, '1.7.0');
+      expect(
+        result.downloadUrl['android'],
+        'https://cdn.example.com/app-2.0.1.apk',
+      );
+    });
+
+    test('仅顶层 minimumVersion 不波及 Android 各渠道（新版本忽略顶层）', () async {
+      // 只有顶层 minimumVersion，无 platforms.android.*.minimumVersion
+      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(),
+          data: {
+            'latestVersion': '2.0.0',
+            'minimumVersion': '1.9.0',
+            'downloadUrl': {'androidApk': 'https://cdn.example.com/app.apk'},
+          },
+        ),
+      );
+
+      bridge.installer = 'com.android.vending';
+      final playResult = await androidChecker.check();
+      expect(playResult!.channel, AppUpdateChannel.androidGooglePlay);
+      expect(playResult.minimumVersion, '0.0.0');
+
+      bridge.installer = null;
+      final apkResult = await androidChecker.check();
+      expect(apkResult!.channel, AppUpdateChannel.androidApk);
+      expect(apkResult.minimumVersion, '0.0.0');
     });
   });
 }

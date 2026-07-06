@@ -122,6 +122,16 @@ void main() {
     );
     // 恢复购买入口（合规必需）
     expect(find.text('Restore Purchases'), findsOneWidget);
+    // 购买相关法律链接应跟随购买内容一起滚动，而不是固定在页面底部。
+    expect(find.text('Terms of Service'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Terms of Service'),
+        matching: find.byType(ListView),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('选中月付套餐后 CTA 变为订阅', (tester) async {
@@ -153,6 +163,8 @@ void main() {
     expect(find.text('Membership'), findsOneWidget);
     // 购买套餐卡不应出现
     expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
+    expect(find.text('Terms of Service'), findsNothing);
+    expect(find.text('Privacy Policy'), findsNothing);
     // 恢复购买已移到 AppBar，两态均可用（已订阅用户偶尔也需恢复）
     expect(find.text('Restore Purchases'), findsOneWidget);
   });

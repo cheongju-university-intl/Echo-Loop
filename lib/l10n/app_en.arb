@@ -45,7 +45,7 @@
     }
   },
   "premiumLifetimeAccessNote": "Lifetime access, no renewal needed",
-  "premiumAutoRenewNotice": "Subscriptions auto-renew unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account.",
+  "premiumAutoRenewNotice": "Auto-renews. Manage or cancel in your App Store account.",
   "premiumNoPlans": "No plans available right now. Please try again later.",
   "premiumLoginRequired": "Please sign in before subscribing.",
   "premiumPurchaseFailed": "Purchase failed. Please try again.",

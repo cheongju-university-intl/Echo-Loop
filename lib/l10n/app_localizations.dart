@@ -281,7 +281,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumAutoRenewNotice.
   ///
   /// In en, this message translates to:
-  /// **'Subscriptions auto-renew unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account.'**
+  /// **'Auto-renews. Manage or cancel in your App Store account.'**
   String get premiumAutoRenewNotice;
 
   /// No description provided for @premiumNoPlans.

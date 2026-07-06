@@ -15,6 +15,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/api_config.dart';
 import '../config/app_store_config.dart';
 import '../models/app_update_info.dart';
+import '../utils/version_compare.dart';
+import 'android_update_bridge.dart';
 import 'app_logger.dart';
 
 /// App Store Lookup API endpoint。
@@ -34,7 +36,8 @@ class AppUpdateChecker {
   final Dio _dio;
   final String _url;
   final String? _bundleId;
-  final bool _useIosLookup;
+  final AppUpdateRuntimePlatform _platform;
+  final AndroidUpdateBridge _androidBridge;
 
   /// 使用默认配置创建检查器
   ///
@@ -48,7 +51,8 @@ class AppUpdateChecker {
       ),
       _url = '$apiBaseUrl/version.json',
       _bundleId = bundleId,
-      _useIosLookup = !kIsWeb && Platform.isIOS;
+      _platform = _currentPlatform(),
+      _androidBridge = const MethodChannelAndroidUpdateBridge();
 
   /// 用于测试的构造函数，允许注入 Dio 实例和配置
   ///
@@ -59,9 +63,17 @@ class AppUpdateChecker {
     String url = '',
     String? bundleId,
     bool useIosLookup = false,
+    AppUpdateRuntimePlatform? platform,
+    AndroidUpdateBridge androidBridge =
+        const MethodChannelAndroidUpdateBridge(),
   }) : _url = url,
        _bundleId = bundleId,
-       _useIosLookup = useIosLookup;
+       _platform =
+           platform ??
+           (useIosLookup
+               ? AppUpdateRuntimePlatform.ios
+               : AppUpdateRuntimePlatform.other),
+       _androidBridge = androidBridge;
 
   /// 检查远程版本信息
   ///
@@ -71,10 +83,80 @@ class AppUpdateChecker {
   /// [country] 指定 App Store 区域（如 `cn` / `us`），决定 Lookup API 返回
   /// 哪个区域的 releaseNotes 本地化文案。仅 iOS 路径使用，为 null 时不传。
   Future<AppUpdateInfo?> check({String? country}) async {
-    if (_useIosLookup) {
-      return _checkIosLookup(country: country);
+    if (_platform == AppUpdateRuntimePlatform.ios) {
+      return _checkIos(country: country);
+    }
+    if (_platform == AppUpdateRuntimePlatform.android) {
+      return _checkAndroid();
     }
     return _checkVersionJson();
+  }
+
+  /// iOS：App Store Lookup 提供真实可下载版本，version.json 提供最低可用版本。
+  Future<AppUpdateInfo?> _checkIos({String? country}) async {
+    final lookup = await _checkIosLookup(country: country);
+    if (lookup == null) return null;
+
+    final manifest = await _checkVersionJson();
+    // 只认 platforms.ios.minimumVersion；顶层 minimumVersion 仅供旧版本 App 兼容，
+    // 新版本一律忽略，避免为旧版而设的顶层 min 误触发 iOS 强制更新。
+    final configuredMinimum = manifest?.platforms.ios.minimumVersion;
+    final effectiveMinimum =
+        configuredMinimum == null ||
+            compareVersions(configuredMinimum, lookup.latestVersion) > 0
+        ? '0.0.0'
+        : configuredMinimum;
+
+    return AppUpdateInfo(
+      latestVersion: lookup.latestVersion,
+      minimumVersion: effectiveMinimum,
+      releaseNotes: lookup.releaseNotes.isNotEmpty
+          ? lookup.releaseNotes
+          : manifest?.releaseNotes ?? const {},
+      downloadUrl: lookup.downloadUrl,
+      platforms: manifest?.platforms ?? const AppUpdatePlatforms(),
+      channel: AppUpdateChannel.iosAppStore,
+    );
+  }
+
+  /// Android：按安装来源选择 Google Play 或 APK 渠道。
+  Future<AppUpdateInfo?> _checkAndroid() async {
+    final manifest = await _checkVersionJson();
+    if (manifest == null) return null;
+
+    final installer = await _androidBridge.installerPackageName();
+    AppLogger.log(_logTag, 'android installer=${installer ?? "(null)"}');
+
+    if (installer == 'com.android.vending') {
+      return AppUpdateInfo(
+        latestVersion: manifest.latestVersion,
+        // 只认渠道级 minimumVersion；顶层仅供旧版本 App 兼容，新版本忽略。
+        minimumVersion:
+            manifest.platforms.android.googlePlay.minimumVersion ?? '0.0.0',
+        releaseNotes: manifest.releaseNotes,
+        downloadUrl: _googlePlayDownloadUrl(manifest),
+        platforms: manifest.platforms,
+        channel: AppUpdateChannel.androidGooglePlay,
+      );
+    }
+
+    final latest =
+        manifest.platforms.android.apk.latestVersion ?? manifest.latestVersion;
+    // 只认渠道级 minimumVersion；顶层仅供旧版本 App 兼容，新版本忽略。
+    final minimum = manifest.platforms.android.apk.minimumVersion ?? '0.0.0';
+    final apkUrl = _apkDownloadUrl(manifest);
+    return AppUpdateInfo(
+      latestVersion: latest,
+      minimumVersion: minimum,
+      releaseNotes: manifest.releaseNotes,
+      downloadUrl: {
+        ...manifest.downloadUrl,
+        if (apkUrl != null) 'android': apkUrl,
+        if (apkUrl != null) 'androidApk': apkUrl,
+      },
+      platforms: manifest.platforms,
+      channel: AppUpdateChannel.androidApk,
+    );
   }
 
   /// iOS：从 App Store Lookup API 解析版本信息
@@ -150,6 +232,7 @@ class AppUpdateChecker {
         minimumVersion: '0.0.0',
         releaseNotes: notes,
         downloadUrl: {'ios': downloadUrl, 'fallback': downloadUrl},
+        channel: AppUpdateChannel.iosAppStore,
       );
     } catch (e) {
       AppLogger.log(_logTag, 'iOS lookup failed: $e');
@@ -181,4 +264,35 @@ class AppUpdateChecker {
 
   /// 释放资源
   void dispose() => _dio.close();
+
+  Map<String, String> _googlePlayDownloadUrl(AppUpdateInfo manifest) {
+    const packageName = 'app.echoloop';
+    final storeUrl =
+        manifest.platforms.android.googlePlay.storeUrl ??
+        'market://details?id=$packageName';
+    final fallbackUrl =
+        manifest.platforms.android.googlePlay.fallbackUrl ??
+        'https://play.google.com/store/apps/details?id=$packageName';
+    return {
+      ...manifest.downloadUrl,
+      'android': storeUrl,
+      'fallback': fallbackUrl,
+    };
+  }
+
+  String? _apkDownloadUrl(AppUpdateInfo manifest) {
+    return manifest.platforms.android.apk.downloadUrl ??
+        manifest.downloadUrl['androidApk'] ??
+        manifest.downloadUrl['android'];
+  }
+}
+
+/// 运行平台，用于测试注入。
+enum AppUpdateRuntimePlatform { ios, android, other }
+
+AppUpdateRuntimePlatform _currentPlatform() {
+  if (kIsWeb) return AppUpdateRuntimePlatform.other;
+  if (Platform.isIOS) return AppUpdateRuntimePlatform.ios;
+  if (Platform.isAndroid) return AppUpdateRuntimePlatform.android;
+  return AppUpdateRuntimePlatform.other;
 }
