@@ -247,6 +247,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get waveformLoadFailed => '波形生成失败，仍可在下方编辑字幕。';
 
   @override
+  String get waveformAudioMissing => '没有找到音频，仍可在下方编辑字幕。';
+
+  @override
   String get waveformRetry => '重试';
 
   @override

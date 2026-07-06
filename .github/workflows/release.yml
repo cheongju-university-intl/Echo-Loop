@@ -340,6 +340,7 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+          REVENUECAT_API_KEY_APPLE: ${{ secrets.REVENUECAT_API_KEY_APPLE }}
         run: |
           # 避免 Homebrew rsync 抢占（Apple toolchain 需要系统 rsync）
           export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
@@ -352,6 +353,9 @@ jobs:
           )
           if [[ -n "$POSTHOG_API_KEY" ]]; then
             DART_DEFINES+=("--dart-define=POSTHOG_API_KEY=${POSTHOG_API_KEY}")
+          fi
+          if [[ -n "$REVENUECAT_API_KEY_APPLE" ]]; then
+            DART_DEFINES+=("--dart-define=REVENUECAT_API_KEY_APPLE=${REVENUECAT_API_KEY_APPLE}")
           fi
           # 先用 flutter 编译 dart 代码，--no-codesign 跳过签名
           flutter build ios --release --no-codesign --flavor=prod \

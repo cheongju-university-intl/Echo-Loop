@@ -389,6 +389,7 @@ void main() {
     List<BookmarkSentence>? sentences,
     SpeechRecordingPhase turnPhase = SpeechRecordingPhase.idle,
     bool startAtHome = false,
+    bool listenAndRepeatRatingEnabled = true,
     BookmarkReview Function(
       ReviewDifficultPracticeState initialState,
       List<BookmarkSentence> sentences,
@@ -428,7 +429,9 @@ void main() {
       overrides: [
         analyticsOverride(),
         ...studyTimeOverrides(),
-        ...learningSettingsOverrides(),
+        ...learningSettingsOverrides(
+          listenAndRepeatRatingEnabled: listenAndRepeatRatingEnabled,
+        ),
         audioEngineProvider.overrideWith(() => TestAudioEngine()),
         bookmarkReviewProvider.overrideWith(
           () =>
@@ -879,6 +882,7 @@ void main() {
       await tester.pumpWidget(
         createTestWidget(
           startAtHome: true,
+          listenAndRepeatRatingEnabled: false,
           playerFactory: (state, sentences) {
             player = _TestBookmarkReview(state, sentences);
             return player;

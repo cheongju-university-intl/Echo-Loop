@@ -252,6 +252,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Waveform unavailable. You can still edit subtitles below.';
 
   @override
+  String get waveformAudioMissing =>
+      'No audio found. You can still edit subtitles below.';
+
+  @override
   String get waveformRetry => 'Retry';
 
   @override

@@ -542,6 +542,12 @@ abstract class AppLocalizations {
   /// **'Waveform unavailable. You can still edit subtitles below.'**
   String get waveformLoadFailed;
 
+  /// No description provided for @waveformAudioMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No audio found. You can still edit subtitles below.'**
+  String get waveformAudioMissing;
+
   /// No description provided for @waveformRetry.
   ///
   /// In en, this message translates to:

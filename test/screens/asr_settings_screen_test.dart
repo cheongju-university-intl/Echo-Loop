@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,7 +126,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Speech Engine'), findsOneWidget);
-    expect(find.text('Echo Loop AI'), findsNWidgets(2));
+    // iOS/macOS 额外显示后端选择器中的 Echo Loop AI；Linux CI 不显示平台后端选择器。
+    final expectedEchoLoopLabels = Platform.isIOS || Platform.isMacOS ? 2 : 1;
+    expect(find.text('Echo Loop AI'), findsNWidgets(expectedEchoLoopLabels));
     expect(find.byType(Card), findsNWidgets(2));
     expect(find.textContaining('~100 MB'), findsOneWidget);
     expect(find.textContaining('~150 MB'), findsOneWidget);

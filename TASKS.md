@@ -1,7 +1,72 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-06（隐藏本地转录入口）
+> 最后更新：2026-07-06（macOS 订阅入口统一走 Apple 平台开关）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：macOS 订阅入口统一走 Apple 平台开关
+
+用户反馈 `flutter run -d macos --dart-define-from-file=.dev.env --flavor prod` 看不到会员和订阅入口。排查确认 macOS 被临时排除在 RevenueCat Apple key 映射外，导致 `subscriptionAvailabilityProvider=false`，设置页账号分组隐藏订阅入口。
+
+- [x] **Apple 平台统一**：`revenueCatApiKey` 改为 iOS/macOS 都使用 `REVENUECAT_API_KEY_APPLE`，Android 继续使用 `REVENUECAT_API_KEY_GOOGLE`，Web/未知平台仍不启用。
+- [x] **映射可测化**：新增 `revenueCatApiKeyForPlatform` 纯函数，避免平台 key 规则散落，并补单测锁定 iOS/macOS 同用 Apple key。
+- [x] **验证**：`flutter analyze lib/config/revenuecat_config.dart test/config/revenuecat_config_test.dart` 0 问题；`flutter test test/config/revenuecat_config_test.dart` 全过（3 例）。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：升级 in_app_purchase_storekit 补丁版本
+
+用户反馈 macOS 运行时 `in_app_purchase_storekit` 输出 StoreKit deprecated warnings，先升级当前依赖约束内可解析的补丁版本，确认是否能缓解第三方插件警告。
+
+- [x] **依赖锁定升级**：`pubspec.lock` 中 `in_app_purchase_storekit` 从 `0.4.10` 升级到 `0.4.10+1`，未带出其他依赖升级。
+- [x] **验证结果**：`flutter build macos --debug --dart-define-from-file=.dev.env --flavor dev` 构建成功，产物为 `build/macos/Build/Products/Debug-dev/Echo Loop Dev.app`。
+- [x] **残留说明**：`0.4.10+1` 仍包含 StoreKit 1 API，macOS 15 SDK 下仍会输出 `SKProduct` / `SKPayment` / `SKPaymentTransactionObserver` 等 deprecated warnings；这属于上游插件未完全迁移 StoreKit 2，不影响本次构建通过。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：字幕编辑页无音频时显示明确提示
+
+用户反馈字幕编辑页中部分 item 只有字幕、没有本地音频时，波形区不应显示「波形生成失败」和「重试」，应提示没有找到音频。
+
+- [x] **状态区分**：`SubtitleEditorState` 新增 `waveformAudioMissing`，将 `audioPath == null` 与真实波形提取失败分开处理。
+- [x] **UI 提示**：`SubtitleWaveformView` 无音频时显示「没有找到音频，仍可在下方编辑字幕。」，不显示失败态与重试按钮；真实波形失败仍保留重试。
+- [x] **测试**：补充 controller 回归测试锁定无音频状态，补充 widget 回归测试锁定无音频提示与无重试按钮。
+- [x] **验证**：`flutter analyze lib/features/subtitle_editor/subtitle_editor_controller.dart lib/features/subtitle_editor/subtitle_simple_editor_screen.dart lib/features/subtitle_editor/subtitle_waveform_view.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart test/features/subtitle_editor/subtitle_editor_controller_test.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart` 0 问题；`flutter test test/features/subtitle_editor/subtitle_editor_controller_test.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart` 全过（67 例）。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：修复查词归一化引用单引号
+
+用户反馈选中 `'onto something'` 这类被单引号包住的引用表达时，查词 key 会保留末尾 `'`，导致词典标题与查询表达异常。尾部撇号应只在 `s'` 复数所有格中保留，普通引用尾引号应剥离；词内 `'s` 缩写/所有格继续保留。
+
+- [x] **归一化规则收敛**：`normalizeDictionaryQueryForPrompt` 在剥离首尾标点后，对尾部直撇号做二次判断，仅保留 `dogs'` / `James'` 这类 `s'` 所有格，`'onto something'` 归一化为 `onto something`。
+- [x] **收藏命中修边同步**：`trimSavedRange` 不再一律保留尾部撇号，避免正文收藏/意群命中时把引用尾引号画进下划线区间。
+- [x] **后端同步**：`../fluency-frontend` 的 `@repo/ai` 归一化方法与 prefill 词典写库 key 同步同一规则，避免线上查询和预填充缓存分叉。
+- [x] **回归测试**：补充 normalizeWord / prompt 归一化测试，以及句内命中区间不覆盖引用尾单引号的纯逻辑测试。
+- [x] **验证**：`flutter analyze lib/utils/text_normalize.dart lib/widgets/practice/sentence_word_selection.dart test/utils/text_normalize_test.dart test/widgets/practice/sentence_word_selection_test.dart` 0 问题；`flutter test test/utils/text_normalize_test.dart test/widgets/practice/sentence_word_selection_test.dart` 全过（67 例）；`../fluency-frontend` 中 `@repo/ai` text-normalize 测试、typecheck、prefill dictionary normalize 单测、prefill `tsc --noEmit` 均通过。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：ASR 推荐模型改为 Balanced
+
+用户反馈语音识别设置页推荐模型应从 Fast 改为 Balanced，避免默认推荐低准确率档位。
+
+- [x] **推荐策略收敛**：`AsrModelManager.recommendModel` 默认返回 `whisper-base-en-int8`（Balanced），不再按低配设备回退到 Tiny/Fast。
+- [x] **回归测试**：补充低内存参数下仍推荐 Balanced 的单测，锁定默认推荐档位。
+- [x] **验证**：`flutter analyze lib/services/asr/asr_model_manager.dart test/services/asr/asr_model_manager_test.dart` 0 问题；`flutter test test/services/asr/asr_model_manager_test.dart` 全过（3 例）。
+
+  **完成时间**: 2026-07-06
+
+## 已完成：修复 GitHub CI Linux 测试失败
+
+最新 GitHub Actions `CI` run `28747157143` 中 `test` job 失败：`3835 tests passed, 9 failed, 13 skipped`。失败集中在 Ubuntu runner 平台差异触发的测试断言不稳，而不是业务实现回归。
+
+- [x] **客户端平台 header 测试收敛**：`client_info_test` 明确 Linux/未知平台按 fail-open 返回空平台并省略 `x-app-platform`，支持平台仍校验公共 header。
+- [x] **设置页平台文案测试固定目标平台**：TTS 入口 `Apple AI` 文案测试显式模拟 iOS，避免 Linux 测试宿主进入不同平台摘要分支。
+- [x] **ASR 设置页平台分支断言**：`asr_settings_screen_test` 按 iOS/macOS 与 Linux 的后端选择器差异分别断言 `Echo Loop AI` 文案数量。
+- [x] **完成返回测试隔离语音能力**：收藏复习、难句补练的完成返回回归测试显式关闭跟读评分，避免 Linux speech gate 改写完成弹窗路径。
+- [x] **验证**：`flutter analyze test/services/client_info_test.dart test/screens/settings_screen_test.dart test/screens/asr_settings_screen_test.dart test/screens/bookmark_review_screen_test.dart test/screens/review_difficult_practice_screen_test.dart` 0 问题；`flutter test test/services/client_info_test.dart test/screens/settings_screen_test.dart test/screens/asr_settings_screen_test.dart test/screens/bookmark_review_screen_test.dart test/screens/review_difficult_practice_screen_test.dart` 全过。
+
+  **完成时间**: 2026-07-06
 
 ## 已完成：隐藏管理字幕里的本地转录入口
 

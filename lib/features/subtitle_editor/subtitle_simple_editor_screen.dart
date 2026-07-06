@@ -151,6 +151,7 @@ class _SubtitleSimpleEditorScreenState
                         waveform: state.waveform,
                         extractionProgress: state.waveformProgress,
                         extractionFailed: state.waveformFailed,
+                        audioMissing: state.waveformAudioMissing,
                         onRetryExtraction: () =>
                             unawaited(controller.retryWaveform()),
                         duration: state.totalDuration,

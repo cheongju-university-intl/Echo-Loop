@@ -31,8 +31,21 @@ final RegExp _smartApostrophes = RegExp('[’‘ʼ＇`´]');
 
 /// 剥离查词输入首尾的非字母数字字符（保留词内连字符/点，如 COVID-19）。
 ///
-/// 右侧不剥离直撇号 `'`，保留所有格/缩写形式（dogs' / it's / library's）。
+/// 右侧先不剥离直撇号 `'`，再由 [_stripQuotedTrailingApostrophes] 判断：
+/// 仅 `s'` 这类复数所有格尾撇号保留，普通引用尾引号剥离。
 final RegExp _edgeNonAlnum = RegExp(r"^[^A-Za-z0-9]+|[^A-Za-z0-9']+$");
+
+/// 剥离引用用途的尾部撇号，同时保留 `dogs'` / `James'` 这类所有格。
+String _stripQuotedTrailingApostrophes(String text) {
+  var result = text;
+  while (result.endsWith("'")) {
+    if (result.length >= 2 && result[result.length - 2].toLowerCase() == 's') {
+      break;
+    }
+    result = result.substring(0, result.length - 1);
+  }
+  return result;
+}
 
 /// 归一化查词输入，供本地 / AI / 网页等所有词典源共用，保证大小写处理一致。
 ///
@@ -48,9 +61,11 @@ String normalizeWord(String word) {
 /// 处理步骤：去首尾空白 → 弯撇号归一为直撇号 → 剥离首尾标点（右侧直撇号除外）
 /// → 折叠内部连续空白为单个空格。缓存和收藏仍使用 [normalizeWord]。
 String normalizeDictionaryQueryForPrompt(String word) {
-  return word
+  final stripped = word
       .trim()
       .replaceAll(_smartApostrophes, "'")
-      .replaceAll(_edgeNonAlnum, '')
-      .replaceAll(RegExp(r'\s+'), ' ');
+      .replaceAll(_edgeNonAlnum, '');
+  return _stripQuotedTrailingApostrophes(
+    stripped,
+  ).replaceAll(RegExp(r'\s+'), ' ');
 }

@@ -142,6 +142,12 @@ void main() {
       expect(hitTexts('the dogs’ bone', words: {"dogs'"}), ['dogs’']);
     });
 
+    test('引用尾单引号不进入命中区间', () {
+      expect(hitTexts("about 'onto something'?", phrases: {'onto something'}), [
+        'onto something',
+      ]);
+    });
+
     test('key 未归一化也命中（本地词典 headword 带点号，如 e.g.）', () {
       expect(hitTexts('See e.g., the appendix.', words: {'e.g.'}), ['e.g']);
     });

@@ -99,6 +99,7 @@
   "waveformZoom": "缩放",
   "waveformLoading": "正在加载波形 {progress}%",
   "waveformLoadFailed": "波形生成失败，仍可在下方编辑字幕。",
+  "waveformAudioMissing": "没有找到音频，仍可在下方编辑字幕。",
   "waveformRetry": "重试",
   "playbackSpeed": "播放速度",
   "loopPlayback": "循环播放",

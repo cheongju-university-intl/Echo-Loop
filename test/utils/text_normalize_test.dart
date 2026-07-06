@@ -63,11 +63,18 @@ void main() {
       expect(normalizeWord('co-op.'), 'co-op');
     });
 
-    test('保留右侧撇号（所有格/缩写）', () {
+    test('保留所有格/缩写撇号', () {
       expect(normalizeWord("dogs'"), "dogs'");
       expect(normalizeWord("it's"), "it's");
       expect(normalizeWord("library's"), "library's");
       expect(normalizeWord("dogs'."), "dogs'");
+    });
+
+    test('剥离引用用途的前后单引号', () {
+      expect(normalizeWord("'onto something'"), 'onto something');
+      expect(normalizeWord("'word'"), 'word');
+      expect(normalizeWord("word'"), 'word');
+      expect(normalizeWord("'dogs'"), "dogs'");
     });
 
     test('弯撇号统一为直撇号（排版文本 I’d → i\'d）', () {
@@ -113,6 +120,14 @@ void main() {
     test('弯撇号统一为直撇号但不转小写', () {
       expect(normalizeDictionaryQueryForPrompt('I’d'), "I'd");
       expect(normalizeDictionaryQueryForPrompt('dogs’.'), "dogs'");
+    });
+
+    test('剥离引用用途的尾部撇号但保留 s 所有格', () {
+      expect(
+        normalizeDictionaryQueryForPrompt("'onto something'"),
+        'onto something',
+      );
+      expect(normalizeDictionaryQueryForPrompt("James'"), "James'");
     });
 
     test('空字符串', () {

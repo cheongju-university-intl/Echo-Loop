@@ -193,6 +193,7 @@ void main() {
     SpeechRecordingPhase turnPhase = SpeechRecordingPhase.idle,
     List<Override> extraOverrides = const [],
     bool startAtHome = false,
+    bool listenAndRepeatRatingEnabled = true,
     TestReviewDifficultPractice Function(
       ReviewDifficultPracticeState initialState,
       List<Sentence> sentences,
@@ -244,7 +245,9 @@ void main() {
       overrides: [
         analyticsOverride(),
         ...studyTimeOverrides(),
-        ...learningSettingsOverrides(),
+        ...learningSettingsOverrides(
+          listenAndRepeatRatingEnabled: listenAndRepeatRatingEnabled,
+        ),
         listeningPracticeProvider.overrideWith(
           () => TestListeningPractice(
             ListeningPracticeState(sentences: sentences),
@@ -895,6 +898,7 @@ void main() {
       await tester.pumpWidget(
         createTestWidget(
           startAtHome: true,
+          listenAndRepeatRatingEnabled: false,
           sessionState: const LearningSessionState(isFreePlay: false),
           playerState: createPlayerState(
             currentSentenceIndex: 4,

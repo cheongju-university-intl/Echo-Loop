@@ -94,6 +94,43 @@ void main() {
     expect(state().selectionEpoch, 0);
   });
 
+  test('无本地音频时标记音频缺失，而不是波形生成失败', () async {
+    final missingAudioItem = audioItem.copyWith(audioPath: null);
+    final localAudioEngine = _RecordingAudioEngine(
+      duration: const Duration(seconds: 12),
+      sentences: sentences,
+    );
+    final localContainer = ProviderContainer(
+      overrides: [
+        audioEngineProvider.overrideWith(() => localAudioEngine),
+        audioItemDaoProvider.overrideWithValue(audioItemDao),
+      ],
+    );
+    final localSubscription = localContainer.listen(
+      subtitleEditorControllerProvider(missingAudioItem),
+      (_, _) {},
+      fireImmediately: true,
+    );
+
+    try {
+      final notifier = localContainer.read(
+        subtitleEditorControllerProvider(missingAudioItem).notifier,
+      );
+      await notifier.load();
+      await pumpEventQueue();
+      final st = localContainer.read(
+        subtitleEditorControllerProvider(missingAudioItem),
+      );
+
+      expect(st.waveformAudioMissing, isTrue);
+      expect(st.waveformFailed, isFalse);
+    } finally {
+      localSubscription.close();
+      localContainer.dispose();
+      localAudioEngine.disposeController();
+    }
+  });
+
   test('setPlaybackSpeed 播放中实时转发到底层音频引擎', () async {
     final notifier = controller();
     await notifier.load();

@@ -449,14 +449,22 @@ void main() {
       });
 
       testWidgets('语音合成入口显示当前平台引擎，不显示口音', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const SettingsScreen(), overrides: buildOverrides()),
-        );
-        await tester.pumpAndSettle();
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        try {
+          await tester.pumpWidget(
+            createTestScreen(
+              const SettingsScreen(),
+              overrides: buildOverrides(),
+            ),
+          );
+          await tester.pumpAndSettle();
 
-        expect(find.text('Text-to-Speech'), findsOneWidget);
-        expect(find.text('Apple AI'), findsOneWidget);
-        expect(find.text('American'), findsNothing);
+          expect(find.text('Text-to-Speech'), findsOneWidget);
+          expect(find.text('Apple AI'), findsOneWidget);
+          expect(find.text('American'), findsNothing);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
       });
 
       testWidgets('语音合成入口显示 Echo Loop 引擎', (tester) async {

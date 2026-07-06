@@ -156,4 +156,16 @@ void main() {
     final result = await manager.validateModel('test-model');
     expect(result.isValid, isTrue);
   });
+
+  test('recommendModel 默认推荐 Balanced 档位', () {
+    final manager = _TestAsrModelManager(
+      Directory.systemTemp,
+      modelRegistryOverride: manifest,
+    );
+
+    final model = manager.recommendModel(ramBytes: 0);
+
+    expect(model.id, 'whisper-base-en-int8');
+    expect(model.displayName, contains('Balanced'));
+  });
 }

@@ -14,7 +14,7 @@ library;
 
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 
 /// Apple App Store 平台的 RevenueCat 公开 API Key（iOS / macOS）。
 const _revenueCatApiKeyApple = String.fromEnvironment(
@@ -37,14 +37,35 @@ const revenueCatEntitlementId = String.fromEnvironment(
 
 /// 当前平台应使用的 RevenueCat API Key（不可用平台返回空串）。
 ///
-/// 注意：macOS 虽与 iOS 共用 Apple key，但 macOS IAP 尚未验证（PLAN.md
-/// Milestone 5 Phase 4），当前刻意不返回 key —— 使 macOS 上
-/// [isRevenueCatConfigured] 为 false，RC 不初始化、订阅入口不展示。
-/// macOS 购买流程验证通过后恢复 `|| Platform.isMacOS` 即可整体启用。
+/// iOS 与 macOS 都属于 Apple App Store / StoreKit 购买通道，统一由
+/// `REVENUECAT_API_KEY_APPLE` 控制；Android 由 Google Play key 控制。
 String get revenueCatApiKey {
-  if (kIsWeb) return '';
-  if (Platform.isIOS) return _revenueCatApiKeyApple;
-  if (Platform.isAndroid) return _revenueCatApiKeyGoogle;
+  return revenueCatApiKeyForPlatform(
+    isWeb: kIsWeb,
+    isIOS: !kIsWeb && Platform.isIOS,
+    isMacOS: !kIsWeb && Platform.isMacOS,
+    isAndroid: !kIsWeb && Platform.isAndroid,
+    appleKey: _revenueCatApiKeyApple,
+    googleKey: _revenueCatApiKeyGoogle,
+  );
+}
+
+/// 根据目标平台选择 RevenueCat public key。
+///
+/// 抽成纯函数便于测试，避免平台判断散落在 UI / 购买服务中。Apple 生态内
+/// iOS 与 macOS 共用同一组 StoreKit / RevenueCat 配置。
+@visibleForTesting
+String revenueCatApiKeyForPlatform({
+  required bool isWeb,
+  required bool isIOS,
+  required bool isMacOS,
+  required bool isAndroid,
+  required String appleKey,
+  required String googleKey,
+}) {
+  if (isWeb) return '';
+  if (isIOS || isMacOS) return appleKey;
+  if (isAndroid) return googleKey;
   return '';
 }
 

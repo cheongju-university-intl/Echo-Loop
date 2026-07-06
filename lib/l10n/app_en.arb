@@ -113,6 +113,7 @@
     }
   },
   "waveformLoadFailed": "Waveform unavailable. You can still edit subtitles below.",
+  "waveformAudioMissing": "No audio found. You can still edit subtitles below.",
   "waveformRetry": "Retry",
   "playbackSpeed": "Playback Speed",
   "loopPlayback": "Loop Playback",

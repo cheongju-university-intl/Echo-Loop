@@ -128,7 +128,7 @@ int wordTokenAtChar(List<WordToken> tokens, int charOffset) {
 final RegExp _letterOrDigit = RegExp(r'[\p{L}\p{N}]', unicode: true);
 
 /// 各类撇号（直/弯/变体，与 [normalizeWord] 的撇号折叠集合一致）；
-/// 修边时尾部撇号一律保留（所有格 dogs' / dogs’）
+/// 修边时仅保留 `s'` 所有格尾撇号，引用尾引号不进入命中区间。
 const String _apostrophes = "'’‘ʼ＇`´";
 
 /// 收藏命中区间：索引中的收藏单词/词组/意群在 [text] 中命中的
@@ -175,7 +175,7 @@ List<(int, int)> savedCharRanges(
   return ranges;
 }
 
-/// 区间修边：两端剥非「字母/数字」字符，尾部撇号（直/弯）保留；
+/// 区间修边：两端剥非「字母/数字」字符，尾部 `s'` 撇号（直/弯）保留；
 /// 修边后为空（纯标点）返回 null。
 ///
 /// 公开供调用方识别「命中区间 == 整段文本修边区间」的自匹配
@@ -188,10 +188,16 @@ List<(int, int)> savedCharRanges(
   }
   while (e > s &&
       !_letterOrDigit.hasMatch(text[e - 1]) &&
-      !_apostrophes.contains(text[e - 1])) {
+      !_isPossessiveTrailingApostrophe(text, e - 1)) {
     e--;
   }
   return s < e ? (s, e) : null;
+}
+
+/// 判断 [index] 处撇号是否是 `dogs'` / `dogs’` 这类尾部所有格。
+bool _isPossessiveTrailingApostrophe(String text, int index) {
+  if (!_apostrophes.contains(text[index]) || index == 0) return false;
+  return text[index - 1].toLowerCase() == 's';
 }
 
 /// 区间修边后加入结果（见 [trimSavedRange]）

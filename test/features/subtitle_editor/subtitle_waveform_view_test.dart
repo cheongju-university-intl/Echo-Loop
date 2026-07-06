@@ -595,6 +595,44 @@ void main() {
       expect(retried, 1);
     });
 
+    testWidgets('无音频时显示没有找到音频，不显示失败态和重试', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 240));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        createTestApp(
+          SubtitleWaveformView(
+            waveform: null,
+            extractionProgress: 0,
+            extractionFailed: false,
+            audioMissing: true,
+            duration: const Duration(seconds: 10),
+            sentences: _sentences(),
+            activeSentence: null,
+            selectionEpoch: 0,
+            playbackPosition: Duration.zero,
+            isPlaying: false,
+            zoomScale: 1,
+            onZoomChanged: (_) {},
+            onScrub: (_) {},
+            onScrubEnd: (_) {},
+            onAdjustEnd: () {},
+          ),
+        ),
+      );
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(
+        find.text('No audio found. You can still edit subtitles below.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Waveform unavailable. You can still edit subtitles below.'),
+        findsNothing,
+      );
+      expect(find.text('Retry'), findsNothing);
+    });
+
     testWidgets('触控板捏合（pan-zoom）按 scale 放大波形', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 240));
       addTearDown(() => tester.binding.setSurfaceSize(null));

@@ -145,6 +145,9 @@ class SubtitleWaveformView extends StatefulWidget {
   /// 波形提取是否失败：为 true 时波形区显示失败态 + 重试，而非「加载中」。
   final bool extractionFailed;
 
+  /// 当前字幕 item 没有本地音频：显示不可重试的无音频提示。
+  final bool audioMissing;
+
   /// 点击「重试」重新提取波形。
   final VoidCallback onRetryExtraction;
 
@@ -186,6 +189,7 @@ class SubtitleWaveformView extends StatefulWidget {
     required this.waveform,
     required this.extractionProgress,
     this.extractionFailed = false,
+    this.audioMissing = false,
     this.onRetryExtraction = _ignoreRetry,
     required this.duration,
     required this.sentences,
@@ -321,7 +325,9 @@ class _SubtitleWaveformViewState extends State<SubtitleWaveformView> {
       child: SizedBox(
         height: 112,
         width: double.infinity,
-        child: widget.extractionFailed
+        child: widget.audioMissing
+            ? const _WaveformAudioMissing()
+            : widget.extractionFailed
             ? _WaveformFailed(onRetry: widget.onRetryExtraction)
             : (waveform == null ||
                   duration == null ||
@@ -777,6 +783,42 @@ class _WaveformLoading extends StatelessWidget {
             Text(
               AppLocalizations.of(context)!.waveformLoading(l10nProgress),
               style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 无本地音频态：字幕仍可编辑，但没有音频输入可用于生成波形。
+class _WaveformAudioMissing extends StatelessWidget {
+  const _WaveformAudioMissing();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.music_off,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                l10n.waveformAudioMissing,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
           ],
         ),

@@ -54,6 +54,11 @@ class SubtitleEditorState {
   /// 不阻断整个编辑流程。与「加载中（waveform == null 且未失败）」显式区分，
   /// 避免失败被误显示成永久「加载 0%」。
   final bool waveformFailed;
+
+  /// 当前 item 没有本地音频文件，无法生成波形。
+  ///
+  /// 这不是波形提取失败：用户仍可编辑已有字幕，但没有可重试的本地音频输入。
+  final bool waveformAudioMissing;
   final double playbackSpeed;
   final double waveformZoomScale;
 
@@ -93,6 +98,7 @@ class SubtitleEditorState {
     this.waveform,
     this.waveformProgress = 0,
     this.waveformFailed = false,
+    this.waveformAudioMissing = false,
     this.playbackSpeed = 1.0,
     this.waveformZoomScale = 1.0,
     this.maxWaveformZoomScale = 1.0,
@@ -130,6 +136,7 @@ class SubtitleEditorState {
     Waveform? waveform,
     double? waveformProgress,
     bool? waveformFailed,
+    bool? waveformAudioMissing,
     double? playbackSpeed,
     double? waveformZoomScale,
     double? maxWaveformZoomScale,
@@ -161,6 +168,7 @@ class SubtitleEditorState {
       waveform: waveform ?? this.waveform,
       waveformProgress: waveformProgress ?? this.waveformProgress,
       waveformFailed: waveformFailed ?? this.waveformFailed,
+      waveformAudioMissing: waveformAudioMissing ?? this.waveformAudioMissing,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       waveformZoomScale: waveformZoomScale ?? this.waveformZoomScale,
       maxWaveformZoomScale: maxWaveformZoomScale ?? this.maxWaveformZoomScale,
@@ -1226,7 +1234,11 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
   /// 重新尝试提取波形（失败态下用户点「重试」）。
   Future<void> retryWaveform() async {
     if (_loadingWaveform) return;
-    state = state.copyWith(waveformFailed: false, waveformProgress: 0);
+    state = state.copyWith(
+      waveformFailed: false,
+      waveformAudioMissing: false,
+      waveformProgress: 0,
+    );
     await _loadWaveform();
   }
 
@@ -1236,7 +1248,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
     try {
       final audioPath = await state.audioItem.getFullAudioPath();
       if (audioPath == null) {
-        if (mounted) state = state.copyWith(waveformFailed: true);
+        if (mounted) state = state.copyWith(waveformAudioMissing: true);
         return;
       }
       final dataDir = await getAppDataDirectory();
@@ -1248,7 +1260,11 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
       if (await waveFile.exists()) {
         final waveform = await JustWaveform.parse(waveFile);
         if (!mounted) return;
-        state = state.copyWith(waveform: waveform, waveformProgress: 1);
+        state = state.copyWith(
+          waveform: waveform,
+          waveformProgress: 1,
+          waveformAudioMissing: false,
+        );
         return;
       }
 
@@ -1263,6 +1279,7 @@ class SubtitleEditorController extends StateNotifier<SubtitleEditorState> {
         state = state.copyWith(
           waveform: progress.waveform,
           waveformProgress: progress.progress,
+          waveformAudioMissing: false,
         );
       }
     } catch (_) {
