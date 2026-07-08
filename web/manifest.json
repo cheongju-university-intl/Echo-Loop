@@ -1,11 +1,11 @@
 {
-    "name": "Echo Loop",
-    "short_name": "Echo Loop",
+    "name": "Echo Loop 韩语",
+    "short_name": "Echo Loop 韩语",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Professional English listening practice application",
+    "description": "Korean listening and speaking practice application",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
