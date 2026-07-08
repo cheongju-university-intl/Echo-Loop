@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Echo Loop 韩语 Web 预览</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f6f8;
+      color: #111827;
+    }
+    body { margin: 0; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .hero {
+      border-radius: 24px;
+      padding: 28px;
+      background: linear-gradient(135deg, #0f172a, #1d4ed8);
+      color: white;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, .25);
+    }
+    h1 { margin: 0 0 8px; font-size: 32px; }
+    .hero p { margin: 6px 0 0; color: #dbeafe; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+    .card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+    }
+    .card h2 { font-size: 18px; margin: 0 0 12px; }
+    input[type="file"] { width: 100%; }
+    audio { width: 100%; margin-top: 10px; }
+    .subtitleBox {
+      margin-top: 18px;
+      min-height: 180px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border-radius: 22px;
+      background: #111827;
+      color: white;
+      padding: 24px;
+    }
+    .subtitleNow { font-size: 30px; font-weight: 750; line-height: 1.45; word-break: keep-all; }
+    .subtitleHint { color: #9ca3af; margin-top: 10px; }
+    .list { max-height: 360px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+    .cue {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 10px 12px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .cue.active { border-color: #2563eb; background: #eff6ff; }
+    .time { color: #6b7280; font-size: 12px; margin-bottom: 4px; }
+    .words span { display: inline-block; padding: 2px 4px; margin: 1px; border-radius: 6px; cursor: pointer; }
+    .words span:hover { background: #dbeafe; }
+    .dict {
+      margin-top: 12px;
+      border-radius: 14px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      padding: 12px;
+      min-height: 72px;
+    }
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      background: #2563eb;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn.secondary { background: #374151; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    textarea { width: 100%; min-height: 110px; border-radius: 12px; border: 1px solid #d1d5db; padding: 10px; }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      .subtitleNow { font-size: 24px; }
+      .wrap { padding: 14px; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { background: #030712; color: #f9fafb; }
+      .card, .cue { background: #111827; border-color: #374151; }
+      .cue.active { background: #172554; }
+      .dict { background: #0f172a; border-color: #374151; }
+      textarea { background: #111827; color: #f9fafb; border-color: #374151; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Echo Loop 韩语 Web 预览</h1>
+      <p>先在 Windows / iPhone 浏览器里测试：导入音频、导入字幕、逐句播放、点韩语词。</p>
+      <p>这是轻量网页预览版，不依赖 Flutter 编译，不需要 Mac / 安卓 / TestFlight。</p>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>1. 导入韩语音频</h2>
+        <input id="audioFile" type="file" accept="audio/*" />
+        <audio id="audio" controls></audio>
+      </div>
+      <div class="card">
+        <h2>2. 导入 SRT / VTT 字幕</h2>
+        <input id="subtitleFile" type="file" accept=".srt,.vtt,text/plain" />
+        <p id="subtitleStatus">还没有字幕。</p>
+      </div>
+    </section>
+
+    <section class="subtitleBox">
+      <div>
+        <div id="subtitleNow" class="subtitleNow">请先导入音频和韩语字幕</div>
+        <div id="subtitleHint" class="subtitleHint">播放时会自动高亮当前句子</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>3. 字幕列表</h2>
+        <div id="cueList" class="list"></div>
+      </div>
+      <div class="card">
+        <h2>4. 韩语点词</h2>
+        <div class="row">
+          <button class="btn" id="copyCurrent">复制当前句</button>
+          <button class="btn secondary" id="clearAll">清空</button>
+        </div>
+        <div id="dict" class="dict">点击字幕里的韩语单词，这里会显示。</div>
+        <h2 style="margin-top:16px">手动粘贴字幕测试</h2>
+        <textarea id="manualText" placeholder="也可以把韩语句子粘贴到这里，点下面按钮分词。"></textarea>
+        <button class="btn" id="manualSplit" style="margin-top:8px">分词显示</button>
+        <div id="manualWords" class="words" style="margin-top:10px"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const audioFile = document.getElementById('audioFile');
+    const subtitleFile = document.getElementById('subtitleFile');
+    const audio = document.getElementById('audio');
+    const subtitleNow = document.getElementById('subtitleNow');
+    const subtitleHint = document.getElementById('subtitleHint');
+    const subtitleStatus = document.getElementById('subtitleStatus');
+    const cueList = document.getElementById('cueList');
+    const dict = document.getElementById('dict');
+    const manualText = document.getElementById('manualText');
+    const manualWords = document.getElementById('manualWords');
+    let cues = [];
+    let activeIndex = -1;
+
+    audioFile.addEventListener('change', () => {
+      const file = audioFile.files[0];
+      if (!file) return;
+      audio.src = URL.createObjectURL(file);
+      subtitleHint.textContent = `已导入音频：${file.name}`;
+    });
+
+    subtitleFile.addEventListener('change', async () => {
+      const file = subtitleFile.files[0];
+      if (!file) return;
+      const text = await file.text();
+      cues = parseSubtitle(text);
+      activeIndex = -1;
+      renderCues();
+      subtitleStatus.textContent = `已导入 ${cues.length} 条字幕：${file.name}`;
+      subtitleNow.textContent = cues[0]?.text || '字幕为空或格式不支持';
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      const t = audio.currentTime;
+      const idx = cues.findIndex(c => t >= c.start && t <= c.end);
+      if (idx !== activeIndex) {
+        activeIndex = idx;
+        if (idx >= 0) {
+          subtitleNow.innerHTML = clickableWords(cues[idx].text);
+          subtitleHint.textContent = formatTime(cues[idx].start) + ' → ' + formatTime(cues[idx].end);
+        }
+        renderCues();
+      }
+    });
+
+    cueList.addEventListener('click', e => {
+      const item = e.target.closest('.cue');
+      if (!item) return;
+      const idx = Number(item.dataset.index);
+      if (!Number.isNaN(idx) && cues[idx]) {
+        audio.currentTime = cues[idx].start;
+        audio.play().catch(() => {});
+      }
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.matches('[data-word]')) return;
+      const word = normalizeKoreanWord(e.target.dataset.word);
+      dict.innerHTML = `<b>选中：</b>${escapeHtml(word)}<br><br>` +
+        `可以复制这个词去 ChatGPT 查：<br>` +
+        `<code>${escapeHtml(word)} 뜻 중국어로 설명해줘. 예문도 줘.</code>`;
+    });
+
+    document.getElementById('copyCurrent').addEventListener('click', async () => {
+      const text = activeIndex >= 0 ? cues[activeIndex].text : subtitleNow.textContent;
+      await navigator.clipboard.writeText(text || '');
+      dict.textContent = '已复制当前句。';
+    });
+
+    document.getElementById('clearAll').addEventListener('click', () => {
+      cues = [];
+      activeIndex = -1;
+      cueList.innerHTML = '';
+      subtitleNow.textContent = '已清空，请重新导入。';
+      subtitleStatus.textContent = '还没有字幕。';
+      dict.textContent = '点击字幕里的韩语单词，这里会显示。';
+    });
+
+    document.getElementById('manualSplit').addEventListener('click', () => {
+      manualWords.innerHTML = clickableWords(manualText.value || '');
+    });
+
+    function parseSubtitle(text) {
+      const normalized = text.replace(/\r/g, '').replace(/^WEBVTT.*\n/i, '').trim();
+      const blocks = normalized.split(/\n\s*\n/g);
+      const result = [];
+      for (const block of blocks) {
+        const lines = block.split('\n').map(x => x.trim()).filter(Boolean);
+        const timeLineIndex = lines.findIndex(l => l.includes('-->'));
+        if (timeLineIndex < 0) continue;
+        const [rawStart, rawEnd] = lines[timeLineIndex].split('-->').map(x => x.trim());
+        const start = parseTime(rawStart);
+        const end = parseTime(rawEnd);
+        const body = lines.slice(timeLineIndex + 1).join(' ').trim();
+        if (Number.isFinite(start) && Number.isFinite(end) && body) {
+          result.push({ start, end, text: body });
+        }
+      }
+      return result.sort((a, b) => a.start - b.start);
+    }
+
+    function parseTime(s) {
+      const clean = s.split(/\s+/)[0].replace(',', '.');
+      const parts = clean.split(':').map(Number);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return Number(clean);
+    }
+
+    function formatTime(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return (h ? String(h).padStart(2, '0') + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function renderCues() {
+      cueList.innerHTML = cues.map((c, i) => `
+        <div class="cue ${i === activeIndex ? 'active' : ''}" data-index="${i}">
+          <div class="time">${formatTime(c.start)} → ${formatTime(c.end)}</div>
+          <div class="words">${clickableWords(c.text)}</div>
+        </div>
+      `).join('');
+    }
+
+    function clickableWords(text) {
+      return escapeHtml(text).split(/(\s+)/).map(part => {
+        if (/^\s+$/.test(part)) return part;
+        const w = normalizeKoreanWord(part);
+        if (!w) return part;
+        return `<span data-word="${escapeHtml(w)}">${part}</span>`;
+      }).join('');
+    }
+
+    function normalizeKoreanWord(word) {
+      return String(word || '')
+        .trim()
+        .replace(/^[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+|[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+$/g, '');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+    }
+  </script>
+</body>
+</html>
