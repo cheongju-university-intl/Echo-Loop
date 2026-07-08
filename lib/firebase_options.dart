@@ -15,6 +15,41 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static const String _webApiKey = String.fromEnvironment(
+    'FIREBASE_WEB_API_KEY',
+  );
+  static const String _webAppId = String.fromEnvironment(
+    'FIREBASE_WEB_APP_ID',
+  );
+  static const String _webMessagingSenderId = String.fromEnvironment(
+    'FIREBASE_MESSAGING_SENDER_ID',
+  );
+  static const String _webProjectId = String.fromEnvironment(
+    'FIREBASE_PROJECT_ID',
+  );
+  static const String _webStorageBucket = String.fromEnvironment(
+    'FIREBASE_STORAGE_BUCKET',
+  );
+  static const String _webAuthDomain = String.fromEnvironment(
+    'FIREBASE_AUTH_DOMAIN',
+  );
+  static const String _webMeasurementId = String.fromEnvironment(
+    'FIREBASE_MEASUREMENT_ID',
+  );
+
+  static bool get isWebConfigured =>
+      _webApiKey.isNotEmpty &&
+      _webAppId.isNotEmpty &&
+      _webMessagingSenderId.isNotEmpty &&
+      _webProjectId.isNotEmpty;
+
+  static FirebaseOptions? get currentPlatformOrNull {
+    if (kIsWeb) {
+      return isWebConfigured ? web : null;
+    }
+    return currentPlatform;
+  }
+
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       throw UnsupportedError(
@@ -52,6 +87,16 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1064671521089',
     projectId: 'echo-loop-20260310',
     storageBucket: 'echo-loop-20260310.firebasestorage.app',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: _webApiKey,
+    appId: _webAppId,
+    messagingSenderId: _webMessagingSenderId,
+    projectId: _webProjectId,
+    authDomain: _webAuthDomain,
+    storageBucket: _webStorageBucket,
+    measurementId: _webMeasurementId,
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

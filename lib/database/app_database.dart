@@ -1,10 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import '../utils/app_data_dir.dart';
-import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'enums.dart' show LearningStage;
@@ -41,6 +37,7 @@ import 'daos/learned_word_form_dao.dart';
 import 'daos/daily_study_record_dao.dart';
 import 'daos/daily_stage_study_record_dao.dart';
 import 'daos/tts_cache_dao.dart';
+import 'open_connection.dart' as connection;
 
 part 'app_database.g.dart';
 
@@ -1025,22 +1022,10 @@ class AppDatabase extends _$AppDatabase {
 }
 
 /// 创建数据库连接（生产环境使用）
-LazyDatabase openConnection() {
-  return openConnectionWithName('echo_loop.db');
-}
+QueryExecutor openConnection() => connection.openConnection();
 
 /// 创建指定文件名的数据库连接。
 ///
 /// 用于运行时切换数据库（如演示模式使用 `echo_loop_demo.db`）。
-LazyDatabase openConnectionWithName(String fileName) {
-  return LazyDatabase(() async {
-    final dbFolder = await getAppDataDirectory();
-    final file = File(p.join(dbFolder.path, fileName));
-    return NativeDatabase.createInBackground(
-      file,
-      setup: (db) {
-        db.execute('PRAGMA foreign_keys = ON');
-      },
-    );
-  });
-}
+QueryExecutor openConnectionWithName(String fileName) =>
+    connection.openConnectionWithName(fileName);

@@ -12,10 +12,9 @@
 // 但 app 仍可匿名运行（与认证一致的渐进式策略）。
 library;
 
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 
+import '../utils/platform_info.dart' as platform;
 import 'web_purchase_config.dart';
 
 /// Apple App Store 平台的 RevenueCat 公开 API Key（iOS / macOS）。
@@ -44,9 +43,9 @@ const revenueCatEntitlementId = String.fromEnvironment(
 String get revenueCatApiKey {
   return revenueCatApiKeyForPlatform(
     isWeb: kIsWeb,
-    isIOS: !kIsWeb && Platform.isIOS,
-    isMacOS: !kIsWeb && Platform.isMacOS,
-    isAndroid: !kIsWeb && Platform.isAndroid,
+    isIOS: platform.isIOS,
+    isMacOS: platform.isMacOS,
+    isAndroid: platform.isAndroid,
     appleKey: _revenueCatApiKeyApple,
     googleKey: _revenueCatApiKeyGoogle,
   );
@@ -106,10 +105,10 @@ String? get manageSubscriptionsUrl {
   if (isWebCheckoutConfigured) {
     return webManageUrl.isNotEmpty ? webManageUrl : null;
   }
-  if (Platform.isIOS || Platform.isMacOS) {
+  if (platform.isIOS || platform.isMacOS) {
     return 'https://apps.apple.com/account/subscriptions';
   }
-  if (Platform.isAndroid) {
+  if (platform.isAndroid) {
     return 'https://play.google.com/store/account/subscriptions';
   }
   return null;

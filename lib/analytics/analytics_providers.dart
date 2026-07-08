@@ -5,8 +5,6 @@
 /// 获取 [AnalyticsService] 实例。
 library;
 
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
+import '../utils/platform_info.dart' as platform;
 import 'analytics_channel.dart';
 import 'analytics_service.dart';
 import 'channels/firebase_channel.dart';
@@ -59,7 +58,7 @@ Future<AnalyticsService> initAnalyticsService(
   await channel.registerSuperProperties({'app_anonymous_id': userId});
 
   // 关闭 Firebase 采集（当前使用 PostHog，避免 Firebase SDK 残留上报）
-  if (!kDebugMode && !Platform.isMacOS) {
+  if (!kDebugMode && !platform.isMacOS) {
     await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(false);
   }
 
@@ -94,7 +93,7 @@ Future<bool> resolveIsMainlandChina(SharedPreferences prefs) async {
   }
 
   // 3. API 失败：locale fallback（不持久化）
-  return Platform.localeName.contains('CN');
+  return platform.localeName.contains('CN');
 }
 
 /// 根据配置选择分析通道
@@ -112,11 +111,11 @@ AnalyticsChannel _createChannel() {
 // ignore: unused_element
 AnalyticsChannel _createChannelLegacy(bool isChina) {
   if (kDebugMode) return LogOnlyChannel();
-  if (Platform.isAndroid) {
+  if (platform.isAndroid) {
     if (isChina && UmengChannel.isConfigured) return UmengChannel();
     return FirebaseChannel();
   }
-  if (!Platform.isMacOS && isChina && UmengChannel.isConfigured) {
+  if (!platform.isMacOS && isChina && UmengChannel.isConfigured) {
     return UmengChannel();
   }
   return FirebaseChannel();

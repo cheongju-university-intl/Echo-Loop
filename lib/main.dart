@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -53,6 +52,7 @@ import 'services/tts/piper_model_manager.dart';
 import 'services/tts/piper_voices.dart';
 import 'services/tts/tts_cache_store.dart';
 import 'utils/app_data_dir.dart';
+import 'utils/platform_info.dart' as platform_info;
 import 'services/speech_practice_platform.dart';
 import 'services/storage_migration_service.dart';
 import 'services/background_audio_handler.dart';
@@ -163,12 +163,17 @@ void main() async {
   // 启动时立即触发（包括 Onboarding 期间的新用户），原因：埋点上报
   // （app_permission_snapshot / onboarding_survey_shown 等）依赖网络通畅，
   // 推迟会丢失事件。系统弹窗由 OS 决定具体呈现时机，可能延后。
-  if (!kIsWeb && Platform.isIOS) {
+  if (platform_info.isIOS) {
     unawaited(NetworkPermissionTrigger.trigger(prefs, apiBaseUrl));
   }
 
   // 初始化 Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final firebaseOptions = DefaultFirebaseOptions.currentPlatformOrNull;
+  if (firebaseOptions != null) {
+    await Firebase.initializeApp(options: firebaseOptions);
+  } else {
+    AppLogger.log('App', 'Firebase skipped: platform config missing');
+  }
 
   // 初始化 Supabase（认证 + 未来云同步用）
   //
@@ -277,12 +282,12 @@ void main() async {
   AsrModelInfo? recommendedAsrModel;
   OfflineAsrSettingsState? initialOfflineAsrSettingsState;
   if (!kIsWeb) {
-    final defaultBackend = Platform.isAndroid
+    final defaultBackend = platform_info.isAndroid
         ? AsrBackend.offline
         : AsrBackend.platform;
     AppLogger.log(
       'App',
-      'ASR: platform=${Platform.operatingSystem}, defaultBackend=${defaultBackend.name}',
+      'ASR: platform=${platform_info.operatingSystem}, defaultBackend=${defaultBackend.name}',
     );
     final platform = SpeechPracticePlatform.instance;
     final ramBytes = platform.isSupported
