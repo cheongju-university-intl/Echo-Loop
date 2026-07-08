@@ -29,11 +29,18 @@ String hashText(String text) {
 /// 用直撇号存储，不归一会查不中且粗体标题渲染异常。
 final RegExp _smartApostrophes = RegExp('[’‘ʼ＇`´]');
 
-/// 剥离查词输入首尾的非字母数字字符（保留词内连字符/点，如 COVID-19）。
+/// 剥离查词输入首尾的标点符号。
+///
+/// 原项目只保留英文/数字，韩语单词（如 `학교`, `먹었다가`）会被剥离为空。
+/// 这里加入韩文字母范围：
+/// - 가-힣：完整韩文字
+/// - ㄱ-ㅎ / ㅏ-ㅣ：兼容单独输入的韩文字母
 ///
 /// 右侧先不剥离直撇号 `'`，再由 [_stripQuotedTrailingApostrophes] 判断：
 /// 仅 `s'` 这类复数所有格尾撇号保留，普通引用尾引号剥离。
-final RegExp _edgeNonAlnum = RegExp(r"^[^A-Za-z0-9]+|[^A-Za-z0-9']+$");
+final RegExp _edgeNonWord = RegExp(
+  r"^[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+|[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ']+$",
+);
 
 /// 剥离引用用途的尾部撇号，同时保留 `dogs'` / `James'` 这类所有格。
 String _stripQuotedTrailingApostrophes(String text) {
@@ -51,7 +58,9 @@ String _stripQuotedTrailingApostrophes(String text) {
 ///
 /// 处理步骤：去首尾空白 → 弯撇号归一为直撇号 → 剥离首尾标点（右侧直撇号除外）
 /// → 一律转小写 → 折叠内部连续空白为单个空格（多词词组换行/多空格归一）。
-/// 全大写缩写（NASA / FBI 等）不做特殊保留，统一小写化。
+///
+/// 英文全大写缩写（NASA / FBI 等）不做特殊保留，统一小写化。
+/// 韩语没有大小写，不受 toLowerCase 影响。
 String normalizeWord(String word) {
   return normalizeDictionaryQueryForPrompt(word).toLowerCase();
 }
@@ -64,7 +73,7 @@ String normalizeDictionaryQueryForPrompt(String word) {
   final stripped = word
       .trim()
       .replaceAll(_smartApostrophes, "'")
-      .replaceAll(_edgeNonAlnum, '');
+      .replaceAll(_edgeNonWord, '');
   return _stripQuotedTrailingApostrophes(
     stripped,
   ).replaceAll(RegExp(r'\s+'), ' ');
