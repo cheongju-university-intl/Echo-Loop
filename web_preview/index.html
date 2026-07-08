@@ -1,85 +1,806 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Echo Loop 韩语</title>
   <style>
-    :root{--bg:#f5f7fb;--card:#fff;--soft:#f8fbff;--text:#0f172a;--muted:#64748b;--line:#e5eaf2;--blue:#2563eb;--blue2:#eff6ff;--blue3:#bfdbfe;--green:#16a34a;--yellow:#f59e0b;--shadow2:0 10px 26px rgba(15,23,42,.06)}
-    body.dark{--bg:#050816;--card:#0f172a;--soft:#111c33;--text:#f8fafc;--muted:#94a3b8;--line:#243149;--blue:#60a5fa;--blue2:#102347;--blue3:#1d4ed8;--shadow2:0 10px 26px rgba(0,0,0,.20)}
-    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 0 0,rgba(37,99,235,.12),transparent 32%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
-    .top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
-    .topin{max-width:1480px;margin:auto;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:14px}.logo{width:46px;height:46px;border-radius:16px;background:linear-gradient(135deg,#1d4ed8,#60a5fa);display:grid;place-items:center;color:white;font-weight:900;font-size:20px;box-shadow:0 12px 28px rgba(37,99,235,.25)}
-    h1{margin:0;font-size:18px}.brand p{margin:5px 0 0;color:var(--muted);font-size:13px}.actions{display:flex;gap:10px;align-items:center}.pill{border:1px solid var(--line);background:var(--card);color:var(--muted);padding:8px 12px;border-radius:999px;font-size:13px;font-weight:700}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-right:8px}.dot.ready{background:var(--green)}.smallbtn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:9px 12px;font-weight:800;cursor:pointer}
-    .layout{max-width:1480px;margin:auto;padding:24px;display:grid;grid-template-columns:330px minmax(0,1fr) 350px;gap:22px}.col{display:flex;flex-direction:column;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--shadow2);overflow:hidden}.pad{padding:20px}.title{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.title h2{font-size:16px;margin:0}.title small{color:var(--muted);font-weight:700}.upload{border:1px dashed var(--blue3);background:var(--soft);border-radius:22px;padding:16px;margin-bottom:12px}.upload h3{font-size:14px;margin:0 0 7px}.upload p{font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 13px}
-    input[type=file],input[type=text],input[type=url]{width:100%;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:14px;padding:10px;font-size:13px;outline:none}input[type=text]:focus,input[type=url]:focus,textarea:focus{border-color:var(--blue3);box-shadow:0 0 0 4px rgba(37,99,235,.08)}audio{width:100%;margin-top:12px}.status{margin-top:10px;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:14px;padding:10px 12px;font-size:12px;line-height:1.5}.row{display:flex;gap:8px;margin-top:8px}.row input{min-width:0}.mini{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{border:1px solid var(--line);border-radius:18px;background:var(--soft);padding:13px}.stat .k{font-size:12px;color:var(--muted);font-weight:700}.stat .v{font-size:24px;font-weight:900;margin-top:6px}
-    .hero{padding:26px;background:radial-gradient(circle at top right,rgba(96,165,250,.18),transparent 30%),linear-gradient(180deg,var(--card),var(--soft))}.herohead{margin-bottom:18px}.hero h2{font-size:28px;line-height:1.15;margin:0;letter-spacing:-.03em}.hero p{color:var(--muted);font-size:14px;line-height:1.65;margin:10px 0 0}.now{margin-top:18px;border:1px solid var(--blue3);background:linear-gradient(180deg,var(--soft),var(--card));border-radius:26px;padding:24px}.meta{display:flex;justify-content:space-between;gap:12px;margin-bottom:16px}.over{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.11em}.time{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800}.mainline{min-height:116px;font-size:34px;line-height:1.55;font-weight:900;word-break:keep-all}.mainline span,.cuetxt span{display:inline-block;margin:2px 3px;padding:3px 6px;border-radius:10px;cursor:pointer}.mainline span:hover,.cuetxt span:hover{background:var(--blue2);color:var(--blue)}.next{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}.next b{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}.next div{color:var(--muted);font-size:16px;line-height:1.65}.tools{display:flex;flex-wrap:wrap;gap:10px;padding:16px 18px}.btn{border:0;border-radius:15px;background:var(--blue);color:white;padding:12px 16px;font-weight:900;cursor:pointer;white-space:nowrap}.btn2{background:var(--card);color:var(--text);border:1px solid var(--line)}.btn.small{padding:10px 12px;font-size:13px}.timeline{min-height:520px}.list{padding:0 20px 20px;display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto}.cue{border:1px solid var(--line);background:var(--card);border-radius:18px;padding:13px 15px;cursor:pointer}.cue:hover{border-color:var(--blue3);background:var(--soft)}.cue.active{border-color:var(--blue3);background:var(--blue2)}.cuetime{font-size:12px;color:var(--muted);font-weight:900;margin-bottom:7px}.cuetxt{font-size:15px;line-height:1.62}.empty{padding:24px;border:1px dashed var(--line);border-radius:20px;color:var(--muted);text-align:center;line-height:1.6;background:var(--soft)}.word{font-size:30px;font-weight:950;margin:2px 0 12px}.info{border:1px solid var(--line);background:var(--soft);border-radius:18px;padding:15px;color:var(--muted);line-height:1.72;min-height:132px;font-size:14px}.prompt{margin-top:12px;border-radius:18px;padding:14px;background:#0f172a;color:#dbeafe;font-size:13px;line-height:1.7;word-break:break-word}textarea{width:100%;min-height:126px;resize:vertical;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:18px;padding:14px;outline:none;line-height:1.6}.chips{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}.chip{padding:8px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;cursor:pointer}.chip:hover{background:var(--blue2);color:var(--blue)}.note{margin-top:12px;color:var(--muted);font-size:12px;line-height:1.65}
-    @media(max-width:1220px){.layout{grid-template-columns:320px 1fr}.right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}.timeline{min-height:420px}}@media(max-width:860px){.layout{grid-template-columns:1fr;padding:16px}.right{display:flex}.hero h2{font-size:23px}.mainline{font-size:26px}.actions{display:none}.row{flex-direction:column}.btn{width:100%}}
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f2;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #687386;
+      --line: #dfe4dc;
+      --blue: #2563eb;
+      --green: #15803d;
+      --amber: #c77700;
+      --red: #be123c;
+      --soft-blue: #eaf1ff;
+      --soft-green: #eaf7ee;
+      --soft-amber: #fff4db;
+      --shadow: 0 18px 45px rgba(23, 32, 51, .08);
+    }
+
+    body.dark {
+      color-scheme: dark;
+      --bg: #101318;
+      --panel: #191e27;
+      --ink: #f6f8fb;
+      --muted: #a2adbd;
+      --line: #303845;
+      --blue: #7aa7ff;
+      --green: #57c785;
+      --amber: #f7be56;
+      --red: #fb7185;
+      --soft-blue: #182740;
+      --soft-green: #152b20;
+      --soft-amber: #302515;
+      --shadow: 0 18px 45px rgba(0, 0, 0, .22);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "Noto Sans KR", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover { border-color: var(--blue); }
+    button.primary { background: var(--blue); border-color: var(--blue); color: white; }
+    button.good { background: var(--green); border-color: var(--green); color: white; }
+    button.warn { background: var(--soft-amber); color: var(--amber); }
+    button.icon { width: 44px; padding: 0; font-size: 18px; }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+
+    input[type="file"], input[type="url"], input[type="text"], textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      outline: none;
+      padding: 10px 12px;
+    }
+
+    textarea { min-height: 116px; resize: vertical; line-height: 1.6; }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 800; }
+    audio { width: 100%; }
+
+    .app {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 340px;
+      gap: 14px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      color: #fff;
+      font-weight: 900;
+    }
+    h1 { margin: 0; font-size: 19px; }
+    .subline { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .top-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .status.ready { color: var(--green); background: var(--soft-green); border-color: transparent; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel.pad { padding: 14px; }
+    .stack { display: grid; gap: 14px; align-content: start; }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .section-title h2 { margin: 0; font-size: 15px; }
+    .section-title small { color: var(--muted); font-weight: 800; }
+
+    .drop {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel) 85%, var(--soft-blue));
+    }
+    .field-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+    .mini-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .metric {
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft-blue);
+    }
+    .metric b { display: block; font-size: 22px; }
+    .metric span { color: var(--muted); font-size: 12px; font-weight: 800; }
+
+    .reader { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 680px; }
+    .stage {
+      padding: 22px;
+      background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 75%, var(--soft-blue)));
+      border-bottom: 1px solid var(--line);
+    }
+    .stage-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .sentence {
+      min-height: 150px;
+      display: flex;
+      align-items: center;
+      padding: 18px 0;
+      font-size: clamp(25px, 4vw, 48px);
+      line-height: 1.45;
+      font-weight: 900;
+      word-break: keep-all;
+    }
+    .sentence.blind .word-chip { color: transparent; background: var(--line); }
+    .sentence .word-chip, .cue-text .word-chip {
+      display: inline-block;
+      margin: 2px 3px;
+      padding: 1px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .sentence .word-chip:hover, .cue-text .word-chip:hover {
+      background: var(--soft-blue);
+      color: var(--blue);
+    }
+    .next-line {
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 13px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .transport {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .main-controls { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+    .options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      min-width: 0;
+    }
+    .toggle input { width: auto; }
+    .toggle select { padding: 4px 6px; }
+
+    .cue-list {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .cue {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      cursor: pointer;
+    }
+    .cue.active { background: var(--soft-blue); border-color: var(--blue); }
+    .cue-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 900; }
+    .cue-text { line-height: 1.55; font-size: 15px; }
+    .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
+
+    .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .tabs button.active { background: var(--soft-blue); border-color: var(--blue); color: var(--blue); }
+    .tab { display: none; }
+    .tab.active { display: grid; gap: 12px; }
+    .word {
+      font-size: 30px;
+      font-weight: 950;
+      line-height: 1.2;
+      min-height: 37px;
+    }
+    .dict-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--soft-green);
+      line-height: 1.65;
+      color: var(--muted);
+    }
+    .link-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .link-grid a {
+      display: block;
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 800;
+      padding: 10px 8px;
+      background: var(--panel);
+    }
+    .link-grid a:hover { border-color: var(--blue); color: var(--blue); }
+    .note-list { display: grid; gap: 8px; max-height: 270px; overflow: auto; }
+    .note-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      line-height: 1.5;
+      cursor: pointer;
+    }
+    .note-item small { display: block; color: var(--muted); margin-bottom: 5px; font-weight: 800; }
+    .rec-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      margin-right: 7px;
+    }
+
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 300px minmax(0, 1fr); }
+      .right { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); display: grid; }
+    }
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 1fr; padding: 10px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .top-actions { justify-content: flex-start; }
+      .reader { min-height: 620px; }
+      .sentence { min-height: 120px; }
+      .options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .right { display: grid; grid-template-columns: 1fr; }
+      .field-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <header class="top"><div class="topin"><div class="brand"><div class="logo">E</div><div><h1>Echo Loop 韩语</h1><p>沉浸式听力 · 逐句字幕 · 点词学习</p></div></div><div class="actions"><div class="pill"><span class="dot" id="dot"></span><span id="status">等待导入材料</span></div><div class="pill">Web Preview</div><button class="smallbtn" id="theme">深色</button></div></div></header>
-  <main class="layout">
-    <aside class="col">
-      <section class="card pad"><div class="title"><h2>学习材料</h2><small>Step 1</small></div><div class="upload"><h3>导入本地韩语音频</h3><p>支持 mp3、m4a、wav。文件只在浏览器本地读取。</p><input id="audioFile" type="file" accept="audio/*"><audio id="audio" controls></audio></div><div class="upload"><h3>导入本地字幕</h3><p>支持 SRT / VTT。导入后自动生成时间轴。</p><input id="subFile" type="file" accept=".srt,.vtt,text/plain"><div class="status" id="subStatus">还没有字幕文件。</div></div><div class="stats"><div class="stat"><div class="k">字幕句数</div><div class="v" id="count">0</div></div><div class="stat"><div class="k">当前句号</div><div class="v" id="idx">-</div></div></div></section>
-      <section class="card pad"><div class="title"><h2>在线查找与导入</h2><small>Online</small></div><div class="upload"><h3>搜索公开学习资源</h3><p>输入主题后打开搜索页面，找到合法公开音频或字幕链接后粘贴到下面。</p><input id="searchQ" type="text" placeholder="例如：TOPIK 듣기, 한국어 뉴스 대본"><div class="row"><button class="btn small" id="searchAudio">搜索音频+대본</button><button class="btn btn2 small" id="searchSub">搜索字幕 SRT/VTT</button></div><div class="mini">只用于打开搜索，不会自动抓取受版权保护内容。</div></div><div class="upload"><h3>粘贴音频直链</h3><p>支持公开可播放的 mp3 / m4a / wav 链接。部分网站可能禁止外部播放。</p><input id="audioUrl" type="url" placeholder="https://example.com/audio.mp3"><div class="row"><button class="btn small" id="loadAudioUrl">载入在线音频</button><button class="btn btn2 small" id="openAudioUrl">打开链接</button></div></div><div class="upload"><h3>粘贴字幕直链</h3><p>支持公开 SRT / VTT 链接。如果被 CORS 拦截，请下载到本地再导入。</p><input id="subUrl" type="url" placeholder="https://example.com/subtitle.srt"><div class="row"><button class="btn small" id="loadSubUrl">导入在线字幕</button><button class="btn btn2 small" id="openSubUrl">打开链接</button></div><div class="status" id="onlineStatus">等待在线资源。</div></div></section>
-      <section class="card pad"><div class="title"><h2>使用流程</h2><small>Guide</small></div><div class="empty" style="text-align:left">1. 导入音频或粘贴音频直链<br>2. 导入字幕或粘贴 SRT/VTT 直链<br>3. 播放时自动高亮当前句<br>4. 点击韩语词生成学习提示</div></section>
+  <main class="app">
+    <header>
+      <div class="brand">
+        <div class="mark">E</div>
+        <div>
+          <h1>Echo Loop 韩语</h1>
+          <div class="subline">盲听 · 精听 · 跟读 · 复述 · 收藏复习</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div id="status" class="status">等待材料</div>
+        <button id="themeBtn" class="icon" title="切换主题">◐</button>
+      </div>
+    </header>
+
+    <aside class="stack">
+      <section class="panel pad">
+        <div class="section-title"><h2>材料</h2><small>Import</small></div>
+        <div class="drop">
+          <label>音频文件
+            <input id="audioFile" type="file" accept="audio/*,video/*">
+          </label>
+          <audio id="audio" controls></audio>
+        </div>
+        <div class="drop" style="margin-top:10px">
+          <label>字幕文件
+            <input id="subtitleFile" type="file" accept=".srt,.vtt,.txt,text/plain">
+          </label>
+        </div>
+        <div class="drop" style="margin-top:10px">
+          <div class="field-row">
+            <label>音频 URL
+              <input id="audioUrl" type="url" placeholder="https://example.com/audio.mp3">
+            </label>
+            <button id="loadAudioUrl">载入</button>
+          </div>
+          <div class="field-row">
+            <label>字幕 URL
+              <input id="subtitleUrl" type="url" placeholder="https://example.com/subtitle.srt">
+            </label>
+            <button id="loadSubtitleUrl">载入</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel pad">
+        <div class="section-title"><h2>统计</h2><small>Today</small></div>
+        <div class="mini-grid">
+          <div class="metric"><b id="cueCount">0</b><span>句子</span></div>
+          <div class="metric"><b id="currentIndex">-</b><span>当前位置</span></div>
+          <div class="metric"><b id="favoriteCount">0</b><span>收藏</span></div>
+          <div class="metric"><b id="practiceCount">0</b><span>跟读</span></div>
+        </div>
+      </section>
+
+      <section class="panel pad">
+        <div class="section-title"><h2>手动文本</h2><small>Split</small></div>
+        <textarea id="manualText" placeholder="오늘은 날씨가 좋아요. 같이 한국어를 연습해요."></textarea>
+        <button id="splitTextBtn" class="primary" style="width:100%;margin-top:10px">切成句子</button>
+      </section>
     </aside>
-    <section class="col"><section class="card hero"><div class="herohead"><div><h2>把韩语材料变成可操作的听力工作台</h2><p>播放、逐句定位、点词、复制句子。现在支持本地导入和公开在线直链导入。</p></div></div><div class="now"><div class="meta"><div class="over">Current Sentence</div><div class="time" id="time">00:00 → 00:00</div></div><div class="mainline" id="line">请先导入韩语音频和字幕</div><div class="next"><b>下一句预览</b><div id="next">导入字幕后，这里会显示下一句。</div></div></div></section><section class="card"><div class="tools"><button class="btn" id="copyBtn">复制当前句</button><button class="btn btn2" id="replayBtn">重播当前句</button><button class="btn btn2" id="clearBtn">清空材料</button></div></section><section class="card timeline"><div class="pad" style="padding-bottom:10px"><div class="title"><h2>句子时间轴</h2><small>Step 2</small></div></div><div class="list" id="list"><div class="empty">导入字幕后，句子会显示在这里。</div></div></section></section>
-    <aside class="col right"><section class="card pad"><div class="title"><h2>点词学习</h2><small>Step 3</small></div><div class="word" id="word">—</div><div class="info" id="info">点击中间字幕区或时间轴里的韩语单词，这里会显示学习建议。</div><div class="prompt" id="prompt">推荐提问模板会显示在这里，方便复制后做释义、例句、语法解析。</div></section><section class="card pad"><div class="title"><h2>手动句子测试</h2><small>Step 4</small></div><textarea id="manual" placeholder="例如：지하철을 탔다가 내릴 역을 놓쳤어요."></textarea><div style="margin-top:12px"><button class="btn" id="splitBtn">分词显示</button></div><div class="chips" id="chips"></div><div class="note">分词后会自动解释第一个词。点击任意词条可切换解释。</div></section></aside>
+
+    <section class="panel reader">
+      <div class="stage">
+        <div class="stage-meta">
+          <span id="stageName">Current Sentence</span>
+          <span id="timeLabel">00:00 - 00:00</span>
+        </div>
+        <div id="sentence" class="sentence">导入韩语音频和字幕后开始练习</div>
+        <div class="next-line" id="nextLine">当前网页会把材料保存在浏览器本地。</div>
+      </div>
+
+      <div class="transport">
+        <div class="main-controls">
+          <button id="prevBtn" class="icon" title="上一句">‹</button>
+          <button id="playBtn" class="icon primary" title="播放/暂停">▶</button>
+          <button id="nextBtn" class="icon" title="下一句">›</button>
+          <button id="repeatBtn" class="icon" title="循环当前句">∞</button>
+          <button id="favoriteBtn" class="icon" title="收藏当前句">☆</button>
+          <button id="speakBtn" class="icon" title="朗读当前句">♪</button>
+          <button id="copyBtn" class="icon" title="复制当前句">⧉</button>
+        </div>
+        <div class="options">
+          <label class="toggle"><input id="blindToggle" type="checkbox">盲听</label>
+          <label class="toggle"><input id="autoNextToggle" type="checkbox" checked>自动下一句</label>
+          <label class="toggle">速度
+            <select id="speedSelect">
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+            </select>
+          </label>
+          <label class="toggle">循环
+            <select id="loopCountSelect">
+              <option value="1">1 次</option>
+              <option value="3" selected>3 次</option>
+              <option value="5">5 次</option>
+              <option value="999">持续</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="cueList" class="cue-list">
+        <div class="empty">暂无字幕</div>
+      </div>
+    </section>
+
+    <aside class="stack right">
+      <section class="panel pad">
+        <div class="tabs">
+          <button class="tabBtn active" data-tab="dict">查词</button>
+          <button class="tabBtn" data-tab="record">跟读</button>
+          <button class="tabBtn" data-tab="notes">复习</button>
+        </div>
+
+        <div id="dictTab" class="tab active">
+          <div class="word" id="selectedWord">단어</div>
+          <div class="dict-card" id="dictInfo">点击句子里的韩语词，打开词典或复制 AI 解释提示。</div>
+          <div class="link-grid" id="dictLinks"></div>
+          <button id="copyPromptBtn">复制 AI 查词提示</button>
+        </div>
+
+        <div id="recordTab" class="tab">
+          <button id="recordBtn" class="good"><span id="recordState"></span>开始录音</button>
+          <audio id="recordAudio" controls></audio>
+          <textarea id="retellNote" placeholder="复述笔记 / 中文理解 / 难点"></textarea>
+          <button id="saveNoteBtn" class="primary">保存笔记</button>
+        </div>
+
+        <div id="notesTab" class="tab">
+          <div class="main-controls" style="justify-content:flex-start">
+            <button id="exportBtn">导出</button>
+            <button id="clearStoreBtn" class="warn">清空</button>
+          </div>
+          <div id="noteList" class="note-list"></div>
+        </div>
+      </section>
+    </aside>
   </main>
+
   <script>
-    const audioFile=document.getElementById('audioFile'),subFile=document.getElementById('subFile'),audio=document.getElementById('audio'),line=document.getElementById('line'),next=document.getElementById('next'),subStatus=document.getElementById('subStatus'),list=document.getElementById('list'),count=document.getElementById('count'),idx=document.getElementById('idx'),time=document.getElementById('time'),statusEl=document.getElementById('status'),dot=document.getElementById('dot'),wordEl=document.getElementById('word'),info=document.getElementById('info'),prompt=document.getElementById('prompt'),manual=document.getElementById('manual'),chips=document.getElementById('chips'),onlineStatus=document.getElementById('onlineStatus');
-    const audioUrl=document.getElementById('audioUrl'),subUrl=document.getElementById('subUrl'),searchQ=document.getElementById('searchQ');
-    let cues=[],active=-1,hasAudio=false;
-    const miniDict={
-      '내일':['明天','名词/副词','내일 만나요. 明天见。'],
-      '오늘':['今天','名词/副词','오늘은 시간이 없어요. 今天没有时间。'],
-      '어제':['昨天','名词/副词','어제 비가 왔어요. 昨天下雨了。'],
-      '학교':['学校','名词','학교에 가요. 去学校。'],
-      '한국어':['韩语','名词','한국어를 공부해요. 学韩语。'],
-      '공부':['学习','名词','공부를 해요. 学习。'],
-      '뉴스':['新闻','外来词，名词','뉴스를 들어요. 听新闻。'],
-      '대본':['台本、文本、脚本','名词','대본을 읽어요. 读文本。'],
-      '자막':['字幕','名词','자막을 봐요. 看字幕。'],
-      '듣기':['听力','名词','듣기 연습을 해요. 做听力练习。'],
-      '지하철':['地铁','名词','지하철을 타요. 坐地铁。'],
-      '시간':['时间','名词','시간이 없어요. 没有时间。'],
-      '사람':['人','名词','사람이 많아요. 人很多。'],
-      '자료':['资料','名词','자료를 찾아요. 找资料。'],
-      '소외':['疏外、排斥、被边缘化','汉字词：疏外','사회에서 소외되다. 在社会中被边缘化。']
+    const $ = (id) => document.getElementById(id);
+    const audio = $('audio');
+    const state = {
+      cues: [],
+      active: -1,
+      looping: false,
+      loopLeft: 0,
+      favorites: new Set(JSON.parse(localStorage.getItem('echoLoopWebFavorites') || '[]')),
+      notes: JSON.parse(localStorage.getItem('echoLoopWebNotes') || '[]'),
+      practiceCount: Number(localStorage.getItem('echoLoopWebPracticeCount') || 0),
+      selectedWord: '',
+      recorder: null,
+      chunks: [],
     };
-    document.getElementById('theme').onclick=()=>{document.body.classList.toggle('dark');document.getElementById('theme').textContent=document.body.classList.contains('dark')?'浅色':'深色'};
-    audioFile.onchange=()=>{const f=audioFile.files[0];if(!f)return;audio.src=URL.createObjectURL(f);hasAudio=true;setStatus('已导入音频：'+f.name)};
-    subFile.onchange=async()=>{const f=subFile.files[0];if(!f)return;loadSubtitleText(await f.text(),'本地字幕：'+f.name)};
-    document.getElementById('searchAudio').onclick=()=>openSearch((searchQ.value||'한국어 듣기 자료 mp3 대본')+' 한국어 듣기 mp3 대본');
-    document.getElementById('searchSub').onclick=()=>openSearch((searchQ.value||'한국어 듣기 자막 srt vtt')+' srt vtt 자막');
-    document.getElementById('openAudioUrl').onclick=()=>openUrl(audioUrl.value);
-    document.getElementById('openSubUrl').onclick=()=>openUrl(subUrl.value);
-    document.getElementById('loadAudioUrl').onclick=()=>{const u=validUrl(audioUrl.value);if(!u){setOnline('请输入 http/https 音频链接');return}audio.src=u;hasAudio=true;setOnline('已载入在线音频。如果不能播放，说明网站禁止外链或链接不是音频直链。');setStatus('已载入在线音频')};
-    document.getElementById('loadSubUrl').onclick=async()=>{const u=validUrl(subUrl.value);if(!u){setOnline('请输入 http/https 字幕链接');return}setOnline('正在读取在线字幕...');try{const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);const t=await r.text();loadSubtitleText(t,'在线字幕：'+u);setOnline('在线字幕已导入')}catch(e){setOnline('在线字幕读取失败：可能是 CORS 跨域限制。请打开链接，下载字幕文件后用本地导入。')}};
-    audio.ontimeupdate=()=>{const t=audio.currentTime;const i=cues.findIndex(c=>t>=c.start&&t<=c.end);if(i!==active&&i>=0)update(i,true)};
-    list.onclick=e=>{const item=e.target.closest('.cue');if(!item)return;const i=Number(item.dataset.i);if(cues[i]){audio.currentTime=cues[i].start;audio.play().catch(()=>{});update(i,true)}};
-    document.onclick=e=>{const n=e.target.closest('[data-word]');if(!n)return;const w=clean(n.dataset.word);if(!w)return;showWord(w)};
-    document.getElementById('copyBtn').onclick=async()=>{const t=active>=0?cues[active].text:line.textContent;try{await navigator.clipboard.writeText(t||'');setStatus('已复制当前句')}catch(e){setStatus('浏览器阻止复制，请手动选择文本')}};
-    document.getElementById('replayBtn').onclick=()=>{if(active>=0&&cues[active]){audio.currentTime=cues[active].start;audio.play().catch(()=>{})}};
-    document.getElementById('clearBtn').onclick=()=>{cues=[];active=-1;hasAudio=false;list.innerHTML='<div class="empty">导入字幕后，句子会显示在这里。</div>';line.textContent='请先导入韩语音频和字幕';next.textContent='导入字幕后，这里会显示下一句。';subStatus.textContent='还没有字幕文件。';onlineStatus.textContent='等待在线资源。';wordEl.textContent='—';info.textContent='点击中间字幕区或时间轴里的韩语单词，这里会显示学习建议。';prompt.textContent='推荐提问模板会显示在这里，方便复制后做释义、例句、语法解析。';count.textContent='0';idx.textContent='-';time.textContent='00:00 → 00:00';audio.pause();audio.removeAttribute('src');audio.load();setStatus('等待导入材料',false)};
-    document.getElementById('splitBtn').onclick=()=>{const words=manual.value.split(/\s+/).filter(Boolean).map(x=>clean(x)).filter(Boolean);chips.innerHTML=words.map(w=>'<span class="chip" data-word="'+esc(w)+'">'+esc(w)+'</span>').join('');if(words[0])showWord(words[0])};
-    function showWord(w){wordEl.textContent=w;const d=miniDict[w];if(d){info.innerHTML='<b>中文：</b>'+esc(d[0])+'<br><b>词性/来源：</b>'+esc(d[1])+'<br><b>例句：</b>'+esc(d[2]);}else{info.innerHTML='<b>本地词典暂时没有固定释义。</b><br>这个词已经识别出来了。可以复制下面的模板让 ChatGPT 解释。';}prompt.textContent=w+' 뜻을 중국어로 설명해주고, 품사, 예문 3개, 비슷한 표현, 반대 표현도 같이 알려줘.'}
-    function loadSubtitleText(text,label){cues=parseSubtitle(text);active=-1;count.textContent=cues.length;subStatus.textContent='已导入 '+cues.length+' 条字幕：'+label;render();if(cues[0])update(0,false);else line.textContent='字幕为空或格式不支持';setStatus('已导入字幕')}
-    function setOnline(t){onlineStatus.textContent=t}
-    function openSearch(q){window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','noopener')}
-    function openUrl(v){const u=validUrl(v);if(u)window.open(u,'_blank','noopener');else setOnline('请输入有效链接')}
-    function validUrl(v){try{const u=new URL(String(v||'').trim());if(u.protocol==='http:'||u.protocol==='https:')return u.href}catch(e){}return ''}
-    function setStatus(t,force){statusEl.textContent=t;dot.classList.toggle('ready',force??(hasAudio&&cues.length>0))}
-    function update(i,scroll){active=i;const c=cues[i];line.innerHTML=clickable(c.text);next.textContent=cues[i+1]?.text||'已经到最后一句了。';time.textContent=fmt(c.start)+' → '+fmt(c.end);idx.textContent=i+1;render();if(scroll)list.querySelector('[data-i="'+i+'"]')?.scrollIntoView({block:'nearest',behavior:'smooth'})}
-    function render(){if(!cues.length){list.innerHTML='<div class="empty">导入字幕后，句子会显示在这里。</div>';return}list.innerHTML=cues.map((c,i)=>'<div class="cue '+(i===active?'active':'')+'" data-i="'+i+'"><div class="cuetime">'+fmt(c.start)+' → '+fmt(c.end)+'</div><div class="cuetxt">'+clickable(c.text)+'</div></div>').join('')}
-    function parseSubtitle(text){const blocks=text.replace(/\r/g,'').replace(/^WEBVTT.*\n/i,'').trim().split(/\n\s*\n/g),out=[];for(const b of blocks){const lines=b.split('\n').map(x=>x.trim()).filter(Boolean),ti=lines.findIndex(x=>x.includes('-->'));if(ti<0)continue;const p=lines[ti].split('-->').map(x=>x.trim()),s=pt(p[0]),e=pt(p[1]),body=lines.slice(ti+1).join(' ').trim();if(Number.isFinite(s)&&Number.isFinite(e)&&body)out.push({start:s,end:e,text:body})}return out.sort((a,b)=>a.start-b.start)}
-    function pt(s){const p=s.split(/\s+/)[0].replace(',','.').split(':').map(Number);if(p.length===3)return p[0]*3600+p[1]*60+p[2];if(p.length===2)return p[0]*60+p[1];return Number(p[0])}
-    function fmt(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=Math.floor(sec%60);return (h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
-    function clickable(t){return esc(t).split(/(\s+)/).map(p=>/^\s+$/.test(p)?p:(clean(p)?'<span data-word="'+esc(clean(p))+'">'+p+'</span>':p)).join('')}
-    function clean(w){return String(w||'').trim().replace(/^[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+|[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+$/g,'')}
-    function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+
+    const demoCues = [
+      { start: 0, end: 3.2, text: '오늘은 한국어 듣기 연습을 해요.' },
+      { start: 3.2, end: 6.6, text: '문장을 듣고 따라 말해 보세요.' },
+      { start: 6.6, end: 10.4, text: '모르는 단어는 바로 눌러서 찾아볼 수 있어요.' },
+    ];
+
+    function save() {
+      localStorage.setItem('echoLoopWebFavorites', JSON.stringify([...state.favorites]));
+      localStorage.setItem('echoLoopWebNotes', JSON.stringify(state.notes));
+      localStorage.setItem('echoLoopWebPracticeCount', String(state.practiceCount));
+    }
+
+    function setStatus(text, ready = false) {
+      $('status').textContent = text;
+      $('status').classList.toggle('ready', ready);
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+    }
+
+    function cleanWord(text) {
+      return String(text || '').trim().replace(/^[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+|[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]+$/g, '');
+    }
+
+    function clickable(text) {
+      return escapeHtml(text).split(/(\s+)/).map((part) => {
+        const word = cleanWord(part);
+        return word ? `<span class="word-chip" data-word="${escapeHtml(word)}">${part}</span>` : part;
+      }).join('');
+    }
+
+    function fmt(seconds) {
+      if (!Number.isFinite(seconds)) return '00:00';
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      return (h ? `${String(h).padStart(2, '0')}:` : '') + `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function parseTime(raw) {
+      const parts = raw.split(/\s+/)[0].replace(',', '.').split(':').map(Number);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return Number(parts[0]);
+    }
+
+    function parseSubtitle(text) {
+      const blocks = text.replace(/\r/g, '').replace(/^WEBVTT[^\n]*\n/i, '').trim().split(/\n\s*\n/g);
+      return blocks.map((block) => {
+        const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+        const timeIndex = lines.findIndex((line) => line.includes('-->'));
+        if (timeIndex < 0) return null;
+        const [startRaw, endRaw] = lines[timeIndex].split('-->').map((part) => part.trim());
+        const start = parseTime(startRaw);
+        const end = parseTime(endRaw);
+        const textLine = lines.slice(timeIndex + 1).join(' ').replace(/<[^>]+>/g, '').trim();
+        return Number.isFinite(start) && Number.isFinite(end) && textLine ? { start, end, text: textLine } : null;
+      }).filter(Boolean).sort((a, b) => a.start - b.start);
+    }
+
+    function render() {
+      $('cueCount').textContent = state.cues.length;
+      $('favoriteCount').textContent = state.favorites.size;
+      $('practiceCount').textContent = state.practiceCount;
+      $('currentIndex').textContent = state.active >= 0 ? state.active + 1 : '-';
+      $('favoriteBtn').textContent = currentCue() && state.favorites.has(currentCue().text) ? '★' : '☆';
+      $('repeatBtn').classList.toggle('primary', state.looping);
+      $('sentence').classList.toggle('blind', $('blindToggle').checked);
+
+      const cue = currentCue();
+      if (cue) {
+        $('sentence').innerHTML = clickable(cue.text);
+        $('timeLabel').textContent = `${fmt(cue.start)} - ${fmt(cue.end)}`;
+        $('nextLine').textContent = state.cues[state.active + 1]?.text || '已到最后一句';
+      } else {
+        $('sentence').textContent = '导入韩语音频和字幕后开始练习';
+        $('timeLabel').textContent = '00:00 - 00:00';
+        $('nextLine').textContent = '当前网页会把材料保存在浏览器本地。';
+      }
+
+      $('cueList').innerHTML = state.cues.length ? state.cues.map((item, index) => `
+        <div class="cue ${index === state.active ? 'active' : ''}" data-index="${index}">
+          <div class="cue-head"><span>${index + 1}</span><span>${fmt(item.start)} - ${fmt(item.end)}</span></div>
+          <div class="cue-text">${clickable(item.text)}</div>
+        </div>
+      `).join('') : '<div class="empty">暂无字幕</div>';
+
+      renderNotes();
+    }
+
+    function renderNotes() {
+      const favoriteItems = [...state.favorites].map((text) => ({ type: '收藏', text }));
+      const noteItems = state.notes.map((note) => ({ type: '笔记', text: note.text, note: note.note }));
+      const items = [...favoriteItems, ...noteItems];
+      $('noteList').innerHTML = items.length ? items.map((item, index) => `
+        <div class="note-item" data-note-index="${index}">
+          <small>${item.type}</small>
+          <div>${escapeHtml(item.text)}</div>
+          ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}
+        </div>
+      `).join('') : '<div class="empty">暂无收藏</div>';
+    }
+
+    function currentCue() {
+      return state.cues[state.active] || null;
+    }
+
+    function activate(index, seek = false) {
+      if (!state.cues.length) return;
+      state.active = Math.max(0, Math.min(index, state.cues.length - 1));
+      const cue = currentCue();
+      if (seek && cue) audio.currentTime = cue.start;
+      render();
+      document.querySelector(`.cue[data-index="${state.active}"]`)?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function loadCues(cues) {
+      state.cues = cues.length ? cues : demoCues;
+      activate(0, false);
+      setStatus(`${state.cues.length} 句已载入`, true);
+    }
+
+    function validUrl(value) {
+      try {
+        const url = new URL(value.trim());
+        return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function showWord(word) {
+      state.selectedWord = word;
+      $('selectedWord').textContent = word || '단어';
+      $('dictInfo').textContent = word ? `为「${word}」打开韩语词典，或复制提示到 AI 工具。` : '点击句子里的韩语词。';
+      const encoded = encodeURIComponent(word);
+      $('dictLinks').innerHTML = word ? `
+        <a href="https://ko.dict.naver.com/#/search?query=${encoded}" target="_blank" rel="noopener">Naver</a>
+        <a href="https://dic.daum.net/search.do?q=${encoded}" target="_blank" rel="noopener">Daum</a>
+        <a href="https://papago.naver.com/?sk=ko&tk=zh-CN&st=${encoded}" target="_blank" rel="noopener">Papago</a>
+        <a href="https://www.google.com/search?q=${encoded}+%ED%95%9C%EA%B5%AD%EC%96%B4+%EC%A4%91%EA%B5%AD%EC%96%B4" target="_blank" rel="noopener">Google</a>
+      ` : '';
+    }
+
+    function aiPrompt() {
+      const word = state.selectedWord || currentCue()?.text || '';
+      return `请用中文解释这个韩语内容：${word}\n包括：1. 中文意思 2. 词性/语法 3. 常见搭配 4. 两个韩语例句和中文翻译。`;
+    }
+
+    $('themeBtn').onclick = () => document.body.classList.toggle('dark');
+
+    $('audioFile').onchange = () => {
+      const file = $('audioFile').files[0];
+      if (!file) return;
+      audio.src = URL.createObjectURL(file);
+      setStatus(`音频：${file.name}`, state.cues.length > 0);
+    };
+
+    $('subtitleFile').onchange = async () => {
+      const file = $('subtitleFile').files[0];
+      if (!file) return;
+      loadCues(parseSubtitle(await file.text()));
+    };
+
+    $('loadAudioUrl').onclick = () => {
+      const url = validUrl($('audioUrl').value);
+      if (!url) return setStatus('音频 URL 无效');
+      audio.src = url;
+      setStatus('在线音频已载入', state.cues.length > 0);
+    };
+
+    $('loadSubtitleUrl').onclick = async () => {
+      const url = validUrl($('subtitleUrl').value);
+      if (!url) return setStatus('字幕 URL 无效');
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(response.status);
+        loadCues(parseSubtitle(await response.text()));
+      } catch (_) {
+        setStatus('字幕读取失败，可能是 CORS');
+      }
+    };
+
+    $('splitTextBtn').onclick = () => {
+      const sentences = $('manualText').value.split(/(?<=[.?!。！？])\s+|\n+/).map((line) => line.trim()).filter(Boolean);
+      loadCues(sentences.map((text, index) => ({ start: index * 4, end: index * 4 + 4, text })));
+    };
+
+    $('playBtn').onclick = () => {
+      if (audio.paused) audio.play().catch(() => setStatus('浏览器阻止播放'));
+      else audio.pause();
+    };
+    $('prevBtn').onclick = () => activate(state.active - 1, true);
+    $('nextBtn').onclick = () => activate(state.active + 1, true);
+    $('repeatBtn').onclick = () => {
+      state.looping = !state.looping;
+      state.loopLeft = Number($('loopCountSelect').value);
+      render();
+    };
+    $('favoriteBtn').onclick = () => {
+      const cue = currentCue();
+      if (!cue) return;
+      state.favorites.has(cue.text) ? state.favorites.delete(cue.text) : state.favorites.add(cue.text);
+      save();
+      render();
+    };
+    $('speakBtn').onclick = () => {
+      const cue = currentCue();
+      if (!cue || !('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(cue.text);
+      utterance.lang = 'ko-KR';
+      utterance.rate = Number($('speedSelect').value);
+      speechSynthesis.speak(utterance);
+    };
+    $('copyBtn').onclick = () => navigator.clipboard?.writeText(currentCue()?.text || '');
+    $('copyPromptBtn').onclick = () => navigator.clipboard?.writeText(aiPrompt());
+    $('blindToggle').onchange = render;
+    $('speedSelect').onchange = () => { audio.playbackRate = Number($('speedSelect').value); };
+
+    audio.ontimeupdate = () => {
+      const time = audio.currentTime;
+      const index = state.cues.findIndex((cue) => time >= cue.start && time < cue.end);
+      if (index >= 0 && index !== state.active) activate(index, false);
+
+      const cue = currentCue();
+      if (!cue || time < cue.end) return;
+      if (state.looping) {
+        if (state.loopLeft !== 999) state.loopLeft -= 1;
+        if (state.loopLeft > 0 || state.loopLeft === 999) {
+          audio.currentTime = cue.start;
+          audio.play().catch(() => {});
+        } else {
+          state.looping = false;
+          render();
+        }
+      } else if (!$('autoNextToggle').checked) {
+        audio.pause();
+      }
+    };
+    audio.onplay = () => { $('playBtn').textContent = 'Ⅱ'; };
+    audio.onpause = () => { $('playBtn').textContent = '▶'; };
+
+    document.addEventListener('click', (event) => {
+      const wordNode = event.target.closest('[data-word]');
+      if (wordNode) showWord(wordNode.dataset.word);
+      const cueNode = event.target.closest('.cue[data-index]');
+      if (cueNode && !wordNode) activate(Number(cueNode.dataset.index), true);
+      const noteNode = event.target.closest('.note-item');
+      if (noteNode) {
+        const text = noteNode.querySelector('div')?.textContent || '';
+        const index = state.cues.findIndex((cue) => cue.text === text);
+        if (index >= 0) activate(index, true);
+      }
+    });
+
+    document.querySelectorAll('.tabBtn').forEach((button) => {
+      button.onclick = () => {
+        document.querySelectorAll('.tabBtn').forEach((b) => b.classList.toggle('active', b === button));
+        document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.id === `${button.dataset.tab}Tab`));
+      };
+    });
+
+    $('recordBtn').onclick = async () => {
+      if (state.recorder?.state === 'recording') {
+        state.recorder.stop();
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        setStatus('浏览器不支持录音');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.chunks = [];
+      state.recorder = new MediaRecorder(stream);
+      state.recorder.ondataavailable = (event) => state.chunks.push(event.data);
+      state.recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        $('recordAudio').src = URL.createObjectURL(new Blob(state.chunks, { type: 'audio/webm' }));
+        $('recordBtn').innerHTML = '开始录音';
+        state.practiceCount += 1;
+        save();
+        render();
+      };
+      state.recorder.start();
+      $('recordBtn').innerHTML = '<span class="rec-dot"></span>停止录音';
+    };
+
+    $('saveNoteBtn').onclick = () => {
+      const cue = currentCue();
+      const note = $('retellNote').value.trim();
+      if (!cue && !note) return;
+      state.notes.unshift({ text: cue?.text || '手动笔记', note, at: new Date().toISOString() });
+      $('retellNote').value = '';
+      save();
+      render();
+    };
+
+    $('exportBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify({ favorites: [...state.favorites], notes: state.notes }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'echo-loop-korean-notes.json';
+      a.click();
+    };
+
+    $('clearStoreBtn').onclick = () => {
+      if (!confirm('清空当前网页的收藏和笔记？')) return;
+      state.favorites.clear();
+      state.notes = [];
+      state.practiceCount = 0;
+      save();
+      render();
+    };
+
+    loadCues(demoCues);
+    setStatus('演示材料已载入', true);
+    showWord('');
   </script>
 </body>
 </html>

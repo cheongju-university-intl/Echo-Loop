@@ -1,4 +1,4 @@
-name: Deploy Web Preview to GitHub Pages
+name: Deploy Web App to GitHub Pages
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy static web preview
+    name: Deploy static web app
     runs-on: ubuntu-latest
 
     steps:
