@@ -26,12 +26,29 @@
       <section class="card pad"><div class="title"><h2>使用流程</h2><small>Guide</small></div><div class="empty" style="text-align:left">1. 导入音频或粘贴音频直链<br>2. 导入字幕或粘贴 SRT/VTT 直链<br>3. 播放时自动高亮当前句<br>4. 点击韩语词生成学习提示</div></section>
     </aside>
     <section class="col"><section class="card hero"><div class="herohead"><div><h2>把韩语材料变成可操作的听力工作台</h2><p>播放、逐句定位、点词、复制句子。现在支持本地导入和公开在线直链导入。</p></div></div><div class="now"><div class="meta"><div class="over">Current Sentence</div><div class="time" id="time">00:00 → 00:00</div></div><div class="mainline" id="line">请先导入韩语音频和字幕</div><div class="next"><b>下一句预览</b><div id="next">导入字幕后，这里会显示下一句。</div></div></div></section><section class="card"><div class="tools"><button class="btn" id="copyBtn">复制当前句</button><button class="btn btn2" id="replayBtn">重播当前句</button><button class="btn btn2" id="clearBtn">清空材料</button></div></section><section class="card timeline"><div class="pad" style="padding-bottom:10px"><div class="title"><h2>句子时间轴</h2><small>Step 2</small></div></div><div class="list" id="list"><div class="empty">导入字幕后，句子会显示在这里。</div></div></section></section>
-    <aside class="col right"><section class="card pad"><div class="title"><h2>点词学习</h2><small>Step 3</small></div><div class="word" id="word">—</div><div class="info" id="info">点击中间字幕区或时间轴里的韩语单词，这里会显示学习建议。</div><div class="prompt" id="prompt">推荐提问模板会显示在这里，方便复制后做释义、例句、语法解析。</div></section><section class="card pad"><div class="title"><h2>手动句子测试</h2><small>Step 4</small></div><textarea id="manual" placeholder="例如：지하철을 탔다가 내릴 역을 놓쳤어요."></textarea><div style="margin-top:12px"><button class="btn" id="splitBtn">分词显示</button></div><div class="chips" id="chips"></div><div class="note">用来快速测试韩语词清洗逻辑。这里不会调用外部 API。</div></section></aside>
+    <aside class="col right"><section class="card pad"><div class="title"><h2>点词学习</h2><small>Step 3</small></div><div class="word" id="word">—</div><div class="info" id="info">点击中间字幕区或时间轴里的韩语单词，这里会显示学习建议。</div><div class="prompt" id="prompt">推荐提问模板会显示在这里，方便复制后做释义、例句、语法解析。</div></section><section class="card pad"><div class="title"><h2>手动句子测试</h2><small>Step 4</small></div><textarea id="manual" placeholder="例如：지하철을 탔다가 내릴 역을 놓쳤어요."></textarea><div style="margin-top:12px"><button class="btn" id="splitBtn">分词显示</button></div><div class="chips" id="chips"></div><div class="note">分词后会自动解释第一个词。点击任意词条可切换解释。</div></section></aside>
   </main>
   <script>
     const audioFile=document.getElementById('audioFile'),subFile=document.getElementById('subFile'),audio=document.getElementById('audio'),line=document.getElementById('line'),next=document.getElementById('next'),subStatus=document.getElementById('subStatus'),list=document.getElementById('list'),count=document.getElementById('count'),idx=document.getElementById('idx'),time=document.getElementById('time'),statusEl=document.getElementById('status'),dot=document.getElementById('dot'),wordEl=document.getElementById('word'),info=document.getElementById('info'),prompt=document.getElementById('prompt'),manual=document.getElementById('manual'),chips=document.getElementById('chips'),onlineStatus=document.getElementById('onlineStatus');
     const audioUrl=document.getElementById('audioUrl'),subUrl=document.getElementById('subUrl'),searchQ=document.getElementById('searchQ');
     let cues=[],active=-1,hasAudio=false;
+    const miniDict={
+      '내일':['明天','名词/副词','내일 만나요. 明天见。'],
+      '오늘':['今天','名词/副词','오늘은 시간이 없어요. 今天没有时间。'],
+      '어제':['昨天','名词/副词','어제 비가 왔어요. 昨天下雨了。'],
+      '학교':['学校','名词','학교에 가요. 去学校。'],
+      '한국어':['韩语','名词','한국어를 공부해요. 学韩语。'],
+      '공부':['学习','名词','공부를 해요. 学习。'],
+      '뉴스':['新闻','外来词，名词','뉴스를 들어요. 听新闻。'],
+      '대본':['台本、文本、脚本','名词','대본을 읽어요. 读文本。'],
+      '자막':['字幕','名词','자막을 봐요. 看字幕。'],
+      '듣기':['听力','名词','듣기 연습을 해요. 做听力练习。'],
+      '지하철':['地铁','名词','지하철을 타요. 坐地铁。'],
+      '시간':['时间','名词','시간이 없어요. 没有时间。'],
+      '사람':['人','名词','사람이 많아요. 人很多。'],
+      '자료':['资料','名词','자료를 찾아요. 找资料。'],
+      '소외':['疏外、排斥、被边缘化','汉字词：疏外','사회에서 소외되다. 在社会中被边缘化。']
+    };
     document.getElementById('theme').onclick=()=>{document.body.classList.toggle('dark');document.getElementById('theme').textContent=document.body.classList.contains('dark')?'浅色':'深色'};
     audioFile.onchange=()=>{const f=audioFile.files[0];if(!f)return;audio.src=URL.createObjectURL(f);hasAudio=true;setStatus('已导入音频：'+f.name)};
     subFile.onchange=async()=>{const f=subFile.files[0];if(!f)return;loadSubtitleText(await f.text(),'本地字幕：'+f.name)};
@@ -43,11 +60,12 @@
     document.getElementById('loadSubUrl').onclick=async()=>{const u=validUrl(subUrl.value);if(!u){setOnline('请输入 http/https 字幕链接');return}setOnline('正在读取在线字幕...');try{const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);const t=await r.text();loadSubtitleText(t,'在线字幕：'+u);setOnline('在线字幕已导入')}catch(e){setOnline('在线字幕读取失败：可能是 CORS 跨域限制。请打开链接，下载字幕文件后用本地导入。')}};
     audio.ontimeupdate=()=>{const t=audio.currentTime;const i=cues.findIndex(c=>t>=c.start&&t<=c.end);if(i!==active&&i>=0)update(i,true)};
     list.onclick=e=>{const item=e.target.closest('.cue');if(!item)return;const i=Number(item.dataset.i);if(cues[i]){audio.currentTime=cues[i].start;audio.play().catch(()=>{});update(i,true)}};
-    document.onclick=e=>{const n=e.target.closest('[data-word]');if(!n)return;const w=clean(n.dataset.word);if(!w)return;wordEl.textContent=w;info.innerHTML='<b>学习建议</b><br>1. 看它在当前句里的语境意思。<br>2. 判断有没有词尾变化或助词。<br>3. 自己造 1～2 个短句。';prompt.textContent=w+' 뜻을 중국어로 설명해주고, 품사, 예문 3개, 비슷한 표현, 반대 표현도 같이 알려줘.'};
+    document.onclick=e=>{const n=e.target.closest('[data-word]');if(!n)return;const w=clean(n.dataset.word);if(!w)return;showWord(w)};
     document.getElementById('copyBtn').onclick=async()=>{const t=active>=0?cues[active].text:line.textContent;try{await navigator.clipboard.writeText(t||'');setStatus('已复制当前句')}catch(e){setStatus('浏览器阻止复制，请手动选择文本')}};
     document.getElementById('replayBtn').onclick=()=>{if(active>=0&&cues[active]){audio.currentTime=cues[active].start;audio.play().catch(()=>{})}};
     document.getElementById('clearBtn').onclick=()=>{cues=[];active=-1;hasAudio=false;list.innerHTML='<div class="empty">导入字幕后，句子会显示在这里。</div>';line.textContent='请先导入韩语音频和字幕';next.textContent='导入字幕后，这里会显示下一句。';subStatus.textContent='还没有字幕文件。';onlineStatus.textContent='等待在线资源。';wordEl.textContent='—';info.textContent='点击中间字幕区或时间轴里的韩语单词，这里会显示学习建议。';prompt.textContent='推荐提问模板会显示在这里，方便复制后做释义、例句、语法解析。';count.textContent='0';idx.textContent='-';time.textContent='00:00 → 00:00';audio.pause();audio.removeAttribute('src');audio.load();setStatus('等待导入材料',false)};
-    document.getElementById('splitBtn').onclick=()=>{chips.innerHTML=manual.value.split(/\s+/).filter(Boolean).map(x=>{const w=clean(x);return w?'<span class="chip" data-word="'+esc(w)+'">'+esc(x)+'</span>':''}).join('')};
+    document.getElementById('splitBtn').onclick=()=>{const words=manual.value.split(/\s+/).filter(Boolean).map(x=>clean(x)).filter(Boolean);chips.innerHTML=words.map(w=>'<span class="chip" data-word="'+esc(w)+'">'+esc(w)+'</span>').join('');if(words[0])showWord(words[0])};
+    function showWord(w){wordEl.textContent=w;const d=miniDict[w];if(d){info.innerHTML='<b>中文：</b>'+esc(d[0])+'<br><b>词性/来源：</b>'+esc(d[1])+'<br><b>例句：</b>'+esc(d[2]);}else{info.innerHTML='<b>本地词典暂时没有固定释义。</b><br>这个词已经识别出来了。可以复制下面的模板让 ChatGPT 解释。';}prompt.textContent=w+' 뜻을 중국어로 설명해주고, 품사, 예문 3개, 비슷한 표현, 반대 표현도 같이 알려줘.'}
     function loadSubtitleText(text,label){cues=parseSubtitle(text);active=-1;count.textContent=cues.length;subStatus.textContent='已导入 '+cues.length+' 条字幕：'+label;render();if(cues[0])update(0,false);else line.textContent='字幕为空或格式不支持';setStatus('已导入字幕')}
     function setOnline(t){onlineStatus.textContent=t}
     function openSearch(q){window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','noopener')}
